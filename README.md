@@ -1,1 +1,3 @@
-# medicat_installer
+# Medicat Installer
+
+http://medicatusb.xyz/
