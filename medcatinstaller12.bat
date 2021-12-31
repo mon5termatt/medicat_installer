@@ -1,39 +1,27 @@
-::[Bat To Exe Converter]
-::
-::YAwzoRdxOk+EWAjk
-::fBw5plQjdCmDJHSB8EszKQ9oYQGGNUi7Eoo15vvv7uaLp19TXeEwGA==
-::YAwzuBVtJxjWCl3EqQJgSA==
-::ZR4luwNxJguZRRnk
-::Yhs/ulQjdF+5
-::cxAkpRVqdFKZSDk=
-::cBs/ulQjdF+5
-::ZR41oxFsdFKZSTk=
-::eBoioBt6dFKZSDk=
-::cRo6pxp7LAbNWATEpSI=
-::egkzugNsPRvcWATEpSI=
-::dAsiuh18IRvcCxnZtBJQ
-::cRYluBh/LU+EWAnk
-::YxY4rhs+aU+IeA==
-::cxY6rQJ7JhzQF1fEqQJiZksaHErUXA==
-::ZQ05rAF9IBncCkqN+0xwdVsGAlTMbCXsZg==
-::ZQ05rAF9IAHYFVzEqQIdLR9dTwWWfEK0FaEd5OT+/Yo=
-::eg0/rx1wNQPfEVWB+kM9LVsJDGQ=
-::fBEirQZwNQPfEVWB+kM9LVsJDGQ=
-::cRolqwZ3JBvQF1fEqQIZBihgbSiufEafIpw/ydy72tml4no0YMp/X7ry/pGqYNAhxWjUQaVN
-::dhA7uBVwLU+EWHGwwHIDclQbYSGmFUibMoAvyqbD1tDn
-::YQ03rBFzNR3SWATElA==
-::dhAmsQZ3MwfNWATE3HYEGCgOA0uvE0XvMpAuxcnP26Skjng/NA==
-::ZQ0/vhVqMQ3MEVWAtB9wSA==
-::Zg8zqx1/OA3MEVWAtB9wSA==
-::dhA7pRFwIByZRRnk
-::Zh4grVQjdCmDJHSB8EszKQ9oeCGxCDqGK7AY4ev6+6qurF4JVe4zfZ2V36yLQA==
-::YB416Ek+ZW8=
-::
-::
-::978f952a14a936cc963da21a135fa983
+@ECHO OFF
+REM BFCPEOPTIONSTART
+REM Advanced BAT to EXE Converter www.BatToExeConverter.com
+REM BFCPEEXE=F:\Medicat\Medicat Installer.exe
+REM BFCPEICON=C:\Users\Matt\Downloads\MediCat_Installer.ico
+REM BFCPEICONINDEX=-1
+REM BFCPEEMBEDDISPLAY=0
+REM BFCPEEMBEDDELETE=1
+REM BFCPEADMINEXE=1
+REM BFCPEINVISEXE=0
+REM BFCPEVERINCLUDE=1
+REM BFCPEVERVERSION=2.0.0.6
+REM BFCPEVERPRODUCT=MEDICAT INSTALLER
+REM BFCPEVERDESC=INSTALL MEDICAT USB WITH GUIDED PROMPTS
+REM BFCPEVERCOMPANY=HTTPS://MEDICATUSB.XYZ
+REM BFCPEVERCOPYRIGHT=HTTPS://MON5TERMATT.CLUB
+REM BFCPEOPTIONEND
+@ECHO ON
 @echo OFF & setlocal enabledelayedexpansion
 set ver=2006
 set maindir=%CD%
+set format=Y
+set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
+reg add HKEY_CURRENT_USER\Software\Medicat\Installer /v version /t  REG_SZ /d  %ver% /f
 :start
 if exist "%CD%\MEDICAT_NEW.EXE" (goto renameprogram) else (call:ascii)
 pause
@@ -74,31 +62,71 @@ exit
 REM -- IF NO UPDATE FOUND THEN CONTINUE DOWNLOADING THE REMAINING FILES AND CHECK IF THEY DOWNLOADED
 :cont
 powershell -c "Invoke-WebRequest -Uri 'http://cdn.medicatusb.xyz/files/installer/motd.txt' -OutFile './motd.txt'"
-powershell -c "Invoke-WebRequest -Uri 'http://cdn.medicatusb.xyz/files/installer/7z.bat' -OutFile './7z.bat'"
 powershell -c "Invoke-WebRequest -Uri 'http://cdn.medicatusb.xyz/files/installer/ver.ini' -OutFile './ver.ini'"
 powershell -c "Invoke-WebRequest -Uri 'http://cdn.medicatusb.xyz/files/installer/LICENSE.txt' -OutFile './LICENSE.txt'"
 set /p ver= < ver.ini
 DEL ver.ini /Q
-REM -- EXTRACT THE 7Z FILES BECAUSE THAT SHIT IS IMPORTANT
-:7z
-CALL 7z.bat
-cls
-:check5
-set goto=filedone
-goto updateventoy
 
-REM -- GO TO END OF FILE FOR MOST EXTRACTIONS
-
-REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
-
-:filedone
+:menu
+REM -- THE MAIN MENU, THE HOLY GRAIL.
+title Medicat Installer [%ver%]
 mode con:cols=100 lines=30
 type LICENSE.txt
 echo.
 echo.Press any Key to Continue (x2)
 pause > nul
 pause > nul
-goto askdownload
+:menu2
+mode con:cols=70 lines=20
+type motd.txt
+echo.
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.IIII                                                       IIII
+echo.IIII                   %installertext%                   IIII
+echo.IIII                                                       IIII
+echo.IIII          I:        [91mI[0mNSTALL MEDICAT                    IIII
+echo.IIII                                                       IIII
+echo.IIII          F:     [91mF[0mormatting Drive: [%format%]                 IIII
+echo.IIII                                                       IIII
+echo.IIII          A:         [91mA[0mUTORUN PATCH                     IIII
+echo.IIII                                                       IIII
+echo.IIII          S:             [91mS[0mite                          IIII
+echo.IIII                                                       IIII
+echo.IIII             VERSION %ver% BY MON5TERMATT.             IIII
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II           
+choice /C:IFAS /N /M "Choose an option: I,F,A,S"
+if errorlevel 4 cls && goto medicatsite
+if errorlevel 3 cls && set goto=exit && goto autorun
+if errorlevel 2 cls && goto formatswitch
+if errorlevel 1 cls && goto 7z 
+:formatswitch
+if "%format%" == "Y" (goto fs2) else (echo.>nul)
+if "%format%" == "N" (goto fs3) else (goto menu2)
+:fs2
+set format=N
+goto menu2
+:fs3
+set format=Y
+goto menu2
+
+
+
+
+REM -- EXTRACT THE 7Z FILES BECAUSE THAT SHIT IS IMPORTANT
+:7z
+powershell -c "Invoke-WebRequest -Uri 'http://cdn.medicatusb.xyz/files/installer/7z.bat' -OutFile './7z.bat'"
+CALL 7z.bat
+DEL 7z.bat /Q
+cls
+:check5
+set goto=askdownload
+goto updateventoy
+
+REM -- GO TO END OF FILE FOR MOST EXTRACTIONS
+
+REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
 
 :askdownload
 if exist "%CD%\MediCat.USB.v21.12.7z" (goto warnventoy) else (goto dlcheck2)
@@ -148,37 +176,6 @@ echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.                          Press any key to bypass this warning.&& pause >nul
 
-
-
-REM -- THE MAIN MENU, THE HOLY GRAIL.
-
-:menu
-title Medicat Installer [%ver%]
-mode con:cols=70 lines=18
-type motd.txt
-echo.
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.IIII                                                       IIII
-echo.IIII                   MEDICAT INSTALLER                   IIII
-echo.IIII                                                       IIII
-echo.IIII                  [1] INSTALL MEDICAT                  IIII
-echo.IIII                                                       IIII
-echo.IIII                   [2] AUTORUN PATCH                   IIII
-echo.IIII                                                       IIII
-echo.IIII                   [3] Site [4] Exit                   IIII
-echo.IIII                                                       IIII
-echo.IIII             VERSION %ver% BY MON5TERMATT.             IIII
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II           
-choice /C:123 /N /M "Choice 1-4:"
-if errorlevel 4 cls && exit
-if errorlevel 3 cls && goto medicatsite
-if errorlevel 2 cls && set goto=exit && goto autorun
-if errorlevel 1 cls && goto install1
-
-
-
 REM -- INSTALLER
 
 :install1
@@ -217,17 +214,7 @@ set "psCommand="(new-object -COM 'Shell.Application')^
 for /f "usebackq delims=" %%I in (`powershell %psCommand%`) do set "folder=%%I"
 REM - AND ENDS
 set drivepath=%folder:~0,1%
-
-
-echo.FORMAT THE DRIVE AND START FROM SCRATCH?
-echo.
-echo.IF NO THEN IT WILL OVERRIDE ALL EXISTING FILES WITH SAME NAME
-echo.BUT WILL NOT DELETE THE OLD ONES IF NAMES HAVE CHANGED
-echo.THIS MAY RESULT IN DOUBLE FILES AND SIZE
-
-choice /C:YN /N /M "Y/N:"
-if errorlevel 2 cls && goto installversion
-if errorlevel 1 cls && goto formatdrive
+if "%format%" == "Y" (goto formatdrive) else (goto installversion)
 :formatdrive
 Echo Warning this will reformat the entire %drivepath%: disk!
 ECHO. you will be prompted to hit enter a few times.
@@ -338,9 +325,9 @@ exit
 
 
 :hasher
-powershell -c "Invoke-WebRequest -Uri 'http://cdn.medicatusb.xyz/files/installer/Fixer.exe' -OutFile './Fixer.exe'"
+powershell -c "Invoke-WebRequest -Uri 'http://cdn.medicatusb.xyz/files/hasher/Fixer.exe' -OutFile './Fixer.exe'"
 start Fixer.exe
-goto warnventoy
+goto install2
 
 
 :medicatsite
