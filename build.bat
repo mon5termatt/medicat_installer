@@ -1,0 +1,1 @@
+bte /bat medicat.bat /exe "Medicat Installer.exe" /x64 /uac-admin /extractdir . /workdir . /icon icon.ico /include wget.exe
