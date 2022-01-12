@@ -9,8 +9,12 @@ Please use the .exe for stability.
 
 
 # Main Files
-##### MedicatInstaller12.bat
+##### medicat.bat
 The main file.
+
+##### build.bat
+Builds The EXE.
+
 
 # ./Installer 
 Contains all files that the installer calls.
