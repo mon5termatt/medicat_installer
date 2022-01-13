@@ -1,32 +1,36 @@
-@ECHO OFF
-REM BFCPEOPTIONSTART
-REM Advanced BAT to EXE Converter www.BatToExeConverter.com
-REM BFCPEEXE=F:\Medicat\Medicat Installer.exe
-REM BFCPEICON=C:\Users\Matt\Downloads\MediCat_Installer.ico
-REM BFCPEICONINDEX=-1
-REM BFCPEEMBEDDISPLAY=0
-REM BFCPEEMBEDDELETE=1
-REM BFCPEADMINEXE=1
-REM BFCPEINVISEXE=0
-REM BFCPEVERINCLUDE=1
-REM BFCPEVERVERSION=2.0.0.6
-REM BFCPEVERPRODUCT=MEDICAT INSTALLER
-REM BFCPEVERDESC=INSTALL MEDICAT USB WITH GUIDED PROMPTS
-REM BFCPEVERCOMPANY="http://MEDICATUSB.XYZ
-REM BFCPEVERCOPYRIGHT="http://MON5TERMATT.CLUB
-REM BFCPEOPTIONEND
-@ECHO ON
 @echo OFF & setlocal enabledelayedexpansion
-set ver=2008
+:winvercheck1
+for /f "tokens=2 delims=," %%i in ('wmic os get caption^,version /format:csv') do set os=%%i
+set os=%os:~0,20%
+if "%os%" == "Microsoft Windows 10" (goto start) else (goto winvercheck2)
+:winvercheck2
+if "%os%" == "Microsoft Windows 11" (goto start) else (goto winvererror)
+:winvererror
+mode con:cols=64 lines=18
+title Medicat Installer [UNSUPPORTED]
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.IIII                                                       IIII
+echo.IIII                  %os%                 IIII
+echo.IIII                   Is Not Supported.                   IIII
+echo.IIII                                                       IIII
+echo.IIII          PLEASE UPDATE TO WINDOWS 10/11 AND           IIII
+echo.IIII             TRY AGAIN. THANKS AND SORRY.              IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.                                        Press any key to close.&& pause >nul && exit
+:start
+set ver=2010
 set maindir=%CD%
 set format=Y
 set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
 reg add HKEY_CURRENT_USER\Software\Medicat\Installer /v version /t  REG_SZ /d  %ver% /f
-:start
-call :extractwget
+
 if exist "%CD%\MEDICAT_NEW.EXE" (goto renameprogram) else (call:ascii)
 pause
-mode con:cols=70 lines=18
+mode con:cols=64 lines=18
 cls && goto:startup
 REM -- WARN FOR ANTIVIRUS AND CHECK FOR UPDATE TO PROGRAM
 :startup
@@ -78,7 +82,7 @@ echo.Press any Key to Continue (x2)
 pause > nul
 pause > nul
 :menu2
-mode con:cols=70 lines=20
+mode con:cols=64 lines=20
 type motd.txt
 echo.
 echo.II-----------------------------------------------------------II
@@ -135,7 +139,7 @@ if exist "%CD%\MediCat.USB.v21.12.7z" (goto warnventoy) else (goto dlcheck2)
 if exist "%CD%\*.001" (goto warnventoy) else (goto dlcheck3)
 :dlcheck3
 cls
-mode con:cols=70 lines=18
+mode con:cols=64 lines=18
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
@@ -162,7 +166,7 @@ title Medicat Installer [VENTOYCHECK]
 cd .\INSTRUCTIONS\Ventoy2Disk\
 start Ventoy2Disk.exe
 cd %maindir%
-mode con:cols=70 lines=18
+mode con:cols=64 lines=18
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
@@ -195,7 +199,7 @@ if exist "%CD%\*.005" (echo..005 Exists) else (goto gdriveerror)
 if exist "%CD%\*.006" (echo..006 Exists) else (goto gdriveerror)
 timeout 2 >nul
 cls
-mode con:cols=70 lines=18
+mode con:cols=64 lines=18
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
@@ -213,7 +217,7 @@ if errorlevel 2 cls && goto install2
 if errorlevel 1 cls && goto hasher
 
 :gdriveerror
-mode con:cols=70 lines=18
+mode con:cols=64 lines=18
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
@@ -261,7 +265,7 @@ if exist "%CD%\MediCat.USB.v21.12.7z" (goto install4) else (goto installversion2
 if exist "%CD%\MediCat.USB.v%ver%.zip.001" (goto install5) else (goto installerror)
 
 :installerror
-mode con:cols=70 lines=18
+mode con:cols=64 lines=18
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
@@ -374,7 +378,7 @@ exit
 
 :bigboi
 cls
-mode con:cols=70 lines=18
+mode con:cols=64 lines=18
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
@@ -392,7 +396,7 @@ if errorlevel 2 cls && goto drivedown
 if errorlevel 1 cls && goto tordown
 :drivedown
 cls
-mode con:cols=70 lines=18
+mode con:cols=64 lines=18
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
