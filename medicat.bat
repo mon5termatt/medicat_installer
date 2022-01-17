@@ -1,33 +1,32 @@
 @echo OFF & setlocal enabledelayedexpansion
-:winvercheck1
-for /f "tokens=2 delims=," %%i in ('wmic os get caption^,version /format:csv') do set os=%%i
-set os=%os:~0,20%
-if "%os%" == "Microsoft Windows 10" (goto start) else (goto winvercheck2)
-:winvercheck2
-if "%os%" == "Microsoft Windows 11" (goto start) else (goto winvererror)
-:winvererror
-mode con:cols=64 lines=18
-title Medicat Installer [UNSUPPORTED]
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.IIII                                                       IIII
-echo.IIII                  %os%                 IIII
-echo.IIII                   Is Not Supported.                   IIII
-echo.IIII                                                       IIII
-echo.IIII          PLEASE UPDATE TO WINDOWS 10/11 AND           IIII
-echo.IIII             TRY AGAIN. THANKS AND SORRY.              IIII
-echo.IIII                                                       IIII
-echo.IIII                                                       IIII
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.                                        Press any key to close.&& pause >nul && exit
-:start
-set ver=2010
+set ver=2019
 set maindir=%CD%
 set format=Y
+
+
+REM == CHECK FOR UPDATE FIRST. DO NOT PASS GO. DO NOT COLLECT $200
+wget "http://cdn.medicatusb.xyz/files/installer/curver.ini" -O ./curver.ini -q
+set /p remver= < curver.ini
+del curver.ini /Q
+if "%ver%" == "%remver%" (goto pwrshl) else (goto updateprogram)
+:updateprogram
+cls
+echo.A new version of the program has been released. The program will now restart.
+wget "http://cdn.medicatusb.xyz/files/installer/Medicat Installer.exe" -O ./MEDICAT_NEW.EXE -q
+wget "http://cdn.medicatusb.xyz/files/installer/update.bat" -O ./update.bat -q
+start cmd /k update.bat
+goto exit
+goto CHECK4ERRORS
+
+
+
+
+
+
+
+:start
 set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
 reg add HKEY_CURRENT_USER\Software\Medicat\Installer /v version /t  REG_SZ /d  %ver% /f
-
 if exist "%CD%\MEDICAT_NEW.EXE" (goto renameprogram) else (call:ascii)
 pause
 mode con:cols=64 lines=18
@@ -51,26 +50,26 @@ echo.                          Press any key to bypass this warning.&& pause >nu
 :checkupdateprogram
 title Medicat Installer [FILECHECK]
 ECHO.GETTING REQUIRED FILES FROM SERVER.
-wget "http://cdn.medicatusb.xyz/files/installer/curver.ini" -O ./curver.ini -q
-set /p remver= < curver.ini
-del curver.ini /Q
-if "%ver%" == "%remver%" (goto cont) else (goto updateprogram)
-:updateprogram
-cls
-echo.this program must be updated to continue.
-timeout 2 > nul
-wget "http://cdn.medicatusb.xyz/files/installer/Medicat Installer.exe" -O ./MEDICAT_NEW.EXE -q
-wget "http://cdn.medicatusb.xyz/files/installer/update.bat" -O ./update.bat -q
-start cmd /k update.bat
-exit
-
-REM -- IF NO UPDATE FOUND THEN CONTINUE DOWNLOADING THE REMAINING FILES AND CHECK IF THEY DOWNLOADED
 :cont
 wget "http://cdn.medicatusb.xyz/files/installer/motd.txt" -O ./motd.txt -q
 wget "http://cdn.medicatusb.xyz/files/installer/ver.ini" -O ./ver.ini -q
 wget "http://cdn.medicatusb.xyz/files/installer/LICENSE.txt" -O ./LICENSE.txt -q
 set /p ver= < ver.ini
 DEL ver.ini /Q
+REM -- EXTRACT THE 7Z FILES BECAUSE THAT SHIT IS IMPORTANT
+:7z
+REM -- CHECK IF 64BIT
+if defined ProgramFiles(x86) (goto 7z64) else (goto 7z32)
+:7z32
+wget "http://cdn.medicatusb.xyz/files/installer/7z/32.bat" -O ./7z.bat -q
+goto 7ze
+:7z64
+wget "http://cdn.medicatusb.xyz/files/installer/7z/64.bat" -O ./7z.bat -q
+goto 7ze
+:7ze
+CALL 7z.bat
+DEL 7z.bat /Q
+cls
 
 :menu
 REM -- THE MAIN MENU, THE HOLY GRAIL.
@@ -105,7 +104,7 @@ choice /C:IFAS /N /M "Choose an option: I,F,A,S"
 if errorlevel 4 cls && goto medicatsite
 if errorlevel 3 cls && set goto=exit && goto autorun
 if errorlevel 2 cls && goto formatswitch
-if errorlevel 1 cls && goto 7z 
+if errorlevel 1 cls && goto check5
 :formatswitch
 if "%format%" == "Y" (goto fs2) else (echo.>nul)
 if "%format%" == "N" (goto fs3) else (goto menu2)
@@ -115,16 +114,6 @@ goto menu2
 :fs3
 set format=Y
 goto menu2
-
-
-
-
-REM -- EXTRACT THE 7Z FILES BECAUSE THAT SHIT IS IMPORTANT
-:7z
-wget "http://cdn.medicatusb.xyz/files/installer/7z.bat" -O ./7z.bat -q
-CALL 7z.bat
-DEL 7z.bat /Q
-cls
 :check5
 set goto=askdownload
 goto updateventoy
@@ -232,10 +221,11 @@ echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.
 echo.
-
+pause
 goto bigboi
 
 :install2
+title Medicat Installer [CHOOSEINSTALL]
 mode con:cols=100 lines=15
 echo.We now need to find out what drive you will be installing to.
 REM - FOLDER PROMPT STARTS
@@ -260,6 +250,7 @@ goto install2
 REM -- CHECK WHICH VERSION USER DOWNLOADED
 
 :installversion
+title Medicat Installer [INSTALL!!!]
 if exist "%CD%\MediCat.USB.v21.12.7z" (goto install4) else (goto installversion2)
 :installversion2
 if exist "%CD%\MediCat.USB.v%ver%.zip.001" (goto install5) else (goto installerror)
@@ -293,16 +284,16 @@ REM -- ACTUALLY EXTRACT/INSTALL
 
 :install4
 set file="MediCat.USB.v21.12.7z"
-7z x" -O%drivepath%: %file% -r -aoa
+7z x -O%drivepath%: %file% -r -aoa
 goto finishup
 
 :install5
 set file="MediCat.USB.v%ver%.zip.001"
-7z x" -O%drivepath%: %file% -r -aoa
+7z x -O%drivepath%: %file% -r -aoa
 goto finishup
 
 :install6
-7z x" -O%drivepath%: "%file%" -r -aoa
+7z x -O%drivepath%: "%file%" -r -aoa
 goto finishup
 
 
@@ -324,11 +315,17 @@ for /f "usebackq delims=" %%I in (`powershell %psCommand%`) do set "folder=%%I"
 REM - AND ENDS
 set drivepath=%folder:~0,1%
 :autorun2
-wget "http://cdn.medicatusb.xyz/files/installer/autorun.ico" -O ./autorun.ico -q
-COPY autorun.ico %drivepath%:/autorun.ico
-DEL autorun.ico /Q
+wget "http://cdn.medicatusb.xyz/files/installer/autorun.ico" -O %drivepath%:/autorun.ico -q
+wget "http://cdn.medicatusb.xyz/files/hasher/Validate_Files.exe" -O %drivepath%:/Validate_Files.exe -q
+cd /d %drivepath%:
+start "%drivepath%:/Validate_Files.exe" "%drivepath%:/Validate_Files.exe"
 goto %goto%
+
+
+
+
 :deletefiles
+cd /d %maindir%
 echo.Would you like to delete the downloaded files?
 echo.(everything in the folder you ran this from)
 choice /C:YN /N /M "Y/N"
@@ -355,13 +352,13 @@ exit
 
 
 :hasher
-wget "http://cdn.medicatusb.xyz/files/hasher/Fixer.exe" -O ./Fixer.exe -q
-start Fixer.exe
+wget "http://cdn.medicatusb.xyz/files/hasher/Validate_Files.exe" -O ./Validate_Files.exe -q
+start Validate_Files.exe
 goto install2
 
 
 :medicatsite
-start "http://medicatusb.xyz
+start https://medicatusb.xyz
 goto menu2
 
 :updateventoy
@@ -409,21 +406,78 @@ echo.IIII             OK USING GOOGLE DRIVE INSTEAD             IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
-wget "http://cdn.medicatusb.xyz/files/installer/downloader.bat" -O ./downloader.bat -q
-call downloader.bat
-del downloader.bat /Q
+wget "http://cdn.medicatusb.xyz/files/installer/download/drive.bat" -O ./downloader.bat -q
+call drive.bat
+del drive.bat /Q
 goto warnventoy
 
 :tordown
-wget "http://cdn.medicatusb.xyz/files/installer/tor/tordownload.bat" -O ./tordownload.bat -q
-call tordownload.bat
-del tordownload.bat /Q
+wget "http://cdn.medicatusb.xyz/files/installer/download/tor.bat" -O ./tor.bat -q
+call tor.bat
+del tor.bat /Q
 goto warnventoy
 
 :renameprogram
 wget "http://cdn.medicatusb.xyz/files/installer/update.bat" -O ./update.bat -q
 start cmd /k update.bat
 exit
+
+
+
+REM == RUNS AT START.
+:CHECK4ERRORS
+:pwrshl
+if exist "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" (goto winvercheck1) else (goto pwrshlerr)
+:pwrshlerr
+mode con:cols=64 lines=18
+title Medicat Installer [ERROR]
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.IIII                                                       IIII
+echo.IIII                 THIS PROGRAM REQUIRES                 IIII
+echo.IIII              POWERSHELL TO BE INSTALLED.              IIII
+echo.IIII                                                       IIII
+echo.IIII         PLEASE INSTALL POWERSHELL ON YOUR OS          IIII
+echo.IIII                 AND TRY AGAIN. THANKS.                IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.If you believe it IS installed and want to bypass this warning,
+Set /P _num=type "OK": || Set _num=NothingChosen
+If "%_num%"=="NothingChosen" exit
+If /i "%_num%"=="ok" goto winvercheck1
+:error
+goto exit
+REM == CHECK IF USER IS RUNNING SUPPORTED OS. OTHERWISE WARN.
+:winvercheck1
+for /f "tokens=2 delims=," %%i in ('wmic os get caption^,version /format:csv') do set os=%%i
+set os=%os:~0,20%
+if "%os%" == "Microsoft Windows 10" (goto start) else (goto winvercheck2)
+:winvercheck2
+if "%os%" == "Microsoft Windows 11" (goto start) else (goto winvererror)
+:winvererror
+mode con:cols=64 lines=18
+title Medicat Installer [UNSUPPORTED]
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.IIII                                                       IIII
+echo.IIII                  %os%                 IIII
+echo.IIII                   Is Not Supported.                   IIII
+echo.IIII                                                       IIII
+echo.IIII          PLEASE UPDATE TO WINDOWS 10/11 AND           IIII
+echo.IIII                   TRY AGAIN. THANKS.                  IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+Set /P _num=To Bypass This Warning Type "I AGREE": || Set _num=NothingChosen
+If "%_num%"=="NothingChosen" exit
+If /i "%_num%"=="I AGREE" goto start
+:error
+goto exit
+
+
 
 
 :ascii
@@ -476,5 +530,5 @@ echo.              .oo0@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@0oo.
 echo.                  .oo0@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@0oo.                  
 echo.                      ..ooo000@@@@@@@@@@@@@@@@@@@@@@@@000ooo..                      
 echo.                              ....oooooooooooooooo....                              
-echo.CODED BY MON5TERMATT#9999 With Help from AAA3A#1157, Daan Breur#6262, Jayro#0783, and many others
+echo.CODED BY MON5TERMATT With Help from AAA3A, Daan Breur, Jayro, and many others. Thanks!
 exit/b

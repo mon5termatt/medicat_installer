@@ -1,7 +1,7 @@
 @echo off &chcp 850 >nul &pushd "%~dp0"
-@set "0=%~f0" &powershell -nop -c $f=[IO.File]::ReadAllText($env:0)-split':bat2file\:.*';iex($f[1]); X(1) &timeout /t 6 &goto build
+@set "0=%~f0" &powershell -nop -c $f=[IO.File]::ReadAllText($env:0)-split':bat2file\:.*';iex($f[1]); X(1) &goto build
 :build
-set ver=2.0.1.2
+set ver=2.0.1.9
 bte /bat medicat.bat /exe "Medicat Installer.exe" /x64 /uac-admin /extractdir . /workdir . /icon icon.ico /include wget.exe /productname "Medicat Installer" /fileversion "%ver%" productversion "%ver%" /description "INSTALL MEDICAT USB WITH GUIDED PROMPTS" /copyright https://medicatusb.xyz /comments https://mon5termatt.club /deleteonexit
 
 
