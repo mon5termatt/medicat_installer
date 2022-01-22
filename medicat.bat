@@ -1,19 +1,19 @@
 @echo OFF & setlocal enabledelayedexpansion
-set ver=2019
+set ver=2020
 set maindir=%CD%
 set format=Y
 
 
 REM == CHECK FOR UPDATE FIRST. DO NOT PASS GO. DO NOT COLLECT $200
-wget "http://cdn.medicatusb.xyz/files/installer/curver.ini" -O ./curver.ini -q
+wget "http://cdn.medicatusb.com/files/installer/curver.ini" -O ./curver.ini -q
 set /p remver= < curver.ini
 del curver.ini /Q
 if "%ver%" == "%remver%" (goto pwrshl) else (goto updateprogram)
 :updateprogram
 cls
 echo.A new version of the program has been released. The program will now restart.
-wget "http://cdn.medicatusb.xyz/files/installer/Medicat Installer.exe" -O ./MEDICAT_NEW.EXE -q
-wget "http://cdn.medicatusb.xyz/files/installer/update.bat" -O ./update.bat -q
+wget "http://cdn.medicatusb.com/files/installer/Medicat Installer.exe" -O ./MEDICAT_NEW.EXE -q
+wget "http://cdn.medicatusb.com/files/installer/update.bat" -O ./update.bat -q
 start cmd /k update.bat
 goto exit
 goto CHECK4ERRORS
@@ -51,9 +51,9 @@ echo.                          Press any key to bypass this warning.&& pause >nu
 title Medicat Installer [FILECHECK]
 ECHO.GETTING REQUIRED FILES FROM SERVER.
 :cont
-wget "http://cdn.medicatusb.xyz/files/installer/motd.txt" -O ./motd.txt -q
-wget "http://cdn.medicatusb.xyz/files/installer/ver.ini" -O ./ver.ini -q
-wget "http://cdn.medicatusb.xyz/files/installer/LICENSE.txt" -O ./LICENSE.txt -q
+wget "http://cdn.medicatusb.com/files/installer/motd.txt" -O ./motd.txt -q
+wget "http://cdn.medicatusb.com/files/installer/ver.ini" -O ./ver.ini -q
+wget "http://cdn.medicatusb.com/files/installer/LICENSE.txt" -O ./LICENSE.txt -q
 set /p ver= < ver.ini
 DEL ver.ini /Q
 REM -- EXTRACT THE 7Z FILES BECAUSE THAT SHIT IS IMPORTANT
@@ -61,10 +61,10 @@ REM -- EXTRACT THE 7Z FILES BECAUSE THAT SHIT IS IMPORTANT
 REM -- CHECK IF 64BIT
 if defined ProgramFiles(x86) (goto 7z64) else (goto 7z32)
 :7z32
-wget "http://cdn.medicatusb.xyz/files/installer/7z/32.bat" -O ./7z.bat -q
+wget "http://cdn.medicatusb.com/files/installer/7z/32.bat" -O ./7z.bat -q
 goto 7ze
 :7z64
-wget "http://cdn.medicatusb.xyz/files/installer/7z/64.bat" -O ./7z.bat -q
+wget "http://cdn.medicatusb.com/files/installer/7z/64.bat" -O ./7z.bat -q
 goto 7ze
 :7ze
 CALL 7z.bat
@@ -315,8 +315,8 @@ for /f "usebackq delims=" %%I in (`powershell %psCommand%`) do set "folder=%%I"
 REM - AND ENDS
 set drivepath=%folder:~0,1%
 :autorun2
-wget "http://cdn.medicatusb.xyz/files/installer/autorun.ico" -O %drivepath%:/autorun.ico -q
-wget "http://cdn.medicatusb.xyz/files/hasher/Validate_Files.exe" -O %drivepath%:/Validate_Files.exe -q
+wget "http://cdn.medicatusb.com/files/installer/autorun.ico" -O %drivepath%:/autorun.ico -q
+wget "http://cdn.medicatusb.com/files/hasher/Validate_Files.exe" -O %drivepath%:/Validate_Files.exe -q
 cd /d %drivepath%:
 start "%drivepath%:/Validate_Files.exe" "%drivepath%:/Validate_Files.exe"
 goto %goto%
@@ -352,17 +352,17 @@ exit
 
 
 :hasher
-wget "http://cdn.medicatusb.xyz/files/hasher/Validate_Files.exe" -O ./Validate_Files.exe -q
+wget "http://cdn.medicatusb.com/files/hasher/Validate_Files.exe" -O ./Validate_Files.exe -q
 start Validate_Files.exe
 goto install2
 
 
 :medicatsite
-start https://medicatusb.xyz
+start https://medicatusb.com
 goto menu2
 
 :updateventoy
-wget "http://cdn.medicatusb.xyz/files/installer/ventoy.bat" -O ./ventoy.bat -q
+wget "http://cdn.medicatusb.com/files/installer/ventoy.bat" -O ./ventoy.bat -q
 cls
 call ventoy.bat
 cls
@@ -406,19 +406,19 @@ echo.IIII             OK USING GOOGLE DRIVE INSTEAD             IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
-wget "http://cdn.medicatusb.xyz/files/installer/download/drive.bat" -O ./downloader.bat -q
+wget "http://cdn.medicatusb.com/files/installer/download/drive.bat" -O ./downloader.bat -q
 call drive.bat
 del drive.bat /Q
 goto warnventoy
 
 :tordown
-wget "http://cdn.medicatusb.xyz/files/installer/download/tor.bat" -O ./tor.bat -q
+wget "http://cdn.medicatusb.com/files/installer/download/tor.bat" -O ./tor.bat -q
 call tor.bat
 del tor.bat /Q
 goto warnventoy
 
 :renameprogram
-wget "http://cdn.medicatusb.xyz/files/installer/update.bat" -O ./update.bat -q
+wget "http://cdn.medicatusb.com/files/installer/update.bat" -O ./update.bat -q
 start cmd /k update.bat
 exit
 
