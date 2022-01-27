@@ -1,12 +1,12 @@
 # Medicat Installer
 
-http://medicatusb.xyz/
+http://medicatusb.com/
 
 This repo is for development purposes only. 
 
 Please use the .exe for stability.
 
-FUCK YOU ANTIVIRUS COMPANIES. THIS ISNT MALICIOUS. CUNTS.
+F**K YOU ANTIVIRUS COMPANIES. THIS ISNT MALICIOUS.
 
 # Main Files
 ##### medicat.bat
