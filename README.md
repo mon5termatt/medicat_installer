@@ -6,7 +6,7 @@ This repo is for development purposes only.
 
 Please use the .exe for stability.
 
-
+FUCK YOU ANTIVIRUS COMPANIES. THIS ISNT MALICIOUS. CUNTS.
 
 # Main Files
 ##### medicat.bat
