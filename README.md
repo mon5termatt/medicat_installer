@@ -11,15 +11,9 @@ F**K YOU ANTIVIRUS COMPANIES. THIS ISNT MALICIOUS.
 # Main Files
 ##### medicat.bat
 The main file.
-
-##### build.bat
-Builds The EXE.
+comes bundled with wget.exe so thats why its GIANT
 
 
 # ./Installer 
 Contains all files that the installer calls.
-Please note that the actual files that the installer uses is stored on site, not here
-
-# ./Hasher 
-Contains all files that the hasher calls.
 Please note that the actual files that the installer uses is stored on site, not here
