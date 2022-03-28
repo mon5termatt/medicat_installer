@@ -1,0 +1,32 @@
+MIT License
+
+#####################################################
+SE PAGOU POR ESTE SOFTWARE, FOI ENGANADO!
+#####################################################
+
+MediCat USB e completamente gratuito.
+
+A permissao e concedida, gratuitamente, a qualquer pessoa que obtenha uma copia
+deste software e arquivos de documentaçao associados (o "Software"), para lidar
+no Software sem restriçao, incluindo, sem limitacao, os direitos
+para usar, copiar, modificar, mesclar, publicar, distribuir, sublicenciar e / ou vender
+copias do Software, e para permitir que as pessoas a quem o Software e
+fornecido para faze-lo, sujeito as seguintes condicoes:
+
+O aviso de direitos autorais acima e este aviso de permissao devem ser incluidos em todas as
+copias ou partes substanciais do Software.
+
+
+
+O SOFTWARE E FORNECIDO "NO ESTADO EM QUE SE ENCONTRA", SEM QUALQUER TIPO DE GARANTIA, EXPRESSA OU 
+IMPLICITA, INCLUINDO, MAS NAO SE LIMITANDO AS GARANTIAS DE COMERCIALIZACAO, ADEQUACAO A UM DETERMINADO 
+FIM E NAO VIOLACAO. EM NENHUMA HIPOTESE OS AUTORES OU DETENTORES DOS DIREITOS AUTORAIS
+SERAO RESPONSAVEIS POR QUALQUER RECLAMACAO, DANOS OU OUTRA RESPONSABILIDADE, SEJA EM ACAO DE CONTRATO, 
+AVALIACAO OU DE OUTRA FORMA, DECORRENTE DE, FORA DE OU EM CONEXAO COM O SOFTWARE OU O USO OU OUTRAS 
+NEGOCIACOES NO SOFTWARE. 
+
+
+
+USE ESTE SOFTWARE SOB SEU PROPRIO RISCO!
+
+Copyright (c) 2021 MediCat USB
