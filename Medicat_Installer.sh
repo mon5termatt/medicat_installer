@@ -90,17 +90,17 @@ fi
 sudo sh ./ventoy/Ventoy2Disk.sh -I $drive
 umount $drive
 sudo mkntfs --fast --label Medicat $drive2
-if ! [[ -d USB/ ]] ; then
-	mkdir USB
+if ! [[ -d MedicatUSB/ ]] ; then
+	mkdir MedicatUSB
 fi
-sudo mount $drive2 ./USB
+sudo mount $drive2 ./MedicatUSB
 7z x -O./USB "$location"
 echo "MedicatUSB has been created!"
-echo "Would you like to unmount ./USB?"
+echo "Would you like to unmount ./USB? (Y/N)"
 read unmountcheck
 if [ $unmountcheck = "Y" ]; then
 	echo "MedicatUSB will be unmounted!"
-	umount ./USB
+	sudo umount ./MedicatUSB
 elif [ $unmountcheck = "N" ]; then
 	echo "MedicatUSB will not be unmounted!"
 else
