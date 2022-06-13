@@ -1,10 +1,39 @@
-echo -e "WELCOME TO THE MEDICAT INSTALLER, PLEASE DO NOT RUN THIS AS ROOT\nThis Installer will attempt to Install Ventoy and Medicat\nTHIS IS IN ALPHA. PLEASE CONTACT MATT IN THE DISCORD FOR ALL ISSUES"
-echo "waiting for 10 seconds"
+#!/bin/bash
+echo -e "WELCOME TO THE MEDICAT INSTALLER, PLEASE DO NOT RUN THIS AS ROOT\nThis Installer will attempt to Install Ventoy and Medicat\nTHIS IS IN BETA. PLEASE CONTACT MATT IN THE DISCORD FOR ALL ISSUES"
+echo "Updated for efficiency and cross-distro use by SkeletonMan"
+echo "Waiting for 10 seconds"
 sleep 10
-echo "Attempting to download the required dependancies"
-echo -e "\n\n\n\n\n\n"
-sudo apt update
-sudo apt install aria2 wget p7zip-full ntfs-3g
+if grep -qs "ubuntu" /etc/os-release; then
+	os="ubuntu"
+	pkgmgr="apt"
+elif grep -qs "freebsd" /etc/os-release; then
+	os="freebsd"
+	pkgmgr="pkg"
+elif [[ -e /etc/debian_version ]]; then
+	os="debian"
+	pkgmgr="apt"
+elif [[ -e /etc/almalinux-release || -e /etc/rocky-release || -e /etc/centos-release ]]; then
+	os="centos"
+	pkgmgr="yum"
+elif [[ -e /etc/fedora-release ]]; then
+	os="fedora"
+	pkgmgr="yum"
+fi
+echo "Acquiring any dependencies"
+sudo $pkgmgr update
+if ! [ $(which aria2c 2>/dev/null) ]; then
+	sudo $pkgmgr install aria2
+fi
+if ! [ $(which wget 2>/dev/null) ]; then
+	sudo $pkgmgr install wget
+fi
+if ! [ $(which 7z 2>/dev/null) ]; then
+	sudo $pkgmgr install p7zip-full
+fi
+if ! [ $(sudo which mkntfs 2>/dev/null) ]; then 
+	sudo $pkgmgr install ntfs-3g
+fi
+echo "Downloading Ventoy"
 wget "https://api.github.com/repos/ventoy/Ventoy/releases/latest"
 cat latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' >> version
 venver=$(cat version)
@@ -33,20 +62,31 @@ if ! [[ -f MediCat.USB.v21.12.7z ]]; then
 		location=''MediCat\ USB\ v21.12/MediCat.USB.v21.12.7z''
 	fi
 fi
-echo -e "\n\n\n\n\n\n"
+echo -e "\n\n\n"
 echo "Please Plug your USB in now if it is not already"
-echo "You will need to have the USB MOUNTED"
+echo "Waiting 5 seconds..."
+sleep 5
 echo "Please Find the ID of your USB below"
 echo -e "\n\n"
-df | grep -v ^/dev/loop
+lsblk | awk '{print $1,$4}'
 echo "Enter the Letter of the USB drive below NOT INCLUDING /dev/ OR the Number After"
 echo "for example enter sda or sdb"
 read letter
 drive=/dev/$letter
 drive2="$drive""1"
-echo "you want to install Ventoy and Medicat to $drive / $drive2?"
-echo "If not please press CTRL+C now (timeout in 5 seconds)"
-sleep 5
+echo "You want to install Ventoy and Medicat to $drive / $drive2?"
+echo "Please enter Y or N"
+read checkingconfirm
+if [ $checkingconfirm = "N" ]; then
+        exit
+elif [ $checkingconfirm = "Y" ]; then
+        echo "Okay! Will continue in 5 seconds!"
+	sleep 5
+else
+        echo "The only valid options are Y or N"
+	exit
+fi
+
 sudo sh ./ventoy/Ventoy2Disk.sh -I $drive
 umount $drive
 sudo mkntfs --fast --label Medicat $drive2
@@ -55,3 +95,14 @@ if ! [[ -d USB/ ]] ; then
 fi
 sudo mount $drive2 ./USB
 7z x -O./USB "$location"
+echo "MedicatUSB has been created!"
+echo "Would you like to unmount ./USB?"
+read unmountcheck
+if [ $unmountcheck = "Y" ]; then
+	echo "MedicatUSB will be unmounted!"
+	umount ./USB
+elif [ $unmountcheck = "N" ]; then
+	echo "MedicatUSB will not be unmounted!"
+else
+	"The only valid options are Y or N"
+fi
