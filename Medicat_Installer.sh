@@ -64,8 +64,8 @@ if ! [[ -f MediCat.USB.v21.12.7z ]]; then
 fi
 echo -e "\n\n\n"
 echo "Please Plug your USB in now if it is not already"
-echo "Waiting 5 seconds..."
-sleep 5
+echo "Waiting 15 seconds..."
+sleep 15
 echo "Please Find the ID of your USB below"
 echo -e "\n\n"
 lsblk | awk '{print $1,$4}'
