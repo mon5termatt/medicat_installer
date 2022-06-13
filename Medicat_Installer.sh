@@ -94,9 +94,9 @@ if ! [[ -d MedicatUSB/ ]] ; then
 	mkdir MedicatUSB
 fi
 sudo mount $drive2 ./MedicatUSB
-7z x -O./USB "$location"
+7z x -O./MedicatUSB "$location"
 echo "MedicatUSB has been created!"
-echo "Would you like to unmount ./USB? (Y/N)"
+echo "Would you like to unmount ./MedicatUSB? (Y/N)"
 read unmountcheck
 if [ $unmountcheck = "Y" ]; then
 	echo "MedicatUSB will be unmounted!"
