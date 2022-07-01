@@ -9,10 +9,22 @@ Please use the .exe for stability.
 F**K YOU ANTIVIRUS COMPANIES. THIS ISNT MALICIOUS.
 
 # Main Files
-##### medicat.bat
+### medicat.bat
 The main file.
-comes bundled with wget.exe so thats why its GIANT
+#### the encoded text at the bottom is some small files.
+> batbox.exe
 
+> Box.bat
+
+> Button.bat
+
+> Getinput.exe
+
+> Getlen.bat
+
+> QuickSFV.exe
+
+> QuickSFV.ini
 
 # ./Installer 
 Contains all files that the installer calls.
