@@ -245,6 +245,9 @@ goto menu2
 set format=Yes
 set formatcolor=2F
 goto menu2
+
+
+
 :check5
 echo.Getting Current Ventoy Version
 timeout 0 >nul
@@ -289,9 +292,10 @@ REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
 
 
 :askdownload
-if exist "%CD%\MediCat.USB.v21.12.7z" (goto warnventoy) else (goto dlcheck2)
+if exist "%CD%\MediCat.USB*.7z" (goto warnventoy) else (goto dlcheck2)
 :dlcheck2
-if exist "%CD%\*.001" (goto warnventoy) else (goto dlcheck3)
+
+if exist "%CD%\MediCat.USB*.001" (goto warnventoy) else (goto dlcheck3)
 :dlcheck3
 cls
 mode con:cols=64 lines=18
@@ -333,7 +337,7 @@ echo.IIII            THIS PROGRAM REQUIRES YOU TO               IIII
 echo.IIII            HAVE VENTOY INSTALLED TO THE               IIII
 echo.IIII            USB DRIVE YOU WILL BE ADDING               IIII
 echo.IIII            MEDICAT USB TO. PLEASE DO SO               IIII
-echo.IIII            BEFORE ATTEMPTING TO RUN THE               IIII
+echo.IIII            BEFORE CONTINUING TO RUN THE               IIII
 echo.IIII                   INSTALL SCRIPT                      IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
@@ -344,18 +348,18 @@ REM -- INSTALLER
 
 :install1
 
-if exist "%CD%\*.001" (goto warnhash) else (goto install2)
+if exist "%CD%\MediCat.USB*.001" (goto warnhash) else (goto install2)
 REM -- IF DOWNLOADED IN PARTS, ASK USER IF THEY WANT TO DOWNLOAD THE HASH CHECKER (FIXER.EXE)
 
 :warnhash
 title Medicat Installer [HASHCHECK]
 cls
-if exist "%CD%\*.001" (echo..001 Exists) else (goto gdriveerror)
-if exist "%CD%\*.002" (echo..002 Exists) else (goto gdriveerror)
-if exist "%CD%\*.003" (echo..003 Exists) else (goto gdriveerror)
-if exist "%CD%\*.004" (echo..004 Exists) else (goto gdriveerror)
-if exist "%CD%\*.005" (echo..005 Exists) else (goto gdriveerror)
-if exist "%CD%\*.006" (echo..006 Exists) else (goto gdriveerror)
+if exist "%CD%\MediCat.USB*.001" (echo..001 Exists) else (goto gdriveerror)
+if exist "%CD%\MediCat.USB*.002" (echo..002 Exists) else (goto gdriveerror)
+if exist "%CD%\MediCat.USB*.003" (echo..003 Exists) else (goto gdriveerror)
+if exist "%CD%\MediCat.USB*.004" (echo..004 Exists) else (goto gdriveerror)
+if exist "%CD%\MediCat.USB*.005" (echo..005 Exists) else (goto gdriveerror)
+if exist "%CD%\MediCat.USB*.006" (echo..006 Exists) else (goto gdriveerror)
 timeout 2 >nul
 cls
 mode con:cols=64 lines=18
