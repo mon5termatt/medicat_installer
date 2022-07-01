@@ -29,7 +29,3 @@ The main file for windows
 ### Medicat_Installer.sh
 Main file for installing via linux command line
 Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
-
-# ./Installer 
-Contains all files that the installer calls.
-Please note that the actual files that the installer uses is stored on site, not here
