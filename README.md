@@ -10,8 +10,10 @@ F**K YOU ANTIVIRUS COMPANIES. THIS ISNT MALICIOUS.
 
 # Main Files
 ### Medicat_Installer.bat
-The main file for windows
-#### the encoded text at the bottom is some small files.
+The main file with guided prompts for downloading and installing Medicat USB
+
+#### the encoded text at the bottom of the main script is for extracting some small files without the internet.
+
 [batbox.exe](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
 
 [Box.bat](https://github.com/TheBATeam/Box-Function-2.0)
