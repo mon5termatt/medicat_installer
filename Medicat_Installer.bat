@@ -17,8 +17,12 @@ REM GET ADMIN CODE MUST GO FIRST
 )
 
 if '%errorlevel%' NEQ '0' (
-    echo Please reopen this script as admin. && pause
-    goto exit
+    	echo.Please reopen this script as admin. 
+	echo.Veuillez rouvrir ce script en tant qu'administrateur.
+	echo.Por favor, reabra este script como administrador.
+	echo.Bitte öffnen Sie dieses Skript erneut als Administrator.
+	pause
+	exit
 ) else ( goto gotAdmin )
 
 :gotAdmin
@@ -115,8 +119,6 @@ REM == CHECK IF USER IS RUNNING SUPPORTED OS. OTHERWISE WARN.
 :winvercheck0
 for /f "tokens=4-5 delims=. " %%i in ('ver') do set os2=%%i.%%j
 if "%os2%" == "10.0" goto start
-goto winvererror
-:winvererror
 mode con:cols=64 lines=18
 title Medicat Installer [UNSUPPORTED]
 echo.II-----------------------------------------------------------II
@@ -173,8 +175,7 @@ DEL ver.ini /Q
 REM -- EXTRACT THE 7Z FILES BECAUSE THAT SHIT IS IMPORTANT
 :7z
 REM -- CHECK IF 64BIT
-if defined ProgramFiles(x86) (goto 7z64) else (goto 7z32)
-:7z32
+if defined ProgramFiles(x86) (goto 7z64)
 wget "http://cdn.medicatusb.com/files/install/7z/32.exe" -O ./bin/7z.exe -q
 wget "http://cdn.medicatusb.com/files/install/7z/32.dll" -O ./bin/7z.dll -q
 goto menu
@@ -245,15 +246,47 @@ set format=Yes
 set formatcolor=2F
 goto menu2
 :check5
-set goto=askdownload
-goto updateventoy
-
+echo.Getting Current Ventoy Version
+timeout 0 >nul
+powershell -c "$data = wget https://api.github.com/repos/ventoy/ventoy/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './ventoyversion.txt'"
+set /p VENVER= <./ventoyversion.txt
+set vencurver=%VENVER:~-6%
+echo.Current Online Version - %VENVER:~-6%
+goto checkventoyver
+:checkventoyver
+echo.Checking if current version found on system.
+timeout 1 >nul
+if exist "%CD%\Ventoy2Disk\" (goto checkver) else (goto ventoyget)
+:checkver
+set /p localver= <.\Ventoy2Disk\ventoy\version
+echo.Current Local Version - %VENVER:~-6%
+if "%localver%" == "%vencurver%" (goto uptodate) else (goto ventoyget)
+:ventoyget
+echo.Update Found. Downloading Latest Ventoy.
+timeout 1 >nul
+wget https://github.com/ventoy/Ventoy/releases/download/v%vencurver%/ventoy-%vencurver%-windows.zip -O ./ventoy.zip -q
+7z x ventoy.zip -r -aoa
+RMDIR Ventoy2Disk /S /Q
+REN ventoy-%vencurver% Ventoy2Disk
+move .\Ventoy2Disk\altexe\Ventoy2Disk_X64.exe .\Ventoy2Disk\Ventoy2Disk.exe
+cls
+echo.Downloaded newest version.
+goto doneventoy
+:uptodate
+echo.Local version matches latest version. Not attempting to update.
+:doneventoy
+timeout 3 >nul
+DEL ventoy.zip /Q
+del .wget-hsts /Q
+del ventoyversion.txt /Q
 
 
 
 REM -- GO TO END OF FILE FOR MOST EXTRACTIONS
-
 REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
+
+
+
 
 :askdownload
 if exist "%CD%\MediCat.USB.v21.12.7z" (goto warnventoy) else (goto dlcheck2)
@@ -465,28 +498,10 @@ goto finishup
 REM -- FILE CLEANUP
 
 :finishup
-set goto=deletefiles
-goto autorun2
-
-
-:autorun
-mode con:cols=100 lines=15
-echo.Please Select Your Medicat Drive
-REM - FOLDER PROMPT STARTS
-set "psCommand="(new-object -COM 'Shell.Application')^
-.BrowseForFolder(0,'Please choose a folder.',0,0).self.path""
-for /f "usebackq delims=" %%I in (`powershell %psCommand%`) do set "folder=%%I"
-REM - AND ENDS
-set drivepath=%folder:~0,1%
-
-
-:autorun2
-wget "http://cdn.medicatusb.com/files/install/autorun.ico" -O %drivepath%:/autorun.ico -q
 wget "http://cdn.medicatusb.com/files/hasher/Validate_Files.exe" -O %drivepath%:/Validate_Files.exe -q
 cd /d %drivepath%:
 start "%drivepath%:/Validate_Files.exe" "%drivepath%:/Validate_Files.exe"
-goto %goto%
-
+goto autorun2
 
 
 
@@ -513,42 +528,6 @@ goto menu2
 :discord
 start https://url.medicatusb.com/discord
 goto menu2
-
-:updateventoy
-echo.Getting Current Ventoy Version
-timeout 0 >nul
-powershell -c "$data = wget https://api.github.com/repos/ventoy/ventoy/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './ventoyversion.txt'"
-set /p VENVER= <./ventoyversion.txt
-set vencurver=%VENVER:~-6%
-echo.Current Online Version - %VENVER:~-6%
-goto checkventoyver
-:checkventoyver
-echo.Checking if current version found on system.
-timeout 1 >nul
-if exist "%CD%\Ventoy2Disk\" (goto checkver) else (goto ventoyget)
-:checkver
-set /p localver= <.\Ventoy2Disk\ventoy\version
-echo.Current Local Version - %VENVER:~-6%
-if "%localver%" == "%vencurver%" (goto uptodate) else (goto ventoyget)
-:ventoyget
-echo.Update Found. Downloading Latest Ventoy.
-timeout 1 >nul
-wget https://github.com/ventoy/Ventoy/releases/download/v%vencurver%/ventoy-%vencurver%-windows.zip -O ./ventoy.zip -q
-7z x ventoy.zip -r -aoa
-RMDIR Ventoy2Disk /S /Q
-REN ventoy-%vencurver% Ventoy2Disk
-move .\Ventoy2Disk\altexe\Ventoy2Disk_X64.exe .\Ventoy2Disk\Ventoy2Disk.exe
-cls
-echo.Downloaded newest version.
-goto doneventoy
-:uptodate
-echo.Local version matches latest version. Not attempting to update.
-:doneventoy
-timeout 3 >nul
-DEL ventoy.zip /Q
-del .wget-hsts /Q
-del ventoyversion.txt /Q
-goto %goto%
 
 
 :exit
