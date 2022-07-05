@@ -27,14 +27,4 @@ For downloading from torrent file.
 
 #### the encoded text at the bottom of the main script is for extracting some small files without the internet.
 
-[batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
-
-[Box](https://github.com/TheBATeam/Box-Function-2.0)
-
-[Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
-
-[Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
-
-[Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
-
-[QuickSFV](http://www.quicksfv.org/)
+[batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin) / [Box](https://github.com/TheBATeam/Box-Function-2.0) / [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc) / [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini) / [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc) / [QuickSFV](http://www.quicksfv.org/)
