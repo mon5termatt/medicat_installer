@@ -84,7 +84,7 @@ if exist "bin\wget.exe" (goto curver) else (goto curlwget)
 :curlwget
 echo.attempting to download wget using curl.
 echo.This requires windows 10 version 1703 or higher.
-curl -O -s http://cdn.medicatusb.com/files/install/wget.exe
+curl -O -s https://eternallybored.org/misc/wget/1.21.3/64/wget.exe
 move .\wget.exe .\bin\wget.exe
 goto checkwget
 :curver
@@ -108,7 +108,6 @@ if "%localver%" == "%remver%" (goto winvercheck0) else (goto updateprogram)
 :updateprogram
 cls
 echo.A new version of the program has been released. The program will now restart.
-wget "http://url.medicatusb.com/installerupdate" -O ./MEDICAT_NEW.bat -q
 wget "http://cdn.medicatusb.com/files/install/update.bat" -O ./update.bat -q
 start cmd /k update.bat
 exit
