@@ -82,6 +82,8 @@ echo.
 echo.
 if exist "bin\wget.exe" (goto curver) else (goto curlwget)
 :curlwget
+echo.attempting to download wget using curl.
+echo.This requires windows 10 version 1703 or higher.
 if defined ProgramFiles(x86) (goto wget64) else (goto wget32)
 :wget32
 curl -O -s https://eternallybored.org/misc/wget/1.21.3/32/wget.exe
