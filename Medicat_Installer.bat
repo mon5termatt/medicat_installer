@@ -82,12 +82,17 @@ echo.
 echo.
 if exist "bin\wget.exe" (goto curver) else (goto curlwget)
 :curlwget
-echo.attempting to download wget using curl.
-echo.This requires windows 10 version 1703 or higher.
+if defined ProgramFiles(x86) (goto wget64) else (goto wget32)
+:wget32
+curl -O -s https://eternallybored.org/misc/wget/1.21.3/32/wget.exe
+move .\wget.exe .\bin\wget.exe
+goto checkwget
+:wget64
 curl -O -s https://eternallybored.org/misc/wget/1.21.3/64/wget.exe
 move .\wget.exe .\bin\wget.exe
 goto checkwget
 :curver
+echo.Found WGET. Continuing...
 REM == CHECK FOR UPDATE FIRST. DO NOT PASS GO. DO NOT COLLECT $200
 wget "http://cdn.medicatusb.com/files/install/curver.ini" -O ./curver.ini -q
 set /p remver= < curver.ini
