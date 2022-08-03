@@ -6,7 +6,7 @@ set localver=4000
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
-
+if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
 REM GET ADMIN CODE MUST GO FIRST
 
 :admin
@@ -75,13 +75,8 @@ if exist "bin\wget.exe" (goto curver) else (goto curlwget)
 :curlwget
 echo.attempting to download wget using curl.
 echo.This requires windows 10 version 1703 or higher.
-if defined ProgramFiles(x86) (goto wget64) else (goto wget32)
-:wget32
-curl -O -s https://eternallybored.org/misc/wget/1.21.3/32/wget.exe
-move .\wget.exe .\bin\wget.exe
-goto checkwget
-:wget64
-curl -O -s https://eternallybored.org/misc/wget/1.21.3/64/wget.exe
+:wgetdownload
+curl -O -s https://eternallybored.org/misc/wget/1.21.3/%bit%/wget.exe
 move .\wget.exe .\bin\wget.exe
 goto checkwget
 :curver
@@ -171,14 +166,8 @@ set /p medicatver= < ver.ini
 DEL ver.ini /Q
 REM -- EXTRACT THE 7Z FILES BECAUSE THAT SHIT IS IMPORTANT
 :7z
-REM -- CHECK IF 64BIT
-if defined ProgramFiles(x86) (goto 7z64)
-wget "http://cdn.medicatusb.com/files/install/7z/32.exe" -O ./bin/7z.exe -q
-wget "http://cdn.medicatusb.com/files/install/7z/32.dll" -O ./bin/7z.dll -q
-goto menu
-:7z64
-wget "http://cdn.medicatusb.com/files/install/7z/64.exe" -O ./bin/7z.exe -q
-wget "http://cdn.medicatusb.com/files/install/7z/64.dll" -O ./bin/7z.dll -q
+wget "http://cdn.medicatusb.com/files/install/7z/%bit%.exe" -O ./bin/7z.exe -q
+wget "http://cdn.medicatusb.com/files/install/7z/%bit%.dll" -O ./bin/7z.dll -q
 goto menu
 
 
