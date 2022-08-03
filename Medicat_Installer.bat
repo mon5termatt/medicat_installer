@@ -31,6 +31,8 @@ if '%errorlevel%' NEQ '0' (
 :-------------------------------------- 
 :UACAdmin
 
+
+REM CHECK FOR POWERSHELL ON SYSTEM
 :pwrshl
 if exist "%SYSTEMROOT%\system32\WindowsPowerShell\v1.0\powershell.exe" (goto lang) else (goto pwrshlerr)
 :pwrshlerr
@@ -52,31 +54,20 @@ echo.If you believe it IS installed and want to bypass this warning,
 Set /P _num=type "OK": || Set _num=NothingChosen
 If "%_num%"=="NothingChosen" exit
 If /i "%_num%"=="ok" goto lang
+
+REM IF POWERSHELL CHECK IS GOOD THEN PROMPT FOR LANGUAGE
 :lang
 call :binfolder
-echo.Select Your Language (only changes some things so far)
+echo.Select Your Language
 call Button 1 2 F2 "ENGLISH" 14 2 F2 "Francais" 28 2 F2 "Portugues" 43 2 F2 "Deutsch" X _Var_Box _Var_Hover
 GetInput /M %_Var_Box% /H %_Var_Hover% 
-If /I "%Errorlevel%"=="1" (goto en)
-If /I "%Errorlevel%"=="2" (goto fr)
-If /I "%Errorlevel%"=="3" (goto pt)
-If /I "%Errorlevel%"=="4" (goto gr)
-:en
-set lang=en
-goto checkwget
-:fr
-set lang=fr
-goto checkwget
-:pt
-set lang=pt
-goto checkwget
-:gr
-set lang=gr
-goto checkwget
+GetInput /M %_Var_Box% /H %_Var_Hover% 
+If /I "%Errorlevel%"=="1" (set lang=en && goto checkwget)
+If /I "%Errorlevel%"=="2" (set lang=fr && goto checkwget)
+If /I "%Errorlevel%"=="3" (set lang=pt && goto checkwget)
+If /I "%Errorlevel%"=="4" (set lang=gr && goto checkwget)
 
-
-REM GOT ADMIN. NOW CHECK FOR WGET, VERSION, AND BIN FILES
-
+REM NOW CHECK FOR REMAINING FILES
 :checkwget
 echo.
 echo.
