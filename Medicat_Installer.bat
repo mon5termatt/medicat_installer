@@ -62,11 +62,22 @@ echo.Select Your Language
 call Button 1 2 F2 "ENGLISH" 14 2 F2 "Francais" 28 2 F2 "Portugues" 43 2 F2 "Deutsch" X _Var_Box _Var_Hover
 GetInput /M %_Var_Box% /H %_Var_Hover% 
 GetInput /M %_Var_Box% /H %_Var_Hover% 
-If /I "%Errorlevel%"=="1" (set lang=en && goto checkwget)
-If /I "%Errorlevel%"=="2" (set lang=fr && goto checkwget)
-If /I "%Errorlevel%"=="3" (set lang=pt && goto checkwget)
-If /I "%Errorlevel%"=="4" (set lang=gr && goto checkwget)
-
+If /I "%Errorlevel%"=="1" (goto en)
+If /I "%Errorlevel%"=="2" (goto fr)
+If /I "%Errorlevel%"=="3" (goto pt)
+If /I "%Errorlevel%"=="4" (goto gr)
+:en
+set lang=en
+goto checkwget
+:fr
+set lang=fr
+goto checkwget
+:pt
+set lang=pt
+goto checkwget
+:gr
+set lang=gr
+goto checkwget
 REM NOW CHECK FOR REMAINING FILES
 :checkwget
 echo.
@@ -87,17 +98,13 @@ set /p remver= < curver.ini
 del curver.ini /Q
 
 
-REMOVE THESE LINES BEFORE RELEASING TO PUBLIC. THIS BYPASSES THE UPDATE
-===========================================================================
-===========================================================================
-===========================================================================
+REM REMOVE THESE LINES BEFORE RELEASING TO PUBLIC. THIS BYPASSES THE UPDATE
+REM ==========================================================================
 goto winvercheck0
-===========================================================================
-===========================================================================
-===========================================================================
+REM ==========================================================================
 
 
-if "%localver%" == "%remver%" (goto winvercheck0) else (goto updateprogram)
+if "%localver%" == "%remver%" (goto winvercheck0)
 :updateprogram
 cls
 echo.A new version of the program has been released. The program will now restart.
@@ -113,6 +120,7 @@ for /f "tokens=4-5 delims=. " %%i in ('ver') do set os2=%%i.%%j
 if "%os2%" == "10.0" goto start
 mode con:cols=64 lines=18
 title Medicat Installer [UNSUPPORTED]
+ver
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
@@ -135,9 +143,7 @@ exit
 
 
 :start
-set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
-reg add HKEY_CURRENT_USER\Software\Medicat\Installer /v version /t  REG_SZ /d  %localver% /f
-if exist "%CD%\MEDICAT_NEW.EXE" (goto renameprogram) else (call:ascii)
+call:ascii
 pause
 mode con:cols=64 lines=18
 cls
@@ -159,15 +165,13 @@ echo.                          Press any key to bypass this warning.&& pause >nu
 title Medicat Installer [FILECHECK]
 :cont
 echo.Please wait. Files are being downloaded. 
-wget "http://cdn.medicatusb.com/files/install/%lang%/motd.txt" -O ./bin/motd.txt -q
 wget "http://cdn.medicatusb.com/files/install/ver.ini" -O ./ver.ini -q
+wget "http://cdn.medicatusb.com/files/install/%lang%/motd.txt" -O ./bin/motd.txt -q
 wget "http://cdn.medicatusb.com/files/install/%lang%/LICENSE.txt" -O ./bin/LICENSE.txt -q
-set /p medicatver= < ver.ini
-DEL ver.ini /Q
-REM -- EXTRACT THE 7Z FILES BECAUSE THAT SHIT IS IMPORTANT
-:7z
 wget "http://cdn.medicatusb.com/files/install/7z/%bit%.exe" -O ./bin/7z.exe -q
 wget "http://cdn.medicatusb.com/files/install/7z/%bit%.dll" -O ./bin/7z.dll -q
+set /p medicatver= < ver.ini
+DEL ver.ini /Q
 goto menu
 
 
@@ -184,15 +188,13 @@ goto menu
 
 
 :menu
-cls
-REM -- THE MAIN MENU, THE HOLY GRAIL.
+set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
 title Medicat Installer [%localver%]
 mode con:cols=100 lines=30
+cls
 type bin\LICENSE.txt
 echo.
-echo.Press any Key to Continue (x2)
-pause > nul
-pause > nul
+pause
 :menu2
 mode con:cols=64 lines=20
 echo.  %installertext%   %installertext%   %installertext%
@@ -491,16 +493,7 @@ REM -- FILE CLEANUP
 wget "http://cdn.medicatusb.com/files/hasher/Validate_Files.exe" -O %drivepath%:/Validate_Files.exe -q
 cd /d %drivepath%:
 start "%drivepath%:/Validate_Files.exe" "%drivepath%:/Validate_Files.exe"
-goto autorun2
-
-
-
-:deletefiles
-cls
-echo.DONE!
-pause 10
 exit
-
 
 :hasher
 wget "http://cdn.medicatusb.com/files/hasher/drivefiles.md5" -O ./drivefiles.md5 -q
@@ -576,9 +569,6 @@ del tor.bat /Q
 goto warnventoy
 
 :renameprogram
-wget "http://cdn.medicatusb.com/files/install/update.bat" -O ./update.bat -q
-start cmd /k update.bat
-exit
 
 
 
