@@ -20,7 +20,7 @@ if '%errorlevel%' NEQ '0' (
     	echo.Please reopen this script as admin. 
 	echo.Veuillez rouvrir ce script en tant qu'administrateur.
 	echo.Por favor, reabra este script como administrador.
-	echo.Bitte öffnen Sie dieses Skript erneut als Administrator.
+	echo.Bitte offnen Sie dieses Skript erneut als Administrator.
 	pause
 	exit
 ) else ( goto gotAdmin )
@@ -57,27 +57,37 @@ If /i "%_num%"=="ok" goto lang
 
 REM IF POWERSHELL CHECK IS GOOD THEN PROMPT FOR LANGUAGE
 :lang
-call :binfolder
+call:binfolder
 echo.Select Your Language
 call Button 1 2 F2 "ENGLISH" 14 2 F2 "Francais" 28 2 F2 "Portugues" 43 2 F2 "Deutsch" X _Var_Box _Var_Hover
 GetInput /M %_Var_Box% /H %_Var_Hover% 
 GetInput /M %_Var_Box% /H %_Var_Hover% 
-If /I "%Errorlevel%"=="1" (goto en)
-If /I "%Errorlevel%"=="2" (goto fr)
-If /I "%Errorlevel%"=="3" (goto pt)
-If /I "%Errorlevel%"=="4" (goto gr)
-:en
+If /I "%Errorlevel%"=="1" (
 set lang=en
 goto checkwget
-:fr
+)
+If /I "%Errorlevel%"=="2" (
 set lang=fr
 goto checkwget
-:pt
+)
+If /I "%Errorlevel%"=="3" (
 set lang=pt
 goto checkwget
-:gr
+)
+If /I "%Errorlevel%"=="4" (
 set lang=gr
 goto checkwget
+)
+
+REM
+REM FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
+REM IF "%OSLanguage%"=="pl-PL" (
+REM )
+REM 
+
+
+
+
 REM NOW CHECK FOR REMAINING FILES
 :checkwget
 echo.
@@ -280,40 +290,13 @@ REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
 
 
 :askdownload
-if exist "%CD%\MediCat.USB*.7z" (goto warnventoy) else (goto dlcheck2)
-:dlcheck2
-
+if exist "%CD%\MediCat.USB*.7z" (goto warnventoy) else (goto dlcheck3)
 if exist "%CD%\MediCat.USB*.001" (goto warnventoy) else (goto dlcheck3)
-:dlcheck3
-cls
-mode con:cols=64 lines=18
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.IIII                                                       IIII
-echo.IIII         COULD NOT FIND THE MEDICAT FILE(S).           IIII
-echo.IIII              HAVE YOU DOWNLOADED THEM?                IIII
-echo.IIII                                                       IIII
-echo.IIII            (EITHER *.001 or the main .7z)             IIII
-echo.IIII                                                       IIII
-echo.IIII           WOULD YOU LIKE TO DOWNLOAD THEM?            IIII
-echo.IIII                       ( Y / N )                       IIII
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-call Button 10 12 F2 "YES" 46 12 F4 "NO" X _Var_Box _Var_Hover
-GetInput /M %_Var_Box% /H %_Var_Hover% 
 
-If /I "%Errorlevel%"=="1" (
-	cls & goto bigboi
-)
-If /I "%Errorlevel%"=="2" (
-	cls & goto warnventoy
-)
 
 REM -- PROMPT USER TO INSTALL VENTOY TO THE USB DRIVE. VENTOY STILL NEEDS TO BE THERE EVEN IF USER ALREADY HAS IT.
-
 :warnventoy
 title Medicat Installer [VENTOYCHECK]
-
 cd .\Ventoy2Disk\
 start Ventoy2Disk.exe
 cd %maindir%
@@ -335,10 +318,7 @@ echo.                          Press any key to bypass this warning.&& pause >nu
 REM -- INSTALLER
 
 :install1
-
 if exist "%CD%\MediCat.USB*.001" (goto warnhash) else (goto install2)
-REM -- IF DOWNLOADED IN PARTS, ASK USER IF THEY WANT TO DOWNLOAD THE HASH CHECKER (FIXER.EXE)
-
 :warnhash
 title Medicat Installer [HASHCHECK]
 cls
@@ -404,6 +384,7 @@ set "psCommand="(new-object -COM 'Shell.Application')^
 for /f "usebackq delims=" %%I in (`powershell %psCommand%`) do set "folder=%%I"
 REM - AND ENDS
 set drivepath=%folder:~0,1%
+IF "%drivepath%" == "~0,1" GOTO install2
 echo.Installing to (%drivepath%) Close and restart the program if this is wrong!
 echo.Otherwise hit any button to continue
 pause > nul
@@ -495,6 +476,16 @@ cd /d %drivepath%:
 start "%drivepath%:/Validate_Files.exe" "%drivepath%:/Validate_Files.exe"
 exit
 
+
+
+
+
+
+
+
+
+
+
 :hasher
 wget "http://cdn.medicatusb.com/files/hasher/drivefiles.md5" -O ./drivefiles.md5 -q
 echo.THIS WILL LOOK FROZEN, DONT PANIC, ITS WORKING!
@@ -516,6 +507,58 @@ goto menu2
 :exit
 exit
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+:dlcheck3
+cls
+mode con:cols=64 lines=18
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.IIII                                                       IIII
+echo.IIII         COULD NOT FIND THE MEDICAT FILE(S).           IIII
+echo.IIII              HAVE YOU DOWNLOADED THEM?                IIII
+echo.IIII                                                       IIII
+echo.IIII            (EITHER *.001 or the main .7z)             IIII
+echo.IIII                                                       IIII
+echo.IIII           WOULD YOU LIKE TO DOWNLOAD THEM?            IIII
+echo.IIII                       ( Y / N )                       IIII
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+call Button 10 12 F2 "YES" 46 12 F4 "NO" X _Var_Box _Var_Hover
+GetInput /M %_Var_Box% /H %_Var_Hover% 
+
+If /I "%Errorlevel%"=="1" (
+	cls & goto bigboi
+)
+If /I "%Errorlevel%"=="2" (
+	cls & goto warnventoy
+)
 
 :bigboi
 cls
