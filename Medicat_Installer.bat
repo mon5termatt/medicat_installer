@@ -58,6 +58,10 @@ If /i "%_num%"=="ok" goto lang
 REM IF POWERSHELL CHECK IS GOOD THEN PROMPT FOR LANGUAGE
 :lang
 call:binfolder
+FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
+IF "%OSLanguage%"=="en-US" (
+set lang=en
+goto checkwget)
 echo.Select Your Language
 call Button 1 2 F2 "ENGLISH" 14 2 F2 "Francais" 28 2 F2 "Portugues" 43 2 F2 "Deutsch" X _Var_Box _Var_Hover
 GetInput /M %_Var_Box% /H %_Var_Hover% 
@@ -79,11 +83,6 @@ set lang=gr
 goto checkwget
 )
 
-REM
-REM FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
-REM IF "%OSLanguage%"=="pl-PL" (
-REM )
-REM 
 
 
 
