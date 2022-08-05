@@ -384,9 +384,8 @@ for /f "usebackq delims=" %%I in (`powershell %psCommand%`) do set "folder=%%I"
 REM - AND ENDS
 set drivepath=%folder:~0,1%
 IF "%drivepath%" == "~0,1" GOTO install2
-echo.Installing to (%drivepath%) Close and restart the program if this is wrong!
-echo.Otherwise hit any button to continue
-pause > nul
+echo.Installing to (%drivepath%). If this is correct just hit enter.
+Set /P drivepath=if this is wrong type the correct drive letter now: || Set drivepath=%drivepath%
 IF "%drivepath%" == "C" GOTO IMPORTANTDRIVE
 if "%format%" == "Yes" (goto formatdrive) else (goto installversion)
 :formatdrive
