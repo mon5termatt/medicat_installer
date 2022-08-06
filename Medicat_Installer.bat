@@ -59,8 +59,12 @@ REM IF POWERSHELL CHECK IS GOOD THEN PROMPT FOR LANGUAGE
 :lang
 call:binfolder
 FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
-IF "%OSLanguage%"=="en-US" (
+set oslang=%OSLanguage:~0,2%
+IF "%oslang%"=="en" (
 set lang=en
+goto checkwget)
+IF "%oslang%"=="fr" (
+set lang=fr
 goto checkwget)
 echo.Select Your Language
 call Button 1 2 F2 "ENGLISH" 14 2 F2 "Francais" 28 2 F2 "Portugues" 43 2 F2 "Deutsch" X _Var_Box _Var_Hover
