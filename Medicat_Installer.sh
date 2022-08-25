@@ -30,14 +30,14 @@ fi
 if ! [ $(which 7z 2>/dev/null) ]; then
 	sudo $pkgmgr install p7zip-full
 fi
+if ! [ $(which curl 2>/dev/null) ]; then
+	sudo $pkgmgr install curl
+fi
 if ! [ $(sudo which mkntfs 2>/dev/null) ]; then 
 	sudo $pkgmgr install ntfs-3g
 fi
 echo "Downloading Ventoy"
-wget "https://api.github.com/repos/ventoy/Ventoy/releases/latest"
-cat latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' >> version
-venver=$(cat version)
-rm version
+venver=$(curl -sL https://api.github.com/repos/ventoy/Ventoy/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
 rm latest
 echo -e "Attempting to download Ventoy Version: ${venver: -6}\n\n\n"
 wget https://github.com/ventoy/Ventoy/releases/download/v${venver: -6}/ventoy-${venver: -6}-linux.tar.gz -O ventoy.tar.gz
