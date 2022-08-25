@@ -21,22 +21,21 @@ elif [[ -e /etc/fedora-release ]]; then
 fi
 echo "Acquiring any dependencies"
 sudo $pkgmgr update
-if ! [ $(which aria2c 2>/dev/null) ]; then
-	sudo $pkgmgr install aria2
-fi
 if ! [ $(which wget 2>/dev/null) ]; then
 	sudo $pkgmgr install wget
-fi
-if ! [ $(which 7z 2>/dev/null) ]; then
-	sudo $pkgmgr install p7zip-full
 fi
 if ! [ $(which curl 2>/dev/null) ]; then
 	sudo $pkgmgr install curl
 fi
+if ! [ $(which 7z 2>/dev/null) ]; then
+	sudo $pkgmgr install p7zip-full
+fi
 if ! [ $(sudo which mkntfs 2>/dev/null) ]; then 
 	sudo $pkgmgr install ntfs-3g
 fi
-echo "Downloading Ventoy"
+if ! [ $(which aria2c 2>/dev/null) ]; then
+	sudo $pkgmgr install aria2
+fi
 venver=$(curl -sL https://api.github.com/repos/ventoy/Ventoy/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
 rm latest
 echo -e "Attempting to download Ventoy Version: ${venver: -6}\n\n\n"
@@ -52,7 +51,7 @@ if ! [[ -f MediCat.USB.v21.12.7z ]]; then
 	if  [[ -f MediCat\ USB\ v21.12/MediCat.USB.v21.12.7z ]]; then
 		location=''MediCat\ USB\ v21.12/MediCat.USB.v21.12.7z''
 	else
-	echo "Please enter location of MediCat.USB.v21.12.7z if it exists or just press enter"
+	echo "Please enter location of MediCat.USB.v21.12.7z if it exists or just press enter to download it via tor."
 	read location
 	fi
 	if [ -z "$location" ] ; then
