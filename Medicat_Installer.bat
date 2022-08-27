@@ -30,37 +30,17 @@ if '%errorlevel%' NEQ '0' (
     CD /D "%~dp0"
 :-------------------------------------- 
 :UACAdmin
-
 :initialchecks
 REM INTERNET CHECK
+echo.Running Initial Checks
 Ping 1.1.1.1 -n 1 -w 1000 > nul
 if errorlevel 1 (echo This script requires internet to download the latest version of the program. && pause && exit)
+echo.Found Internet
 curl.exe -V > nul
 if errorlevel 1 (echo Filed to find curl. && pause && exit)
-REM CHECK FOR POWERSHELL ON SYSTEM
-:pwrshl
-if exist "%SYSTEMROOT%\system32\WindowsPowerShell\v1.0\powershell.exe" (goto lang) else (goto pwrshlerr)
-:pwrshlerr
-mode con:cols=64 lines=18
-title Medicat Installer [ERROR]
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.IIII                                                       IIII
-echo.IIII                 THIS PROGRAM REQUIRES                 IIII
-echo.IIII              POWERSHELL TO BE INSTALLED.              IIII
-echo.IIII                                                       IIII
-echo.IIII         PLEASE INSTALL POWERSHELL ON YOUR OS          IIII
-echo.IIII                 AND TRY AGAIN. THANKS.                IIII
-echo.IIII                                                       IIII
-echo.IIII                                                       IIII
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.If you believe it IS installed and want to bypass this warning,
-Set /P _num=type "OK": || Set _num=NothingChosen
-If "%_num%"=="NothingChosen" exit
-If /i "%_num%"=="ok" goto lang
-
-REM IF POWERSHELL CHECK IS GOOD THEN PROMPT FOR LANGUAGE
+echo.Found cURL
+if not exist "%SYSTEMROOT%\system32\WindowsPowerShell\v1.0\powershell.exe" (echo.Cound not find Powershell. && pause && exit) 
+echo.Found Powershell
 :lang
 curl -O -s http://cdn.medicatusb.com/files/install/bin.bat
 call bin
