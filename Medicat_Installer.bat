@@ -1,4 +1,6 @@
 @echo OFF & setlocal enabledelayedexpansion
+set "params=%*"
+cd /d "%~dp0" && ( if exist "%temp%\getadmin.vbs" del "%temp%\getadmin.vbs" ) && fsutil dirty query %systemdrive% 1>nul 2>nul || (  echo Set UAC = CreateObject^("Shell.Application"^) : UAC.ShellExecute "cmd.exe", "/k cd ""%~sdp0"" && %~s0 %params%", "", "runas", 1 >> "%temp%\getadmin.vbs" && "%temp%\getadmin.vbs" && exit /B )
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
@@ -21,6 +23,7 @@ if '%errorlevel%' NEQ '0' (
 	echo.Veuillez rouvrir ce script en tant qu'administrateur.
 	echo.Por favor, reabra este script como administrador.
 	echo.Bitte offnen Sie dieses Skript erneut als Administrator.
+	echo.Lutfen bu betigi yonetici olarak yeniden acın.
 	pause
 	exit
 ) else ( goto gotAdmin )
@@ -62,7 +65,7 @@ set oslang=%OSLanguage:~0,2%
 IF "%oslang%"=="en" (set lang=en && goto curver)
 IF "%oslang%"=="fr" (set lang=fr && goto curver)
 echo.Select Your Language
-call Button 1 2 F2 "ENGLISH" 14 2 F2 "Francais" 28 2 F2 "Portugues" 43 2 F2 "Deutsch" X _Var_Box _Var_Hover
+call Button 1 2 F2 "English" 14 2 F2 "Francais" 28 2 F2 "Portugues" 43 2 F2 "Deutsch" 56 2 F2 "Turkish" X _Var_Box _Var_Hover
 GetInput /M %_Var_Box% /H %_Var_Hover% 
 GetInput /M %_Var_Box% /H %_Var_Hover% 
 If /I "%Errorlevel%"=="1" (
@@ -79,6 +82,14 @@ goto curver
 )
 If /I "%Errorlevel%"=="4" (
 set lang=gr
+goto curver
+)
+If /I "%Errorlevel%"=="4" (
+set lang=gr
+goto curver
+)
+If /I "%Errorlevel%"=="5" (
+set lang=tr
 goto curver
 )
 
@@ -101,7 +112,7 @@ if "%localver%" == "%remver%" (goto winvercheck0)
 :updateprogram
 cls
 echo.A new version of the program has been released. The program will now restart.
-wget "http://cdn.medicatusb.com/files/install/update.bat" -O ./update.bat -q
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.bat" -O ./update.bat -q
 start cmd /k update.bat
 exit
 
@@ -159,10 +170,10 @@ title Medicat Installer [FILECHECK]
 :cont
 echo.Please wait. Files are being downloaded. 
 wget "http://cdn.medicatusb.com/files/install/ver.ini" -O ./ver.ini -q
-wget "http://cdn.medicatusb.com/files/install/%lang%/motd.txt" -O ./bin/motd.txt -q
-wget "http://cdn.medicatusb.com/files/install/%lang%/LICENSE.txt" -O ./bin/LICENSE.txt -q
-wget "http://cdn.medicatusb.com/files/install/7z/%bit%.exe" -O ./bin/7z.exe -q
-wget "http://cdn.medicatusb.com/files/install/7z/%bit%.dll" -O ./bin/7z.dll -q
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/motd.txt" -O ./bin/motd.txt -q
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/LICENSE.txt" -O ./bin/LICENSE.txt -q
+wget "https://github.com/mon5termatt/medicat_installer/blob/main/7z/%bit%.exe" -O ./bin/7z.exe -q
+wget "https://github.com/mon5termatt/medicat_installer/blob/main/7z/%bit%.dll" -O ./bin/7z.dll -q
 set /p medicatver= < ver.ini
 DEL ver.ini /Q
 goto menu
@@ -554,13 +565,13 @@ echo.IIII             OK USING GOOGLE DRIVE INSTEAD             IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
-wget "http://cdn.medicatusb.com/files/install/download/drive.bat" -O ./drive.bat -q
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/drive.bat" -O ./drive.bat -q
 call drive.bat
 del drive.bat /Q
 goto warnventoy
 
 :tordown
-wget "http://cdn.medicatusb.com/files/install/download/tor.bat" -O ./tor.bat -q
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -O ./tor.bat -q
 call tor.bat
 del tor.bat /Q
 goto warnventoy
