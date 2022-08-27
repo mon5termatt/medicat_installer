@@ -11,6 +11,8 @@ This repo is for development purposes only.
 # Compatibility
 Works with Windows 10/11 **with powershell installed**
 
+**please note that this script requires cURL which was not included with windows until release 1703.**
+
 **THIS SCRIPT DOES NOT WORK WITH WINDOWS 7/8**
 
 Linux script tested with Ubuntu and CentOS
