@@ -65,12 +65,11 @@ del bin.bat
 
 
 
-rem languages
 :lang
 FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
-set oslang=%OSLanguage:~0,2%
-IF "%oslang%"=="en" (set lang=en && goto curver)
-IF "%oslang%"=="fr" (set lang=fr && goto curver)
+set lang=%OSLanguage:~0,2%
+IF "%lang%"=="en" (goto curver)
+IF "%lang%"=="fr" (goto curver)
 echo.Select Your Language
 call Button 1 2 F2 "English" 14 2 F2 "Francais" 28 2 F2 "Portugues" 43 2 F2 "Deutsch" 56 2 F2 "Turkish" X _Var_Box _Var_Hover
 GetInput /M %_Var_Box% /H %_Var_Hover% 
@@ -99,7 +98,6 @@ If /I "%Errorlevel%"=="5" (
 set lang=tr
 goto curver
 )
-
 
 :curver
 wget "http://cdn.medicatusb.com/files/install/curver.ini" -O ./curver.ini -q
