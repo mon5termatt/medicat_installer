@@ -1,6 +1,4 @@
 @echo OFF & setlocal enabledelayedexpansion
-set "params=%*"
-cd /d "%~dp0" && ( if exist "%temp%\getadmin.vbs" del "%temp%\getadmin.vbs" ) && fsutil dirty query %systemdrive% 1>nul 2>nul || (  echo Set UAC = CreateObject^("Shell.Application"^) : UAC.ShellExecute "cmd.exe", "/k cd ""%~sdp0"" && %~s0 %params%", "", "runas", 1 >> "%temp%\getadmin.vbs" && "%temp%\getadmin.vbs" && exit /B )
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
@@ -10,7 +8,6 @@ set format=Yes
 set formatcolor=2F
 if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
 REM GET ADMIN CODE MUST GO FIRST
-
 :admin
     IF "%PROCESSOR_ARCHITECTURE%" EQU "amd64" (
 >nul 2>&1 "%SYSTEMROOT%\SysWOW64\cacls.exe" "%SYSTEMROOT%\SysWOW64\config\system"
@@ -31,8 +28,6 @@ if '%errorlevel%' NEQ '0' (
 :gotAdmin
     pushd "%CD%"
     CD /D "%~dp0"
-:-------------------------------------- 
-:UACAdmin
 :initialchecks
 REM INTERNET CHECK
 echo.Running Initial Checks
@@ -44,6 +39,18 @@ if errorlevel 1 (echo Filed to find curl. && pause && exit)
 echo.Found cURL
 if not exist "%SYSTEMROOT%\system32\WindowsPowerShell\v1.0\powershell.exe" (echo.Cound not find Powershell. && pause && exit) 
 echo.Found Powershell
+:winvercheck0
+for /f "tokens=4-5 delims=. " %%i in ('ver') do set os2=%%i.%%j
+if "%os2%" == "10.0" goto oscheckpass
+mode con:cols=64 lines=18
+title Medicat Installer [UNSUPPORTED]
+ver
+echo.Your version of windows might not be supported.
+echo.If you believe this is an error you can
+Set /P _num=bypass this warning by typing "I AGREE": || Set _num=NothingChosen
+If "%_num%"=="NothingChosen" exit
+If /i "%_num%"=="I AGREE" goto oscheckpass
+:oscheckpass
 timeout 2 > nul
 md bin
 clear
@@ -94,56 +101,26 @@ goto curver
 )
 
 
-
-
 :curver
 wget "http://cdn.medicatusb.com/files/install/curver.ini" -O ./curver.ini -q
 set /p remver= < curver.ini
 del curver.ini /Q
 
+:---------------------------------------------------
+:---------------------------------------------------
+rem REMOVE THIS TO CHECK FOR UPDATES
+goto start
+:---------------------------------------------------
+:---------------------------------------------------
 
-REM REMOVE THESE LINES BEFORE RELEASING TO PUBLIC. THIS BYPASSES THE UPDATE
-REM ==========================================================================
-goto winvercheck0
-REM ==========================================================================
 
-
-if "%localver%" == "%remver%" (goto winvercheck0)
+if "%localver%" == "%remver%" (goto start)
 :updateprogram
 cls
 echo.A new version of the program has been released. The program will now restart.
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.bat" -O ./update.bat -q
 start cmd /k update.bat
 exit
-
-REM == CHECK IF USER IS RUNNING SUPPORTED OS. OTHERWISE WARN.
-
-
-:winvercheck0
-for /f "tokens=4-5 delims=. " %%i in ('ver') do set os2=%%i.%%j
-if "%os2%" == "10.0" goto start
-mode con:cols=64 lines=18
-title Medicat Installer [UNSUPPORTED]
-ver
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.IIII                                                       IIII
-echo.IIII                YOUR VERSION OF WINDOWS                IIII
-echo.IIII                   IS NOT SUPPORTED.                   IIII
-echo.IIII                                                       IIII
-echo.IIII            PLEASE UPDATE TO WINDOWS 10/11             IIII
-echo.IIII                                                       IIII
-echo.IIII          INSIDER BUILDS MAY HAVE THIS ERROR           IIII
-echo.IIII                                                       IIII
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-Set /P _num=To Bypass This Warning Type "I AGREE": || Set _num=NothingChosen
-If "%_num%"=="NothingChosen" exit
-If /i "%_num%"=="I AGREE" goto start
-:error
-exit
-
-
 
 
 :start
@@ -169,7 +146,7 @@ echo.                          Press any key to bypass this warning.&& pause >nu
 title Medicat Installer [FILECHECK]
 :cont
 echo.Please wait. Files are being downloaded. 
-wget "http://cdn.medicatusb.com/files/install/ver.ini" -O ./ver.ini -q
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/ver.ini" -O ./ver.ini -q
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/motd.txt" -O ./bin/motd.txt -q
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/LICENSE.txt" -O ./bin/LICENSE.txt -q
 wget "https://github.com/mon5termatt/medicat_installer/blob/main/7z/%bit%.exe" -O ./bin/7z.exe -q
