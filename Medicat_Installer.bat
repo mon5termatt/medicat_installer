@@ -47,7 +47,7 @@ clear
 echo.Downloading WGET for the remaining downloads as its faster.
 curl -O -s https://eternallybored.org/misc/wget/1.21.3/%bit%/wget.exe
 move .\wget.exe .\bin\wget.exe
-curl -O -s http://cdn.medicatusb.com/files/install/bin.bat
+wget "http://cdn.medicatusb.com/files/install/bin.bat" -O ./bin.bat -q
 call bin
 del bin.bat
 
@@ -486,34 +486,6 @@ start https://url.medicatusb.com/discord
 goto menu2
 
 
-:exit
-exit
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -652,3 +624,6 @@ echo.                              ....oooooooooooooooo....
 echo.CODED BY MON5TERMATT With Help from AAA3A, Daan Breur, Jayro, and many others. Thanks!
 echo.TRANSLATED BY MON5TERMATT
 exit/b
+
+:exit
+exit
