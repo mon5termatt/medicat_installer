@@ -1,38 +1,38 @@
-MIT Lisansı
+MIT Lisansi
 
 ################################################# ###
-BU YAZILIM PARA İÇİN ÖDEDİYSENİZ, DOLANDIRILMIŞSINIZ!
+BU YAZILIM PARA ICIN ODEDIYSENIZ, DOLANDIRILMISSINIZ!
 ################################################# ###
 
-MediCat USB tamamen ücretsiz olarak piyasaya 
-sürülür.
+MediCat USB tamamen ucretsiz olarak piyasaya 
+surulur.
 
-Bu belgeyle, bu yazılımın ve ilgili belge
-dosyalarının ("Yazılım") bir kopyasını edinen
-herhangi bir kişiye, kullanım, kopyalama,
-değiştirme, birleştirme hakları dahil ancak
-bunlarla sınırlı olmamak üzere, herhangi bir
-kısıtlama olmaksızın Yazılımı kullanma izni
-verilir. Yazılımın kopyalarını yayınlamak,
-dağıtmak, alt lisansını vermek ve/veya satmak
-ve aşağıdaki koşullara tabi olarak yazılımın
-verildiği kişilerin bunu yapmasına izin vermek:
+Bu belgeyle, bu yazilimin ve ilgili belge
+dosyalarinin ("Yazilim") bir kopyasini edinen
+herhangi bir kisiye, kullanim, kopyalama,
+degistirme, birlestirme haklari dahil ancak
+bunlarla sinirli olmamak uzere, herhangi bir
+kisitlama olmaksizin Yazilimi kullanma izni
+verilir. Yazilimin kopyalarini yayinlamak,
+dagitmak, alt lisansini vermek ve/veya satmak
+ve asagidaki kosullara tabi olarak yazilimin
+verildigi kisilerin bunu yapmasina izin vermek:
 
-Yukarıdaki telif hakkı bildirimi ve bu izin
-bildirimi,yazılımın tüm kopyalarına veya
-önemli bölümlerine dahil edilecektir.
+Yukaridaki telif hakki bildirimi ve bu izin
+bildirimi,yazilimin tum kopyalarina veya
+onemli bolumlerine dahil edilecektir.
 
-YAZILIM, SATILABİLİRLİK, BELİRLİ BİR AMACA
-UYGUNLUK VE İHLAL ETMEME GARANTİLERİ DAHİL
-ANCAK BUNLARLA SINIRLI OLMAYAN, AÇIK VEYA
-ZIMNİ HİÇBİR GARANTİ OLMAKSIZIN "OLDUĞU GİBİ"
-SAĞLANMAKTADIR. HİÇBİR DURUMDA YAZARLAR VEYA
-TELİF HAKKI SAHİPLERİ, SÖZLEŞME, HAKSIZ YA DA
-BAŞKA BİR DURUMDA, YAZILIMIN DIŞINDA VEYA
-BAĞLANTILI OLARAK VEYA YAZILIMLARIN KULLANIMINDAN
-KAYNAKLANAN HERHANGİ BİR İDDİA, ZARAR VEYA DİĞER
+YAZILIM, SATILABILIRLIK, BELIRLI BIR AMACA
+UYGUNLUK VE IHLAL ETMEME GARANTILERI DAHIL
+ANCAK BUNLARLA SINIRLI OLMAYAN, ACIK VEYA
+ZIMNI HICBIR GARANTI OLMAKSIZIN "OLDUGU GIBI"
+SAGLANMAKTADIR. HICBIR DURUMDA YAZARLAR VEYA
+TELIF HAKKI SAHIPLERI, SOZLESME, HAKSIZ YA DA
+BASKA BIR DURUMDA, YAZILIMIN DISINDA VEYA
+BAGLANTILI OLARAK VEYA YAZILIMLARIN KULLANIMINDAN
+KAYNAKLANAN HERHANGI BIR IDDIA, ZARAR VEYA DIGER
 SORUMLULUKTAN SORUMLU TUTULAMAZLAR.
 
-YAZILIMI KULLANIRKEN OLUŞABİLECEK RİSKLER SİZE AİTİR!
+YAZILIMI KULLANIRKEN OLUSABILECEK RISKLER SIZE AITIR!
 
-Telif hakkı (c) 2021 MediCat USB
+Telif hakki (c) 2021 MediCat USB
