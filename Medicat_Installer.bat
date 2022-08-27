@@ -64,6 +64,7 @@ REM IF POWERSHELL CHECK IS GOOD THEN PROMPT FOR LANGUAGE
 :lang
 curl -O -s http://cdn.medicatusb.com/files/install/bin.bat
 call bin
+del bin.bat
 FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
 set oslang=%OSLanguage:~0,2%
 IF "%oslang%"=="en" (
