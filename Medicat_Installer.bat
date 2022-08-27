@@ -20,7 +20,7 @@ if '%errorlevel%' NEQ '0' (
 	echo.Veuillez rouvrir ce script en tant qu'administrateur.
 	echo.Por favor, reabra este script como administrador.
 	echo.Bitte offnen Sie dieses Skript erneut als Administrator.
-	echo.Lutfen bu betigi yonetici olarak yeniden acın.
+	echo.Lutfen bu betigi yonetici olarak yeniden acin.
 	pause
 	exit
 ) else ( goto gotAdmin )
