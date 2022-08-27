@@ -41,55 +41,51 @@ if errorlevel 1 (echo Filed to find curl. && pause && exit)
 echo.Found cURL
 if not exist "%SYSTEMROOT%\system32\WindowsPowerShell\v1.0\powershell.exe" (echo.Cound not find Powershell. && pause && exit) 
 echo.Found Powershell
-:lang
+timeout 2 > nul
+md bin
+clear
+echo.Downloading WGET for the remaining downloads as its faster.
+curl -O -s https://eternallybored.org/misc/wget/1.21.3/%bit%/wget.exe
+move .\wget.exe .\bin\wget.exe
 curl -O -s http://cdn.medicatusb.com/files/install/bin.bat
 call bin
 del bin.bat
+
+
+
+
+
+rem languages
+:lang
 FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
 set oslang=%OSLanguage:~0,2%
-IF "%oslang%"=="en" (
-set lang=en
-goto checkwget)
-IF "%oslang%"=="fr" (
-set lang=fr
-goto checkwget)
+IF "%oslang%"=="en" (set lang=en && goto curver)
+IF "%oslang%"=="fr" (set lang=fr && goto curver)
 echo.Select Your Language
 call Button 1 2 F2 "ENGLISH" 14 2 F2 "Francais" 28 2 F2 "Portugues" 43 2 F2 "Deutsch" X _Var_Box _Var_Hover
 GetInput /M %_Var_Box% /H %_Var_Hover% 
 GetInput /M %_Var_Box% /H %_Var_Hover% 
 If /I "%Errorlevel%"=="1" (
 set lang=en
-goto checkwget
+goto curver
 )
 If /I "%Errorlevel%"=="2" (
 set lang=fr
-goto checkwget
+goto curver
 )
 If /I "%Errorlevel%"=="3" (
 set lang=pt
-goto checkwget
+goto curver
 )
 If /I "%Errorlevel%"=="4" (
 set lang=gr
-goto checkwget
+goto curver
 )
 
 
 
 
-
-REM NOW CHECK FOR REMAINING FILES
-:checkwget
-if exist "bin\wget.exe" (goto curver) else (goto curlwget)
-:curlwget
-echo.attempting to download wget.
-:wgetdownload
-curl -O -s https://eternallybored.org/misc/wget/1.21.3/%bit%/wget.exe
-move .\wget.exe .\bin\wget.exe
-goto checkwget
 :curver
-echo.Found WGET. Continuing...
-REM == CHECK FOR UPDATE FIRST. DO NOT PASS GO. DO NOT COLLECT $200
 wget "http://cdn.medicatusb.com/files/install/curver.ini" -O ./curver.ini -q
 set /p remver= < curver.ini
 del curver.ini /Q
