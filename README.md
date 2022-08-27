@@ -39,12 +39,8 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
       * For File Extraction
   5. [Wget](https://eternallybored.org/misc/wget/)
       * For downloading files from the internet. Because I hate curl...
-</details>
-
-<details>
-  <summary>Files Included with Program</summary>
-  
-  ## Files Included
+ 
+  ## Files Included In Bin.bat
   1. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
   2. [Box](https://github.com/TheBATeam/Box-Function-2.0)
   3. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
