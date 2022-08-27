@@ -20,7 +20,7 @@ curl -O -s https://eternallybored.org/misc/wget/1.21.3/64/wget.exe
 move .\wget.exe .\bin\wget.exe
 goto checkwget
 :curver
-wget "http://url.medicatusb.com/installerupdate" -O ./Medicat_Installer.bat -q
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/Medicat_Installer.bat" -O ./Medicat_Installer.bat -q
 cls
 start cmd /k Medicat_Installer.bat Medicat_Installer.bat
 del %0 && exit
