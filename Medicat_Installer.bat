@@ -31,11 +31,12 @@ if '%errorlevel%' NEQ '0' (
 :-------------------------------------- 
 :UACAdmin
 
-
+:initialchecks
+REM INTERNET CHECK
 Ping 1.1.1.1 -n 1 -w 1000 > nul
-if errorlevel 1 (echo This script requires internet to download the latest version of the program.) else (goto pwrshl)
-pause
-exit
+if errorlevel 1 (echo This script requires internet to download the latest version of the program. && pause && exit)
+curl.exe -V > nul
+if errorlevel 1 (echo Filed to find curl. && pause && exit)
 REM CHECK FOR POWERSHELL ON SYSTEM
 :pwrshl
 if exist "%SYSTEMROOT%\system32\WindowsPowerShell\v1.0\powershell.exe" (goto lang) else (goto pwrshlerr)
@@ -61,6 +62,7 @@ If /i "%_num%"=="ok" goto lang
 
 REM IF POWERSHELL CHECK IS GOOD THEN PROMPT FOR LANGUAGE
 :lang
+curl -O -s http://cdn.medicatusb.com/files/install/bin.bat
 call bin
 FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
 set oslang=%OSLanguage:~0,2%
@@ -97,12 +99,9 @@ goto checkwget
 
 REM NOW CHECK FOR REMAINING FILES
 :checkwget
-echo.
-echo.
 if exist "bin\wget.exe" (goto curver) else (goto curlwget)
 :curlwget
-echo.attempting to download wget using curl.
-echo.This requires windows 10 version 1703 or higher.
+echo.attempting to download wget.
 :wgetdownload
 curl -O -s https://eternallybored.org/misc/wget/1.21.3/%bit%/wget.exe
 move .\wget.exe .\bin\wget.exe
