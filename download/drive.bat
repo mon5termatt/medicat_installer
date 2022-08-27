@@ -1,17 +1,5 @@
 @echo off
 :: https://github.com/prasmussen/gdrive
-:7z
-REM -- CHECK IF 64BIT
-if defined ProgramFiles(x86) (goto 7z64) else (goto 7z32)
-:7z32
-wget "http://cdn.medicatusb.com/files/install/7z/32.bat" -O ./7z.bat -q
-goto 7ze
-:7z64
-wget "http://cdn.medicatusb.com/files/install/7z/64.bat" -O ./7z.bat -q
-goto 7ze
-:7ze
-CALL 7z.bat
-DEL 7z.bat /Q
 wget https://github.com/prasmussen/gdrive/releases/download/2.1.1/gdrive_2.1.1_windows_amd64.tar.gz -O ./gdrive.tar.gz
 7z e gdrive.tar.gz -r -aoa
 7z e gdrive.tar -r -aoa
@@ -43,11 +31,11 @@ if exist "%CD%\*.006" (echo..006 Exists) else (goto gdriveerror)
 goto hashfiles
 :gdriveerror
 echo. Attempting MIRROR dir
-start https://drive.google.com/drive/folders/1FbJtFbWXOPGNSc0ieg8sc5sPvb8PdM_M?usp=sharing
+start https://drive.google.com/drive/folders/1R_05cS0Vq24xfuX27j75OiZrC_mZgQUB
+echo.Manually download these
 pause
 goto verifyfiles
 :verifyfiles
-Google_Drive_Validate_Files.exe
 wget "http://cdn.medicatusb.com/files/hasher/Google_Drive_Validate_Files.exe" -O ./Google_Drive_Validate_Files.exe -q
 start Google_Drive_Validate_Files.exe Google_Drive_Validate_Files.exe
 :exit
