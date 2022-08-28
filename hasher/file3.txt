@@ -1,6 +1,0 @@
-
-Algorithm       Hash                                                           
----------       ----                                                           
-SHA1            69A5C48BDBA8FE7AE33B9D251813230F2868D731                       
-
-
