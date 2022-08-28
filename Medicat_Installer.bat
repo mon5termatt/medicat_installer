@@ -105,8 +105,6 @@ powershell -c "$data = wget https://api.github.com/repos/mon5termatt/medicat_ins
 set /p remver= < curver.ini
 set remver=%remver:~-4%
 del curver.ini /Q
-echo."%localver%" == "%remver%"
-pause
 if "%localver%" == "%remver%" (goto start)
 
 :updateprogram
