@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=4000
+set localver=3203
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -53,13 +53,14 @@ If /i "%_num%"=="I AGREE" goto oscheckpass
 :oscheckpass
 timeout 2 > nul
 md bin
-clear
+cls
 echo.Downloading WGET for the remaining downloads as its faster.
 curl -O -s https://eternallybored.org/misc/wget/1.21.3/%bit%/wget.exe
 move .\wget.exe .\bin\wget.exe
-wget "http://cdn.medicatusb.com/files/install/bin.bat" -O ./bin.bat -q
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin.bat" -O ./bin.bat -q
 call bin
 del bin.bat
+cls
 
 
 
@@ -100,19 +101,14 @@ goto curver
 )
 
 :curver
-wget "http://cdn.medicatusb.com/files/install/curver.ini" -O ./curver.ini -q
+powershell -c "$data = wget https://api.github.com/repos/mon5termatt/medicat_installer/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './curver.ini'"
 set /p remver= < curver.ini
+set remver=%remver:~-4%
 del curver.ini /Q
-
-:---------------------------------------------------
-:---------------------------------------------------
-rem REMOVE THIS TO CHECK FOR UPDATES
-goto start
-:---------------------------------------------------
-:---------------------------------------------------
-
-
+echo."%localver%" == "%remver%"
+pause
 if "%localver%" == "%remver%" (goto start)
+
 :updateprogram
 cls
 echo.A new version of the program has been released. The program will now restart.
@@ -152,14 +148,6 @@ wget "https://github.com/mon5termatt/medicat_installer/blob/main/7z/%bit%.dll" -
 set /p medicatver= < ver.ini
 DEL ver.ini /Q
 goto menu
-
-
-
-
-
-
-
-
 
 
 
@@ -439,9 +427,9 @@ goto finishup
 REM -- FILE CLEANUP
 
 :finishup
-wget "http://cdn.medicatusb.com/files/hasher/Validate_Files.exe" -O %drivepath%:/Validate_Files.exe -q
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -O %drivepath%:/CheckFiles.bat -q
 cd /d %drivepath%:
-start "%drivepath%:/Validate_Files.exe" "%drivepath%:/Validate_Files.exe"
+start cmd /k CheckFiles.bat
 exit
 
 
@@ -450,12 +438,21 @@ exit
 
 
 
+::---------------------------------------------------------------------------------------------------------------------------------------------------
+::---------------------------------------------------------------------------------------------------------------------------------------------------
+::---------------------------------------------------------------------------------------------------------------------------------------------------
+::---------------------------------------------------------------------------------------------------------------------------------------------------
+::---------------------------------------------------------------------------------------------------------------------------------------------------
+::---------------------------------------------------------------------------------------------------------------------------------------------------
+::---------------------------------------------------------------------------------------------------------------------------------------------------
+::---------------------------------------------------------------------------------------------------------------------------------------------------
+::---------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 
 
 :hasher
-wget "http://cdn.medicatusb.com/files/hasher/drivefiles.md5" -O ./drivefiles.md5 -q
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/drivefiles.md5" -O ./drivefiles.md5 -q
 echo.THIS WILL LOOK FROZEN, DONT PANIC, ITS WORKING!
 echo.CANCEL AT ANY TIME BY CLOSING THE QUICKSFV BOX!
 QuickSFV.EXE drivefiles.md5
