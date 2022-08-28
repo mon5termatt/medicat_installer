@@ -3,11 +3,6 @@
 
 [Visit the Medicat Site](http://medicatusb.com/)
 
-[Please use the batch file hosted on the site for stability.](https://medicatusb.com/installer)
-
-This repo is for development purposes only. 
-
-
 # Compatibility
 Works with Windows 10/11 **with powershell installed**
 
