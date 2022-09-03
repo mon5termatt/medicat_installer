@@ -56,7 +56,7 @@ if ! [[ -f MediCat.USB.v21.12.7z ]]; then
 	fi
 	if [ -z "$location" ] ; then
 		echo "Starting to download torrent"
-		wget https://cdn.medicatusb.com/files/install/download/MediCat_USB_v21.12.torrent -O medicat.torrent
+		wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_v21.12.torrent -O medicat.torrent
 		aria2c --file-allocation=none --seed-time=0 medicat.torrent
 		location=''MediCat\ USB\ v21.12/MediCat.USB.v21.12.7z''
 	fi
