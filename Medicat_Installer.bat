@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3300
+set localver=3301
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -29,16 +29,18 @@ if '%errorlevel%' NEQ '0' (
     pushd "%CD%"
     CD /D "%~dp0"
 :initialchecks
-REM INTERNET CHECK
 echo.Running Initial Checks
 Ping 1.1.1.1 -n 1 -w 1000 > nul
 if errorlevel 1 (echo This script requires internet to download the latest version of the program. && pause && exit)
 echo.Found Internet
+timeout 1 > nul
 curl.exe -V > nul
 if errorlevel 1 (echo Filed to find curl. && pause && exit)
 echo.Found cURL
+timeout 1 > nul
 if not exist "%SYSTEMROOT%\system32\WindowsPowerShell\v1.0\powershell.exe" (echo.Cound not find Powershell. && pause && exit) 
 echo.Found Powershell
+timeout 1 > nul
 :winvercheck0
 for /f "tokens=4-5 delims=. " %%i in ('ver') do set os2=%%i.%%j
 if "%os2%" == "10.0" goto oscheckpass
@@ -51,7 +53,8 @@ Set /P _num=bypass this warning by typing "I AGREE": || Set _num=NothingChosen
 If "%_num%"=="NothingChosen" exit
 If /i "%_num%"=="I AGREE" goto oscheckpass
 :oscheckpass
-timeout 2 > nul
+echo.Using Supported version of windows.
+timeout 1 > nul
 md bin
 cls
 echo.Downloading WGET for the remaining downloads as its faster.
