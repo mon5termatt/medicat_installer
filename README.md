@@ -43,6 +43,5 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
   3. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
   4. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
   5. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
-  #### the encoded text at the bottom of the main script is for extracting some small files without the internet.
 </details>
 
