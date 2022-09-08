@@ -30,11 +30,9 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
       * For downloading from Google Drive.
   2. [aria2](https://github.com/aria2/aria2)
       * For downloading from torrent file.
-  3. [QuickSFV](http://www.quicksfv.org/)
-      * For hashing files somewhat quickly...
-  4. [7Zip](https://www.7-zip.org/)
+  3. [7Zip](https://www.7-zip.org/)
       * For File Extraction
-  5. [Wget](https://eternallybored.org/misc/wget/)
+  4. [Wget](https://eternallybored.org/misc/wget/)
       * For downloading files from the internet. Because I hate curl...
  
   ## Files Included In Bin.bat
@@ -43,5 +41,7 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
   3. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
   4. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
   5. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
+  6. [QuickSFV](http://www.quicksfv.org/)
+      * For hashing files somewhat quickly...
 </details>
 
