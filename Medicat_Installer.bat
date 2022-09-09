@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3301
+set localver=3302
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -428,6 +428,7 @@ goto finishup
 REM -- FILE CLEANUP
 
 :finishup
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/icon.ico" -O %drivepath%:/autorun.ico -q
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -O %drivepath%:/CheckFiles.bat -q
 cd /d %drivepath%:
 start cmd /k CheckFiles.bat
