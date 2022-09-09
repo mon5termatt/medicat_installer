@@ -144,8 +144,8 @@ echo.Please wait. Files are being downloaded.
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/ver.ini" -O ./ver.ini -q
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/motd.txt" -O ./bin/motd.txt -q
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/LICENSE.txt" -O ./bin/LICENSE.txt -q
-wget "https://github.com/mon5termatt/medicat_installer/blob/main/7z/%bit%.exe" -O ./bin/7z.exe -q
-wget "https://github.com/mon5termatt/medicat_installer/blob/main/7z/%bit%.dll" -O ./bin/7z.dll -q
+wget "https://github.com/mon5termatt/medicat_installer/raw/main/7z/%bit%.exe" -O ./bin/7z.exe -q
+wget "https://github.com/mon5termatt/medicat_installer/raw/main/7z/%bit%.dll" -O ./bin/7z.dll -q
 set /p medicatver= < ver.ini
 DEL ver.ini /Q
 goto menu
