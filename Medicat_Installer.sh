@@ -6,35 +6,54 @@ sleep 10
 if grep -qs "ubuntu" /etc/os-release; then
 	os="ubuntu"
 	pkgmgr="apt"
+	install_arg="install"
+	update_arg="update"
 elif grep -qs "freebsd" /etc/os-release; then
 	os="freebsd"
 	pkgmgr="pkg"
+	install_arg="install"
+	update_arg="update"
 elif [[ -e /etc/debian_version ]]; then
 	os="debian"
 	pkgmgr="apt"
+	install_arg="install"
+	update_arg="update"
 elif [[ -e /etc/almalinux-release || -e /etc/rocky-release || -e /etc/centos-release ]]; then
 	os="centos"
 	pkgmgr="yum"
+	install_arg="install"
+	update_arg="update"
 elif [[ -e /etc/fedora-release ]]; then
 	os="fedora"
 	pkgmgr="yum"
+	install_arg="install"
+	update_arg="update"
+elif [[ -e /etc/arch-release ]]; then
+	os="arch"
+	pkgmgr="pacman"
+	install_arg="-S --needed --noconfirm"
+	update_arg="-Syy"
 fi
 echo "Acquiring any dependencies"
-sudo $pkgmgr update
+sudo $pkgmgr $update_arg
 if ! [ $(which wget 2>/dev/null) ]; then
-	sudo $pkgmgr install wget
+	sudo $pkgmgr $install_arg wget
 fi
 if ! [ $(which curl 2>/dev/null) ]; then
-	sudo $pkgmgr install curl
+	sudo $pkgmgr $install_arg curl
 fi
 if ! [ $(which 7z 2>/dev/null) ]; then
-	sudo $pkgmgr install p7zip-full
+	if [[ -e /etc/arch-release ]]; then
+		sudo $pkgmgr $install_arg p7zip
+	else
+		sudo $pkgmgr $install_arg p7zip-full
+	fi
 fi
 if ! [ $(sudo which mkntfs 2>/dev/null) ]; then 
-	sudo $pkgmgr install ntfs-3g
+	sudo $pkgmgr $install_arg ntfs-3g
 fi
 if ! [ $(which aria2c 2>/dev/null) ]; then
-	sudo $pkgmgr install aria2
+	sudo $pkgmgr $install_arg aria2
 fi
 venver=$(curl -sL https://api.github.com/repos/ventoy/Ventoy/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
 rm latest
