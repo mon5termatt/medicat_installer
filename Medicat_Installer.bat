@@ -2,45 +2,39 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3302
+set localver=3303
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
 if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
 REM GET ADMIN CODE MUST GO FIRST
-:admin
-    IF "%PROCESSOR_ARCHITECTURE%" EQU "amd64" (
->nul 2>&1 "%SYSTEMROOT%\SysWOW64\cacls.exe" "%SYSTEMROOT%\SysWOW64\config\system"
-) ELSE (
->nul 2>&1 "%SYSTEMROOT%\system32\cacls.exe" "%SYSTEMROOT%\system32\config\system"
-)
-
-if '%errorlevel%' NEQ '0' (
-    echo.Please reopen this script as admin. 
-	echo.Veuillez rouvrir ce script en tant qu'administrateur.
-	echo.Por favor, reabra este script como administrador.
-	echo.Bitte offnen Sie dieses Skript erneut als Administrator.
-	echo.Lutfen bu betigi yonetici olarak yeniden acin.
-	pause
-	exit
-) else ( goto gotAdmin )
-
-:gotAdmin
-    pushd "%CD%"
-    CD /D "%~dp0"
 :initialchecks
 echo.Running Initial Checks
 Ping 1.1.1.1 -n 1 -w 1000 > nul
 if errorlevel 1 (echo This script requires internet to download the latest version of the program. && pause && exit)
 echo.Found Internet
-timeout 1 > nul
 curl.exe -V > nul
 if errorlevel 1 (echo Filed to find curl. && pause && exit)
 echo.Found cURL
-timeout 1 > nul
-if not exist "%SYSTEMROOT%\system32\WindowsPowerShell\v1.0\powershell.exe" (echo.Cound not find Powershell. && pause && exit) 
+for %%# in (powershell.exe) do @if "%%~$PATH:#"=="" (echo.Could not find Powershell. && pause && exit) 
 echo.Found Powershell
-timeout 1 > nul
+echo.Promting for admin permissions if not run as admin.
+timeout 1 >nul
+set _elev=
+if /i "%~1"=="-el" set _elev=1
+set _PSarg="""%~f0""" -el %_args% && set "nul=>nul 2>&1" && setlocal EnableDelayedExpansion
+%nul% reg query HKU\S-1-5-19 || (
+if not defined _elev %nul% powershell.exe "start cmd.exe -arg '/c \"!_PSarg:'=''!\"' -verb runas" && exit /b
+	echo.Please reopen this script as admin. 
+	echo.Veuillez rouvrir ce script en tant qu'administrateur.
+	echo.Por favor, reabra este script como administrador.
+	echo.Bitte offnen Sie dieses Skript erneut als Administrator.
+	echo.Lutfen bu betigi yonetici olarak yeniden acin. && pause && exit /b
+)
+    pushd "%CD%"
+    CD /D "%~dp0"
+
+
 :winvercheck0
 for /f "tokens=4-5 delims=. " %%i in ('ver') do set os2=%%i.%%j
 if "%os2%" == "10.0" goto oscheckpass
