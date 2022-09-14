@@ -48,8 +48,10 @@ If /i "%_num%"=="I AGREE" goto oscheckpass
 echo.Using Supported version of windows.
 timeout 1 > nul
 md bin
-mode con:cols=64 lines=18
-cls
+cd %maindir%\bin
+curl -O -s https://eternallybored.org/misc/wget/1.21.3/%bit%/wget.exe
+cd %maindir% 
+
 
 
 :lang
@@ -87,6 +89,8 @@ goto curver
 )
 
 :curver
+mode con:cols=64 lines=18
+cls
 powershell -c "$data = wget https://api.github.com/repos/mon5termatt/medicat_installer/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './curver.ini'"
 set /p remver= < curver.ini
 set remver=%remver:~-4%
@@ -119,9 +123,6 @@ echo.                          Press any key to bypass this warning.&& pause >nu
 title Medicat Installer [FILECHECK]
 cls
 echo.Please wait. Files are being downloaded. 
-cd %maindir%\bin
-curl -O -s https://eternallybored.org/misc/wget/1.21.3/%bit%/wget.exe
-cd %maindir% 
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin.bat" -O ./bin.bat -q
 call bin
 del bin.bat
