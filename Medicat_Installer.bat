@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3303
+set localver=3304
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -31,11 +31,9 @@ if not defined _elev %nul% powershell.exe "start cmd.exe -arg '/c \"!_PSarg:'=''
 	echo.Bitte offnen Sie dieses Skript erneut als Administrator.
 	echo.Lutfen bu betigi yonetici olarak yeniden acin. && pause && exit /b
 )
-    pushd "%CD%"
-    CD /D "%~dp0"
 
-
-:winvercheck0
+pushd "%CD%"
+CD /D "%~dp0"
 for /f "tokens=4-5 delims=. " %%i in ('ver') do set os2=%%i.%%j
 if "%os2%" == "10.0" goto oscheckpass
 mode con:cols=64 lines=18
@@ -50,17 +48,8 @@ If /i "%_num%"=="I AGREE" goto oscheckpass
 echo.Using Supported version of windows.
 timeout 1 > nul
 md bin
+mode con:cols=64 lines=18
 cls
-echo.Downloading WGET for the remaining downloads as its faster.
-curl -O -s https://eternallybored.org/misc/wget/1.21.3/%bit%/wget.exe
-move .\wget.exe .\bin\wget.exe
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin.bat" -O ./bin.bat -q
-call bin
-del bin.bat
-cls
-
-
-
 
 
 :lang
@@ -102,7 +91,7 @@ powershell -c "$data = wget https://api.github.com/repos/mon5termatt/medicat_ins
 set /p remver= < curver.ini
 set remver=%remver:~-4%
 del curver.ini /Q
-if "%localver%" == "%remver%" (goto start)
+if "%localver%" == "%remver%" (goto startup)
 
 :updateprogram
 cls
@@ -112,11 +101,6 @@ start cmd /k update.bat
 exit
 
 
-:start
-call:ascii
-pause
-mode con:cols=64 lines=18
-cls
 :startup
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
@@ -133,7 +117,15 @@ echo.II-----------------------------------------------------------II
 echo.                          Press any key to bypass this warning.&& pause >nul
 :checkupdateprogram
 title Medicat Installer [FILECHECK]
-:cont
+cls
+echo.Please wait. Files are being downloaded. 
+cd %maindir%\bin
+curl -O -s https://eternallybored.org/misc/wget/1.21.3/%bit%/wget.exe
+cd %maindir% 
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin.bat" -O ./bin.bat -q
+call bin
+del bin.bat
+cls
 echo.Please wait. Files are being downloaded. 
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/ver.ini" -O ./ver.ini -q
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/motd.txt" -O ./bin/motd.txt -q
@@ -142,13 +134,11 @@ wget "https://github.com/mon5termatt/medicat_installer/raw/main/7z/%bit%.exe" -O
 wget "https://github.com/mon5termatt/medicat_installer/raw/main/7z/%bit%.dll" -O ./bin/7z.dll -q
 set /p medicatver= < ver.ini
 DEL ver.ini /Q
-goto menu
 
 
-
-
-
-
+:start
+call:ascii
+pause
 :menu
 set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
 title Medicat Installer [%localver%]
