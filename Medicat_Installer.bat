@@ -397,6 +397,8 @@ REM -- ACTUALLY EXTRACT/INSTALL
 
 :install4
 set file="MediCat.USB.v21.12.7z"
+set sha256=a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4
+set sha1=2cbf5f337849a11084124a79a1b8d7e77eaca7d5
 7z x -O%drivepath%: %file% -r -aoa
 goto finishup
 
