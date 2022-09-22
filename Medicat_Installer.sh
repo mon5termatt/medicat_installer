@@ -92,18 +92,18 @@ echo "for example enter sda or sdb"
 read letter
 drive=/dev/$letter
 drive2="$drive""1"
-echo "You want to install Ventoy and Medicat to $drive / $drive2?"
-echo "Please enter Y or N"
-read checkingconfirm
-if [ $checkingconfirm = "N" ]; then
+checkingconfirm=""
+while [[ "$checkingconfirm" != [NnYy]* ]]; do
+	read -e -p "You want to install Ventoy and Medicat to $drive / $drive2? (Y/N) " checkingconfirm
+	if [[ "$checkingconfirm" == [Nn]* ]]; then
         exit
-elif [ $checkingconfirm = "Y" ]; then
-        echo "Okay! Will continue in 5 seconds!"
-	sleep 5
-else
-        echo "The only valid options are Y or N"
-	exit
-fi
+	elif [[ "$checkingconfirm" == [Yy]* ]]; then
+		echo "Okay! Will continue in 5 seconds!"
+		sleep 5
+	else
+		echo "Invalid input!"
+	fi
+done
 
 sudo sh ./ventoy/Ventoy2Disk.sh -I $drive
 umount $drive
@@ -114,13 +114,15 @@ fi
 sudo mount $drive2 ./MedicatUSB
 7z x -O./MedicatUSB "$location"
 echo "MedicatUSB has been created!"
-echo "Would you like to unmount ./MedicatUSB? (Y/N)"
-read unmountcheck
-if [ $unmountcheck = "Y" ]; then
-	echo "MedicatUSB will be unmounted!"
-	sudo umount ./MedicatUSB
-elif [ $unmountcheck = "N" ]; then
-	echo "MedicatUSB will not be unmounted!"
-else
-	"The only valid options are Y or N"
-fi
+unmountcheck=""
+while [[ "$unmountcheck" != [NnYy]* ]]; do
+	read -e -p "Would you like to unmount ./MedicatUSB? (Y/N) " unmountcheck
+	if [[ $unmountcheck == [Yy]* ]]; then
+		echo "MedicatUSB will be unmounted!"
+		sudo umount ./MedicatUSB
+	elif [[ $unmountcheck == [Nn]* ]]; then
+		echo "MedicatUSB will not be unmounted!"
+	else
+		echo "Invalid input!"
+	fi
+done
