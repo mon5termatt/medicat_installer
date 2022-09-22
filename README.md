@@ -6,11 +6,18 @@
 ### [We are always looking for people to help improve this code and medicat, Inquire in the discord :D](http://medicatusb.com/discord)
 
 # Compatibility
-* Works with Windows 10/11
+* Windows 10/11 (Insider is not always supported)
 * Ubuntu / Arch / Debian / CentOS / FreeBSD / Fedora
 
 #### Requirements for Windows
+* Windows 1703+ (releases after 2017)
 * cURL
+* Half a brain
+
+#### Requirements for Linux
+* Terminal
+* like 75% of a brain
+* General Linux Knowedge 
 
 # Main Files
 ### Medicat_Installer.bat
@@ -21,10 +28,8 @@ Main file for installing via linux command line
 Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
 
 # Programs Included / Downloaded during install
-<details>
-  <summary>Files Downloaded During Install</summary>
-  
-  ## Files Downloaded
+
+  ### Files Downloaded
   1. [Gdrive](https://github.com/prasmussen/gdrive)
       * For downloading from Google Drive.
   2. [aria2](https://github.com/aria2/aria2)
@@ -34,7 +39,7 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
   4. [Wget](https://eternallybored.org/misc/wget/)
       * For downloading files from the internet. Because I hate curl...
  
-  ## Files Included In Bin.bat
+  ### Files Included In Bin.bat
   1. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
   2. [Box](https://github.com/TheBATeam/Box-Function-2.0)
   3. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
@@ -42,5 +47,9 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
   5. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
   6. [QuickSFV](http://www.quicksfv.org/)
       * For hashing files somewhat quickly...
-</details>
 
+# Credits
+* [@SkeletonMan03](https://github.com/SkeletonMan03)
+* [@Teknoist](https://github.com/Teknoist)
+* [@Samega7Cattac](https://github.com/Samega7Cattac)
+* Along with all the others helping in the discord.
