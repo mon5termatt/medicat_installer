@@ -1,17 +1,16 @@
 # Medicat Installer
 ![Logo](icon.png)
 
-[Visit the Medicat Site](http://medicatusb.com/)
+# [Visit the Medicat Site](http://medicatusb.com/)
+
+### [We are always looking for people to help improve this code and medicat, Inquire in the discord :D](http://medicatusb.com/discord)
 
 # Compatibility
-Works with Windows 10/11 **with powershell installed**
+* Works with Windows 10/11
+* Ubuntu / Arch / Debian / CentOS / FreeBSD / Fedora
 
-**please note that this script requires cURL which was not included with windows until release 1703.**
-
-**THIS SCRIPT DOES NOT WORK WITH WINDOWS 7/8**
-
-Linux script tested with Ubuntu and CentOS
-
+#### Requirements for Windows
+* cURL
 
 # Main Files
 ### Medicat_Installer.bat
