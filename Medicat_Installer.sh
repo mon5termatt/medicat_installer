@@ -60,7 +60,7 @@ rm latest
 echo -e "Attempting to download Ventoy Version: ${venver: -6}\n\n\n"
 wget https://github.com/ventoy/Ventoy/releases/download/v${venver: -6}/ventoy-${venver: -6}-linux.tar.gz -O ventoy.tar.gz
 tar -xf ventoy.tar.gz
-rm ventoy.tar.gz
+rm -rf ventoy.tar.gz ./ventoy/ventoy-${venver: -6}
 mv ventoy-${venver: -6} ventoy
 echo -e "\n\n\n\n\n\n"
 if [[ -f MediCat.USB.v21.12.7z ]]; then
