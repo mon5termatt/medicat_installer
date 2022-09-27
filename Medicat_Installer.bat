@@ -468,9 +468,9 @@ echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII         COULD NOT FIND THE MEDICAT FILE(S).           IIII
-echo.IIII              HAVE YOU DOWNLOADED THEM?                IIII
 echo.IIII                                                       IIII
 echo.IIII            (EITHER *.001 or the main .7z)             IIII
+echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII           WOULD YOU LIKE TO DOWNLOAD THEM?            IIII
 echo.IIII                       ( Y / N )                       IIII
