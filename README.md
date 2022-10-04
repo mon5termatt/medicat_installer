@@ -1,9 +1,9 @@
 # Medicat Installer
 ![Logo](icon.png)
 
-# [Visit the Medicat Site](http://medicatusb.com/)
+# [Visit the Medicat Site](https://medicatusb.com/)
 
-### [We are always looking for people to help improve this code and medicat, Inquire in the discord :D](http://medicatusb.com/discord)
+### [We are always looking for people to help improve this code and medicat, Inquire in the discord :D](https://url.medicatusb.com/discord)
 
 # Compatibility
 * Windows 10/11 (Insider is not always supported)
