@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3304
+set localver=3306
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -10,8 +10,13 @@ if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
 REM GET ADMIN CODE MUST GO FIRST
 :initialchecks
 echo.Running Initial Checks
-Ping 1.1.1.1 -n 1 -w 1000 > nul
-if errorlevel 1 (echo This script requires internet to download the latest version of the program. && pause && exit)
+ping 1.1.1.1 -n 1 -w 1000 > nul
+if errorlevel 1 (Echo.Could not Ping 1.1.1.1, Attempting backup pings.) else (goto foundinternet)
+ping 8.8.8.8 -n 1 -w 2000 > nul
+if errorlevel 1 (Echo.Could not Ping 8.8.8.8, Attempting backup pings.) else (goto foundinternet)
+ping github.com -n 1 -w 2000 > nul
+if errorlevel 1 (Echo.Could not Ping gihub.com, Exiting Script && timeout 5 > nul && exit) else (goto foundinternet)
+:foundinternet
 echo.Found Internet
 curl.exe -V > nul
 if errorlevel 1 (echo Filed to find curl. && pause && exit)
