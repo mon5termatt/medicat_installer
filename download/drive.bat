@@ -19,13 +19,13 @@ if not "%WINPYWORKDIR%"=="%WINPYWORKDIR1%" cd %WINPYWORKDIR1%
 pip install gdown
 cls
 echo. Attempting to download from MAIN directory
-gdown %file1% --folder %maindir%
-gdown %file2% --folder %maindir%
-gdown %file3% --folder %maindir%
-gdown %file4% --folder %maindir%
-gdown %file5% --folder %maindir%
-gdown %file6% --folder %maindir%
-::gdown %file7% --folder %maindir%
+gdown %file1% -O %maindir%
+gdown %file2% -O %maindir%
+gdown %file3% -O %maindir%
+gdown %file4% -O %maindir%
+gdown %file5% -O %maindir%
+gdown %file6% -O %maindir%
+::gdown %file7% -O %maindir%
 echo.
 title Medicat Installer [HASHCHECK]
 cls
