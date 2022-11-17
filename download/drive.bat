@@ -1,24 +1,31 @@
 @echo off
-:: https://github.com/prasmussen/gdrive
-wget https://github.com/prasmussen/gdrive/releases/download/2.1.1/gdrive_2.1.1_windows_amd64.tar.gz -O ./gdrive.tar.gz
-7z e gdrive.tar.gz -r -aoa
-7z e gdrive.tar -r -aoa
-DEL gdrive.tar.gz
-DEL gdrive.tar
-cls
-echo. Attempting to download from MAIN directory
+Set "Path=%Path%;%CD%;%CD%\bin;"
+set maindir=%CD%
+if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
 set file1=1q8gulgxsQjEveNcf2ZLSOpQgroJ78CZq
 set file2=1xMiquzKsfW1LUd8RmypMO3Z7PzilY9lu
 set file3=1nhFdNHYiWhsh__uL6h1qo2QMceEcqhEy
 set file4=1uO9I1poXhwJ-FP7n1kFS6NY7na_ZrSZR
 set file5=1ubWGDRP3Cy2bk1yU008TGMQ0zRA2lsVF
 set file6=1k78sLJTUyxW-zu7rwn9crHYZjHjah3OE
-gdrive download %file1% %options%
-gdrive download %file2% %options%
-gdrive download %file3% %options%
-gdrive download %file4% %options%
-gdrive download %file5% %options%
-gdrive download %file6% %options%
+set file7=1b8ZJonZfq9B3UDc1PSAQ2nynE-wRua9z
+if exist "%CD%\WPy%bit%-31080\" (goto download)
+wget https://github.com/winpython/winpython/releases/download/5.0.20221030final/Winpython%bit%-3.10.8.0dot.exe
+Winpython%bit%-3.10.8.0dot.exe -y
+:download
+cd WPy%bit%-31080\scripts
+call env_for_icons.bat
+if not "%WINPYWORKDIR%"=="%WINPYWORKDIR1%" cd %WINPYWORKDIR1%
+pip install gdown
+cls
+echo. Attempting to download from MAIN directory
+gdown %file1% --folder %maindir%
+gdown %file2% --folder %maindir%
+gdown %file3% --folder %maindir%
+gdown %file4% --folder %maindir%
+gdown %file5% --folder %maindir%
+gdown %file6% --folder %maindir%
+::gdown %file7% --folder %maindir%
 echo.
 title Medicat Installer [HASHCHECK]
 cls
