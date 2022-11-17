@@ -19,13 +19,13 @@ if not "%WINPYWORKDIR%"=="%WINPYWORKDIR1%" cd %WINPYWORKDIR1%
 pip install gdown
 cls
 echo. Attempting to download from MAIN directory
-gdown %file1% -O %maindir%
-gdown %file2% -O %maindir%
-gdown %file3% -O %maindir%
-gdown %file4% -O %maindir%
-gdown %file5% -O %maindir%
-gdown %file6% -O %maindir%
-::gdown %file7% -O %maindir%
+gdown %file1% -O %maindir%\MediCat.USB.v21.12.zip.001
+gdown %file2% -O %maindir%\MediCat.USB.v21.12.zip.002
+gdown %file3% -O %maindir%\MediCat.USB.v21.12.zip.003
+gdown %file4% -O %maindir%\MediCat.USB.v21.12.zip.004
+gdown %file5% -O %maindir%\MediCat.USB.v21.12.zip.005
+gdown %file6% -O %maindir%\MediCat.USB.v21.12.zip.006
+::gdown %file7% -O %maindir%\MediCat.USB.v21.12.zip.001
 echo.
 title Medicat Installer [HASHCHECK]
 cls
