@@ -46,25 +46,5 @@ goto verifyfiles
 wget "http://cdn.medicatusb.com/files/hasher/Google_Drive_Validate_Files.exe" -O ./Google_Drive_Validate_Files.exe -q
 start Google_Drive_Validate_Files.exe Google_Drive_Validate_Files.exe
 :exit
-DEL gdrive.exe /q
-exit
 
-
-
-gdrive [global] download query [options] <query>
-
-global:
-  -c, --config <configDir>         Application path, default: /Users/<user>/.gdrive
-  --refresh-token <refreshToken>   Oauth refresh token used to get access token (for advanced users)
-  --access-token <accessToken>     Oauth access token, only recommended for short-lived requests because of short lifetime (for advanced users)
-  --service-account <accountFile>  Oauth service account filename, used for server to server communication without user interaction (file is relative to config dir)
-  
-options:
-  -f, --force       Overwrite existing file
-  -r, --recursive   Download directories recursively, documents will be skipped
-  --path <path>     Download path
-
-
-:exit
-DEL gdrive.exe /q
 exit
