@@ -30,15 +30,24 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
 # Programs Included / Downloaded during install
 
   ### Files Downloaded
+  
   1. [Gdrive](https://github.com/prasmussen/gdrive)
       * For downloading from Google Drive.
+      * Old Method
   2. [aria2](https://github.com/aria2/aria2)
       * For downloading from torrent file.
   3. [7Zip](https://www.7-zip.org/)
       * For File Extraction
   4. [Wget](https://eternallybored.org/misc/wget/)
       * For downloading files from the internet. Because I hate curl...
- 
+  5. [gdown](https://github.com/wkentaro/gdown)
+      * New Google Drive Method
+  6. [WinPython](https://winpython.github.io/)
+      * Portable Python
+  7. [IPget](https://github.com/ipfs/ipget)
+      * IPFS wget basically
+      
+      
   ### Files Included In Bin.bat
   1. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
   2. [Box](https://github.com/TheBATeam/Box-Function-2.0)
