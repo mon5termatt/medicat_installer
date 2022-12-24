@@ -231,6 +231,56 @@ del ventoyversion.txt /Q
 
 
 
+
+
+:install2
+title Medicat Installer [CHOOSEINSTALL]
+mode con:cols=100 lines=15
+echo.We now need to find out what drive you will be installing to.
+REM - FOLDER PROMPT STARTS
+set "psCommand="(new-object -COM 'Shell.Application')^
+.BrowseForFolder(0,'Please choose a folder.',0,0).self.path""
+for /f "usebackq delims=" %%I in (`powershell %psCommand%`) do set "folder=%%I"
+REM - AND ENDS
+set drivepath=%folder:~0,1%
+IF "%drivepath%" == "~0,1" GOTO install2
+echo.Installing to (%drivepath%). If this is correct just hit enter.
+Set /P drivepath=if this is wrong type the correct drive letter now: || Set drivepath=%drivepath%
+IF "%drivepath%" == "C" GOTO IMPORTANTDRIVE
+if "%format%" == "Yes" (goto formatdrive) else (goto installversion)
+:formatdrive
+cd .\Ventoy2Disk\
+Ventoy2Disk.exe VTOYCLI /I /Drive:%drivepath%: /NOSB
+cd %maindir%
+Echo.Warning this will reformat the entire %drivepath%: disk!
+ECHO.You will be prompted to hit enter a few times.
+pause
+format %drivepath%: /FS:NTFS /x /q /V:Medicat
+goto askdownload
+
+:error
+echo.nothing was chosen, try again
+timeout 5
+goto install2
+:importantdrive
+mode con:cols=64 lines=18
+echo.[101mII-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.IIII                                                       IIII
+echo.IIII                   IMPORTANT WARNING                   IIII
+echo.IIII                                                       IIII
+echo.IIII       IT LOOKS LIKE YOU SELECTED THE C DRIVE          IIII
+echo.IIII        THIS MAY CAUSE IRREPARABLE DAMAGE TO           IIII
+echo.IIII               YOUR COMPUTER SYSTEM..                  IIII
+echo.IIII           THE PROGRAM WILL NOW ASK AGAIN              IIII
+echo.IIII                                                       IIII
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.                          Press any key to bypass this warning.[0m&& pause >nul
+goto install2
+
+
+
 REM -- GO TO END OF FILE FOR MOST EXTRACTIONS
 REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
 
@@ -238,30 +288,9 @@ REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
 
 
 :askdownload
-if exist "%CD%\MediCat.USB*.7z" (goto warnventoy) else (goto dlcheck3)
-if exist "%CD%\MediCat.USB*.001" (goto warnventoy) else (goto dlcheck3)
+if exist "%CD%\MediCat.USB*.7z" (goto installerror) else (goto dlcheck3)
+if exist "%CD%\MediCat.USB*.001" (goto installerror) else (goto dlcheck3)
 
-
-REM -- PROMPT USER TO INSTALL VENTOY TO THE USB DRIVE. VENTOY STILL NEEDS TO BE THERE EVEN IF USER ALREADY HAS IT.
-:warnventoy
-title Medicat Installer [VENTOYCHECK]
-cd .\Ventoy2Disk\
-start Ventoy2Disk.exe
-cd %maindir%
-mode con:cols=64 lines=18
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.IIII                                                       IIII
-echo.IIII            THIS PROGRAM REQUIRES YOU TO               IIII
-echo.IIII            HAVE VENTOY INSTALLED TO THE               IIII
-echo.IIII            USB DRIVE YOU WILL BE ADDING               IIII
-echo.IIII            MEDICAT USB TO. PLEASE DO SO               IIII
-echo.IIII            BEFORE CONTINUING TO RUN THE               IIII
-echo.IIII                   INSTALL SCRIPT                      IIII
-echo.IIII                                                       IIII
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.                          Press any key to bypass this warning.&& pause >nul
 
 REM -- INSTALLER
 
@@ -322,49 +351,6 @@ echo.
 pause
 goto bigboi
 
-:install2
-title Medicat Installer [CHOOSEINSTALL]
-mode con:cols=100 lines=15
-echo.We now need to find out what drive you will be installing to.
-REM - FOLDER PROMPT STARTS
-set "psCommand="(new-object -COM 'Shell.Application')^
-.BrowseForFolder(0,'Please choose a folder.',0,0).self.path""
-for /f "usebackq delims=" %%I in (`powershell %psCommand%`) do set "folder=%%I"
-REM - AND ENDS
-set drivepath=%folder:~0,1%
-IF "%drivepath%" == "~0,1" GOTO install2
-echo.Installing to (%drivepath%). If this is correct just hit enter.
-Set /P drivepath=if this is wrong type the correct drive letter now: || Set drivepath=%drivepath%
-IF "%drivepath%" == "C" GOTO IMPORTANTDRIVE
-if "%format%" == "Yes" (goto formatdrive) else (goto installversion)
-:formatdrive
-Echo.Warning this will reformat the entire %drivepath%: disk!
-ECHO.You will be prompted to hit enter a few times.
-pause
-format %drivepath%: /FS:NTFS /x /q /V:Medicat
-goto installversion
-
-:error
-echo.nothing was chosen, try again
-timeout 5
-goto install2
-:importantdrive
-mode con:cols=64 lines=18
-echo.[101mII-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.IIII                                                       IIII
-echo.IIII                   IMPORTANT WARNING                   IIII
-echo.IIII                                                       IIII
-echo.IIII       IT LOOKS LIKE YOU SELECTED THE C DRIVE          IIII
-echo.IIII        THIS MAY CAUSE IRREPARABLE DAMAGE TO           IIII
-echo.IIII               YOUR COMPUTER SYSTEM..                  IIII
-echo.IIII           THE PROGRAM WILL NOW ASK AGAIN              IIII
-echo.IIII                                                       IIII
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.                          Press any key to bypass this warning.[0m&& pause >nul
-goto install2
-
 REM -- CHECK WHICH VERSION USER DOWNLOADED
 
 :installversion
@@ -424,6 +410,8 @@ wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/icon.
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -O %drivepath%:/CheckFiles.bat -q
 cd /d %drivepath%:
 start cmd /k CheckFiles.bat
+echo.The Installer Has Completed.
+pause
 exit
 
 
@@ -488,7 +476,7 @@ If /I "%Errorlevel%"=="1" (
 	cls & goto bigboi
 )
 If /I "%Errorlevel%"=="2" (
-	cls & goto warnventoy
+	cls & goto installerror
 )
 
 :bigboi
