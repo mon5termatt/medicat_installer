@@ -288,14 +288,14 @@ REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
 
 
 :askdownload
-if exist "%CD%\MediCat.USB*.7z" (goto installerror) else (goto dlcheck3)
-if exist "%CD%\MediCat.USB*.001" (goto installerror) else (goto dlcheck3)
-
+:installversion
+title Medicat Installer [INSTALL!]
+if exist "%CD%\MediCat.USB.v%medicatver%.7z" (goto install4) else (goto installversion2)
+:installversion2
+if exist "%CD%\MediCat.USB.v%medicatver%.zip.001" (goto warnhash) else (goto installerror)
 
 REM -- INSTALLER
 
-:install1
-if exist "%CD%\MediCat.USB*.001" (goto warnhash) else (goto install2)
 :warnhash
 title Medicat Installer [HASHCHECK]
 cls
@@ -353,11 +353,6 @@ goto bigboi
 
 REM -- CHECK WHICH VERSION USER DOWNLOADED
 
-:installversion
-title Medicat Installer [INSTALL!!!]
-if exist "%CD%\MediCat.USB.v21.12.7z" (goto install4) else (goto installversion2)
-:installversion2
-if exist "%CD%\MediCat.USB.v%medicatver%.zip.001" (goto install5) else (goto installerror)
 
 :installerror
 mode con:cols=64 lines=18
@@ -439,7 +434,7 @@ echo.THIS WILL LOOK FROZEN, DONT PANIC, ITS WORKING!
 echo.CANCEL AT ANY TIME BY CLOSING THE QUICKSFV BOX!
 QuickSFV.EXE drivefiles.md5
 DEL drivefiles.md5 /Q
-goto install2
+goto install5
 
 
 :medicatsite
