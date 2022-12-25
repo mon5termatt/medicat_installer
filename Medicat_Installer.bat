@@ -517,13 +517,13 @@ echo.II-----------------------------------------------------------II
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/drive.bat" -O ./drive.bat -q
 call drive.bat
 del drive.bat /Q
-goto warnventoy
+goto installversion
 
 :tordown
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -O ./tor.bat -q
 call tor.bat
 del tor.bat /Q
-goto warnventoy
+goto installversion
 
 :renameprogram
 
