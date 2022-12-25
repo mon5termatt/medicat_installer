@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3306
+set localver=3401
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -292,7 +292,7 @@ REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
 title Medicat Installer [INSTALL!]
 if exist "%CD%\MediCat.USB.v%medicatver%.7z" (goto install4) else (goto installversion2)
 :installversion2
-if exist "%CD%\MediCat.USB.v%medicatver%.zip.001" (goto warnhash) else (goto installerror)
+if exist "%CD%\MediCat.USB.v%medicatver%.zip.001" (goto warnhash) else (goto dlcheck3)
 
 REM -- INSTALLER
 
