@@ -2,11 +2,12 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3401
+set localver=3402
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
 if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
+
 REM GET ADMIN CODE MUST GO FIRST
 :initialchecks
 echo.Running Initial Checks
@@ -66,8 +67,7 @@ IF "%lang%"=="en" (goto curver)
 IF "%lang%"=="fr" (goto curver)
 echo.Select Your Language
 call Button 1 2 F2 "English" 14 2 F2 "Francais" 28 2 F2 "Portugues" 43 2 F2 "Deutsch" 56 2 F2 "Turkish" X _Var_Box _Var_Hover
-GetInput /M %_Var_Box% /H %_Var_Hover% 
-GetInput /M %_Var_Box% /H %_Var_Hover% 
+GetInput /M %_Var_Box% /H %_Var_Hover%  
 If /I "%Errorlevel%"=="1" (
 set lang=en
 goto curver
@@ -247,16 +247,79 @@ IF "%drivepath%" == "~0,1" GOTO install2
 echo.Installing to (%drivepath%). If this is correct just hit enter.
 Set /P drivepath=if this is wrong type the correct drive letter now: || Set drivepath=%drivepath%
 IF "%drivepath%" == "C" GOTO IMPORTANTDRIVE
-if "%format%" == "Yes" (goto formatdrive) else (goto installversion)
+if "%format%" == "Yes" (goto formatdrive) else (goto updateventoy)
 :formatdrive
+set gpt=on
+set gptcolor=2F
+set sb=off
+set sbcolor=4F
+set arg1=/GPT
+set arg2=/NOSB
+
+:ventoylist
+Title Ventoy Options
+
+cls
+call Button 1 2 %gptcolor% "GPT is %gpt%" 16 2 %sbcolor% "Secureboot is %sb%" 1 6 F2 "Continue And Install Ventoy"   X _Var_Box _Var_Hover
+
+GetInput /M %_Var_Box% /H %_Var_Hover% 
+
+
+If /I "%Errorlevel%"=="1" (
+	cls & goto gptopt
+)
+If /I "%Errorlevel%"=="2" (
+	cls & goto sbopt
+)
+If /I "%Errorlevel%"=="3" (
+	cls & goto ventoyinstall
+)
+
+
+
+
+
+:gptopt
+if "%gpt%" == "off" (goto gptt) else (goto gptf)
+:gptt
+set gpt=on
+set gptcolor=2F
+set arg1=/GPT
+goto ventoylist
+:gptf
+set gpt=off
+set gptcolor=4F
+set arg1= 
+goto ventoylist
+
+:sbopt
+if "%sb%" == "off" (goto sbt) else (goto sbf)
+:sbt
+set sb=on
+set arg2= 
+set sbcolor=2F
+goto ventoylist
+:sbf
+set sb=off
+set arg2=/NOSB
+set sbcolor=4F
+goto ventoylist
+
+
+
+
+
+:ventoyinstall
+echo.installing ventoy with the following options
+echo.GPT is %gpt% and Secureboot is %sb% 
+
+
 cd .\Ventoy2Disk\
-Ventoy2Disk.exe VTOYCLI /I /Drive:%drivepath%: /NOSB
+Ventoy2Disk.exe VTOYCLI /I /Drive:%drivepath%: %arg1% %arg2% 
 cd %maindir%
-Echo.Warning this will reformat the entire %drivepath%: disk!
-ECHO.You will be prompted to hit enter a few times.
-pause
-format %drivepath%: /FS:NTFS /x /q /V:Medicat
-goto askdownload
+echo.[101mPlease hit enter, The format diolouge is dumb[0m
+format %drivepath%: /FS:NTFS /X /Q /V:Medicat
+goto installversion
 
 :error
 echo.nothing was chosen, try again
@@ -285,9 +348,10 @@ REM -- GO TO END OF FILE FOR MOST EXTRACTIONS
 REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
 
 
-
-
-:askdownload
+:updateventoy
+cd .\Ventoy2Disk\
+Ventoy2Disk.exe VTOYCLI /U /Drive:%drivepath%:
+cd %maindir%
 :installversion
 title Medicat Installer [INSTALL!]
 if exist "%CD%\MediCat.USB.v%medicatver%.7z" (goto install4) else (goto installversion2)
