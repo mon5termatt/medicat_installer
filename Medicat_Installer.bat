@@ -349,6 +349,7 @@ REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
 
 
 :updateventoy
+echo.Please Wait, Updating Ventoy but not formatting
 cd .\Ventoy2Disk\
 Ventoy2Disk.exe VTOYCLI /U /Drive:%drivepath%:
 cd %maindir%
