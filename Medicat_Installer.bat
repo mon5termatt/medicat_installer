@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3403
+set localver=3404
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -128,16 +128,33 @@ echo.                          Press any key to bypass this warning.&& pause >nu
 title Medicat Installer [FILECHECK]
 cls
 echo.Please wait. Files are being downloaded. 
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin.bat" -O ./bin.bat -q
-call bin
-del bin.bat
-cls
-echo.Please wait. Files are being downloaded. 
+echo.1/13  [====                                                ]
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -O ./bin/QuickSFV.exe -q
+echo.2/13  [========                                            ]
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini" -O ./bin/QuickSFV.ini -q
+echo.3/13  [============                                        ]
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat" -O ./bin/Box.bat -q
+echo.4/13  [================                                    ]
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat" -O ./bin/Button.bat -q
+echo.5/13  [====================                                ]
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe" -O ./bin/GetInput.exe -q
+echo.6/13  [========================                            ]
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat" -O ./bin/Getlen.bat -q
+echo.7/13  [============================                        ]
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe" -O ./bin/batbox.exe -q
+echo.8/13  [================================                    ]
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe" -O ./bin/folderbrowse.exe -q
+echo.9/13  [====================================                ]
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/ver.ini" -O ./ver.ini -q
+echo.10/13 [========================================            ]
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/motd.txt" -O ./bin/motd.txt -q
+echo.11/13 [============================================        ]
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/LICENSE.txt" -O ./bin/LICENSE.txt -q
-wget "https://github.com/mon5termatt/medicat_installer/raw/main/7z/%bit%.exe" -O ./bin/7z.exe -q
-wget "https://github.com/mon5termatt/medicat_installer/raw/main/7z/%bit%.dll" -O ./bin/7z.dll -q
+echo.12/13 [================================================    ]
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.exe" -O ./bin/7z.exe -q
+echo.13/13 [====================================================]
+
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.dll" -O ./bin/7z.dll -q
 set /p medicatver= < ver.ini
 DEL ver.ini /Q
 
