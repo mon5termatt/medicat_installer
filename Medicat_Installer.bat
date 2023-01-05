@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3402
+set localver=3403
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -238,9 +238,7 @@ title Medicat Installer [CHOOSEINSTALL]
 mode con:cols=100 lines=15
 echo.We now need to find out what drive you will be installing to.
 REM - FOLDER PROMPT STARTS
-set "psCommand="(new-object -COM 'Shell.Application')^
-.BrowseForFolder(0,'Please choose a folder.',0,0).self.path""
-for /f "usebackq delims=" %%I in (`powershell %psCommand%`) do set "folder=%%I"
+folderbrowse.exe "Please select the drive you want to install medicat on"
 REM - AND ENDS
 set drivepath=%folder:~0,1%
 IF "%drivepath%" == "~0,1" GOTO install2
@@ -370,32 +368,10 @@ if exist "%CD%\MediCat.USB*.003" (echo..003 Exists) else (goto gdriveerror)
 if exist "%CD%\MediCat.USB*.004" (echo..004 Exists) else (goto gdriveerror)
 if exist "%CD%\MediCat.USB*.005" (echo..005 Exists) else (goto gdriveerror)
 if exist "%CD%\MediCat.USB*.006" (echo..006 Exists) else (goto gdriveerror)
+echo.Hashing files to verify they are not corrupted
 timeout 2 >nul
-cls
-mode con:cols=64 lines=18
+goto hasher
 
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.IIII                                                       IIII
-echo.IIII     All Drive Files Exist (HASHES NOT CHECKED)        IIII
-echo.IIII                                                       IIII
-echo.IIII                                                       IIII
-echo.IIII   IT LOOKS LIKE YOU DOWNLOADED MEDICAT IN PARTS.      IIII
-echo.IIII WOULD YOU LIKE TO MAKE SURE THEY DOWNLOADED PROPERLY? IIII
-echo.IIII                                                       IIII
-echo.IIII                                                       IIII
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II 
-call Button 10 12 F2 "YES" 46 12 F4 "NO" X _Var_Box _Var_Hover
-GetInput /M %_Var_Box% /H %_Var_Hover% 
-REM BELOW IS YES
-If /I "%Errorlevel%"=="1" (
-	cls & goto hasher
-)
-REM BELOW IS NO
-If /I "%Errorlevel%"=="2" (
-	cls & goto install2
-)
 
 :gdriveerror
 mode con:cols=64 lines=18
