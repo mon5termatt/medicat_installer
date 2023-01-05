@@ -31,34 +31,30 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
 
   ### Files Downloaded
   
-  1. [Gdrive](https://github.com/prasmussen/gdrive)
-      * For downloading from Google Drive.
-      * Old Method
-  2. [aria2](https://github.com/aria2/aria2)
+  1. [aria2](https://github.com/aria2/aria2)
       * For downloading from torrent file.
-  3. [7Zip](https://www.7-zip.org/)
+  2. [7Zip](https://www.7-zip.org/)
       * For File Extraction
-  4. [Wget](https://eternallybored.org/misc/wget/)
+  3. [Wget](https://eternallybored.org/misc/wget/)
       * For downloading files from the internet. Because I hate curl...
-  5. [gdown](https://github.com/wkentaro/gdown)
+  4. [gdown](https://github.com/wkentaro/gdown)
       * New Google Drive Method
-  6. [WinPython](https://winpython.github.io/)
+  5. [WinPython](https://winpython.github.io/)
       * Portable Python
-  7. [IPget](https://github.com/ipfs/ipget)
+  6. [IPget](https://github.com/ipfs/ipget)
       * IPFS wget basically
-      
-      
-  ### Files Included In Bin.bat
-  1. [Compressed2TXT](https://github.com/AveYo/Compressed2TXT)
-      * This Program is what is used to make bin.bat
-  3. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
-  4. [Box](https://github.com/TheBATeam/Box-Function-2.0)
-  5. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
-  6. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
-  7. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
-  8. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
-  9. [QuickSFV](http://www.quicksfv.org/)
+  7. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
+      * To find out what drive you want to install to without typing stuff
+  8. [QuickSFV](http://www.quicksfv.org/)
       * For hashing files somewhat quickly...
+      
+      
+  #### The Following are for the menu system.
+  9. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
+  10. [Box](https://github.com/TheBATeam/Box-Function-2.0)
+  11. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
+  12. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
+  13. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
 
 # Credits
 * [@SkeletonMan03](https://github.com/SkeletonMan03)
