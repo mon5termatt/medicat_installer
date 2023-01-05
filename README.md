@@ -46,15 +46,16 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
   7. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
       * To find out what drive you want to install to without typing stuff
   8. [QuickSFV](http://www.quicksfv.org/)
-      * For hashing files somewhat quickly...
-      
+      * For hashing the big files somewhat quickly...
+  9. [MD5](https://github.com/npocmaka/batch.scripts/blob/master/fileUtils/md5.bat)
+      * For hashing downloads and small files
       
   #### The Following are for the menu system.
-  9. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
-  10. [Box](https://github.com/TheBATeam/Box-Function-2.0)
-  11. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
-  12. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
-  13. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
+  10. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
+  11. [Box](https://github.com/TheBATeam/Box-Function-2.0)
+  12. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
+  13. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
+  14. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
 
 # Credits
 * [@SkeletonMan03](https://github.com/SkeletonMan03)
