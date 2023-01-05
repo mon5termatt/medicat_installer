@@ -54,7 +54,8 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
   3. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
   4. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
   5. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
-  6. [QuickSFV](http://www.quicksfv.org/)
+  6. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
+  7. [QuickSFV](http://www.quicksfv.org/)
       * For hashing files somewhat quickly...
 
 # Credits
