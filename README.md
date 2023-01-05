@@ -49,13 +49,15 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
       
       
   ### Files Included In Bin.bat
-  1. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
-  2. [Box](https://github.com/TheBATeam/Box-Function-2.0)
-  3. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
-  4. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
-  5. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
-  6. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
-  7. [QuickSFV](http://www.quicksfv.org/)
+  1. [Compressed2TXT](https://github.com/AveYo/Compressed2TXT)
+      * This Program is what is used to make bin.bat
+  3. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
+  4. [Box](https://github.com/TheBATeam/Box-Function-2.0)
+  5. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
+  6. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
+  7. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
+  8. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
+  9. [QuickSFV](http://www.quicksfv.org/)
       * For hashing files somewhat quickly...
 
 # Credits
