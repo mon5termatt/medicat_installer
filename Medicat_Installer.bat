@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3404
+set localver=3405
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -263,72 +263,67 @@ echo.Installing to (%drivepath%). If this is correct just hit enter.
 Set /P drivepath=if this is wrong type the correct drive letter now: || Set drivepath=%drivepath%
 IF "%drivepath%" == "C" GOTO IMPORTANTDRIVE
 if "%format%" == "Yes" (goto formatdrive) else (goto updateventoy)
+
 :formatdrive
-set gpt=on
-set gptcolor=2F
-set sb=off
-set sbcolor=4F
 set arg1=/GPT
 set arg2=/NOSB
 
-:ventoylist
-Title Ventoy Options
-
-cls
-call Button 1 2 %gptcolor% "GPT is %gpt%" 16 2 %sbcolor% "Secureboot is %sb%" 1 6 F2 "Continue And Install Ventoy"   X _Var_Box _Var_Hover
-
+:sbask
+mode con:cols=64 lines=18
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.IIII               WOULD YOU LIKE TO USE GPT               IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+call Button 10 12 F2 "YES" 46 12 F4 "NO" X _Var_Box _Var_Hover
 GetInput /M %_Var_Box% /H %_Var_Hover% 
-
-
+REM BELOW IS YES
 If /I "%Errorlevel%"=="1" (
-	cls & goto gptopt
+	cls & set arg1=/GPT & goto gptask
 )
+REM BELOW IS NO
 If /I "%Errorlevel%"=="2" (
-	cls & goto sbopt
+	cls & set "arg1=" & goto gptask
 )
-If /I "%Errorlevel%"=="3" (
-	cls & goto ventoyinstall
+goto sbask
+
+:gptask
+mode con:cols=64 lines=18
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.IIII           WOULD YOU LIKE TO USE SECUREBOOT?           IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+call Button 10 12 F2 "YES" 46 12 F4 "NO" X _Var_Box _Var_Hover
+GetInput /M %_Var_Box% /H %_Var_Hover% 
+REM BELOW IS YES
+If /I "%Errorlevel%"=="1" (
+	cls & set "arg2=" & goto ventoyinstall
 )
-
-
-
-
-
-:gptopt
-if "%gpt%" == "off" (goto gptt) else (goto gptf)
-:gptt
-set gpt=on
-set gptcolor=2F
-set arg1=/GPT
-goto ventoylist
-:gptf
-set gpt=off
-set gptcolor=4F
-set arg1= 
-goto ventoylist
-
-:sbopt
-if "%sb%" == "off" (goto sbt) else (goto sbf)
-:sbt
-set sb=on
-set arg2= 
-set sbcolor=2F
-goto ventoylist
-:sbf
-set sb=off
-set arg2=/NOSB
-set sbcolor=4F
-goto ventoylist
-
-
+REM BELOW IS NO
+If /I "%Errorlevel%"=="2" (
+	cls & set set arg2=/NOSB & goto ventoyinstall
+)
+goto sbask
 
 
 
 :ventoyinstall
-echo.installing ventoy with the following options
-echo.GPT is %gpt% and Secureboot is %sb% 
-
-
+echo.Please Wait, Installing Ventoy. Please close the file explorer when done.
 cd .\Ventoy2Disk\
 Ventoy2Disk.exe VTOYCLI /I /Drive:%drivepath%: %arg1% %arg2% 
 cd %maindir%
