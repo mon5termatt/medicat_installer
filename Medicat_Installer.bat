@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3405
+set localver=3406
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -533,49 +533,45 @@ mode con:cols=64 lines=18
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
+echo.IIII         HOW WOULD YOU LIKE TO GRAB THE FILES?         IIII
 echo.IIII                                                       IIII
-echo.IIII           WOULD YOU LIKE TO USE THE TORRENT           IIII
-echo.IIII            TO DOWNLOAD THE LATEST VERSION?            IIII
+echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
-call Button 10 12 F2 "YES" 46 12 F4 "NO" X _Var_Box _Var_Hover
+call Button 14 6 F2 "DRIVE" 27 6 F2 "TORRENT" 42 6 F2 "FTP" X _Var_Box _Var_Hover
 GetInput /M %_Var_Box% /H %_Var_Hover% 
-REM BELOW IS YES
 If /I "%Errorlevel%"=="1" (
 	cls & goto tordown
 )
-REM BELOW IS NO
 If /I "%Errorlevel%"=="2" (
 	cls & goto drivedown
 )
+If /I "%Errorlevel%"=="3" (
+	cls & goto ftpdown
+)
 :drivedown
 cls
-mode con:cols=64 lines=18
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.IIII                                                       IIII
-echo.IIII                                                       IIII
-echo.IIII           WOULD YOU LIKE TO USE THE TORRENT           IIII
-echo.IIII            TO DOWNLOAD THE LATEST VERSION?            IIII
-echo.IIII                                                       IIII
-echo.IIII                                                       IIII
-echo.IIII             OK USING GOOGLE DRIVE INSTEAD             IIII
-echo.IIII                                                       IIII
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/drive.bat" -O ./drive.bat -q
 call drive.bat
 del drive.bat /Q
 goto installversion
 
 :tordown
+cls
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -O ./tor.bat -q
 call tor.bat
 del tor.bat /Q
+goto installversion
+
+:ftpdown
+cls
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/ftp.bat" -O ./ftp.bat -q
+call ftp.bat
+del ftp.bat /Q
 goto installversion
 
 :renameprogram
