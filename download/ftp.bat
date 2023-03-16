@@ -9,8 +9,8 @@ if "%size%" == "%propersize%" (goto done)
 
 :download
 echo.Downloading from FTP server.
-echo.Please Enter the name of Jayros Kitten as the password. First letter Is Capital. (Starts with G)
-wget ftp://files.medicatusb.com/tor/MediCat.USB.v21.12.7z --user=Pepe --ask-password -O ./MediCat.USB.v21.12.7z -q --show-progress --progress=bar -c
+::echo.Please Enter the name of Jayros Kitten as the password. First letter Is Capital. (Starts with G)
+wget ftp://files.medicatusb.com/tor/MediCat.USB.v21.12.7z --user=Pepe --pass=Gizmo -O ./MediCat.USB.v21.12.7z -q --show-progress --progress=bar -c
 
 
 :done
