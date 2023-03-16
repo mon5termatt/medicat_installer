@@ -51,7 +51,7 @@ Set /P _num=bypass this warning by typing "I AGREE": || Set _num=NothingChosen
 If "%_num%"=="NothingChosen" exit
 If /i "%_num%"=="I AGREE" goto oscheckpass
 :oscheckpass
-echo.Using Supported version of Windows.
+echo.Using supported version of Windows.
 timeout 1 > nul
 md bin
 cd %maindir%\bin
