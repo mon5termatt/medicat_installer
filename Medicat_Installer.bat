@@ -260,7 +260,7 @@ REM - AND ENDS
 set drivepath=%folder:~0,1%
 IF "%drivepath%" == "~0,1" GOTO install2
 echo.Installing to (%drivepath%). If this is correct just hit Enter.
-Set /P drivepath=if this is wrong type the correct drive letter now: || Set drivepath=%drivepath%
+Set /P drivepath=If this is wrong, type the correct drive letter now: || Set drivepath=%drivepath%
 IF "%drivepath%" == "C" GOTO IMPORTANTDRIVE
 if "%format%" == "Yes" (goto formatdrive) else (goto updateventoy)
 
