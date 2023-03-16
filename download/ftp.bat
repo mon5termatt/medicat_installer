@@ -3,6 +3,9 @@
 cls
 set size=0
 set propersize=22994783619
+wget https://cdn.mon5termatt.club/files/MedicatFTP/ftp.txt -q
+set /p userpass= < ftp.txt
+del ftp.txt /Q
 call :filesize "MediCat.USB.v21.12.7z"
 if "%size%" == "%propersize%" (goto done)
 )
@@ -10,7 +13,7 @@ if "%size%" == "%propersize%" (goto done)
 :download
 echo.Downloading from FTP server.
 ::echo.Please Enter the name of Jayros Kitten as the password. First letter Is Capital. (Starts with G)
-wget ftp://files.medicatusb.com/tor/MediCat.USB.v21.12.7z --ftp-user=Pepe --ftp-password=Gizmo -O ./MediCat.USB.v21.12.7z -q --show-progress --progress=bar -c
+wget ftp://files.medicatusb.com/tor/MediCat.USB.v21.12.7z %userpass% -O ./MediCat.USB.v21.12.7z -q --show-progress --progress=bar -c
 
 
 :done
