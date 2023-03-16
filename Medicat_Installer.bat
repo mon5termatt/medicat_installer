@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3406
+set localver=3407
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -545,10 +545,10 @@ echo.II-----------------------------------------------------------II
 call Button 14 6 F2 "DRIVE" 27 6 F2 "TORRENT" 42 6 F2 "FTP" X _Var_Box _Var_Hover
 GetInput /M %_Var_Box% /H %_Var_Hover% 
 If /I "%Errorlevel%"=="1" (
-	cls & goto tordown
+	cls & goto drivedown
 )
 If /I "%Errorlevel%"=="2" (
-	cls & goto drivedown
+	cls & goto tordown
 )
 If /I "%Errorlevel%"=="3" (
 	cls & goto ftpdown
@@ -569,6 +569,7 @@ goto installversion
 
 :ftpdown
 cls
+echo.IF THE DOWNLOAD CANCELS PLEASE RERUN FTP.BAT TO CONTINUE DOWNLOAD!!!! IT WILL KEEP PROGRESS!!!!
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/ftp.bat" -O ./ftp.bat -q
 call ftp.bat
 del ftp.bat /Q
