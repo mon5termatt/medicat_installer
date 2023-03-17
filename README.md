@@ -61,4 +61,5 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
 * [@SkeletonMan03](https://github.com/SkeletonMan03)
 * [@Teknoist](https://github.com/Teknoist)
 * [@Samega7Cattac](https://github.com/Samega7Cattac)
+* [@Ben-Hampson](https://github.com/Ben-Hampson)
 * Along with all the others helping in the discord.
