@@ -1,10 +1,33 @@
 @echo off
-timeout 1 > nul
-echo.You guys abused it.
-timeout 1 > nul
-echo.You can thank the following IP adresses for that.
-echo.84.254.105.112
-echo.14.200.146.210
-timeout 1 > nul
-echo.The option will return soon.
+:check
+cls
+set size=0
+set propersize=22994783619
+call :filesize "MediCat.USB.v21.12.7z"
+if "%size%" == "%propersize%" (goto done)
+)
+
+:download
+echo.Downloading from Medicat server.
+wget "http://files.medicatusb.com/main.html?download&weblink=76c769ac1d76951558cbc1daf98a161b&realfilename=MediCat.USB.v21.12.7z" -O ./MediCat.USB.v21.12.7z -q --show-progress --progress=bar -c
+
+:done
+cls
+echo.Completed Downloading, Checking File Size.
+set size=0
+call :filesize "MediCat.USB.v21.12.7z"
+if "%size%" == "%propersize%" (goto exit)
+echo.the file doesnt appear to be complete.
+timeout 3 > nul
+goto check
+
+
+:exit
+echo.File Appears to be downloaded successfully.
 timeout 5 > nul
+exit /b
+
+
+:filesize
+  set size=%~z1
+  exit /b 0
