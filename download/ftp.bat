@@ -9,7 +9,7 @@ if "%size%" == "%propersize%" (goto done)
 
 :download
 echo.Downloading from Medicat server.
-wget "http://files.medicatusb.com/main.html?download&weblink=76c769ac1d76951558cbc1daf98a161b&realfilename=MediCat.USB.v21.12.7z" -O ./MediCat.USB.v21.12.7z -q --show-progress --progress=bar -c
+wget "https://files.medicatusb.com/MediCat.USB.v21.12.7z" -q --show-progress --progress=bar -c
 
 :done
 cls
