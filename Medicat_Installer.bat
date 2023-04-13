@@ -2,12 +2,11 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3406
+set localver=3500
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
 if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
-
 REM GET ADMIN CODE MUST GO FIRST
 :initialchecks
 echo.Running Initial Checks
@@ -542,15 +541,12 @@ echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
-call Button 14 6 F2 "DRIVE" 27 6 F2 "TORRENT" 42 6 F2 "CDN" X _Var_Box _Var_Hover
+call Button 15 6 F2 "TORRENT" 40 6 F2 "CDN" X _Var_Box _Var_Hover
 GetInput /M %_Var_Box% /H %_Var_Hover% 
 If /I "%Errorlevel%"=="1" (
 	cls & goto tordown
 )
 If /I "%Errorlevel%"=="2" (
-	cls & goto drivedown
-)
-If /I "%Errorlevel%"=="3" (
 	cls & goto cdndown
 )
 :drivedown
