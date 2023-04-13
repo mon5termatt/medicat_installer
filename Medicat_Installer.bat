@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3407
+set localver=3406
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -24,7 +24,7 @@ if errorlevel 1 (echo Filed to find curl. && pause && exit)
 echo.Found cURL
 for %%# in (powershell.exe) do @if "%%~$PATH:#"=="" (echo.Could not find Powershell. && pause && exit) 
 echo.Found Powershell
-echo.Prompting for admin permissions if not run as admin.
+echo.Promting for admin permissions if not run as admin.
 timeout 1 >nul
 set _elev=
 if /i "%~1"=="-el" set _elev=1
@@ -45,13 +45,13 @@ if "%os2%" == "10.0" goto oscheckpass
 mode con:cols=64 lines=18
 title Medicat Installer [UNSUPPORTED]
 ver
-echo.Your version of Windows might not be supported.
+echo.Your version of windows might not be supported.
 echo.If you believe this is an error you can
-Set /P _num=bypass this warning by typing "I AGREE": || Set _num=NothingChosen
-If "%_num%"=="NothingChosen" exit
-If /i "%_num%"=="I AGREE" goto oscheckpass
+Set /P warn=bypass this warning by typing "I AGREE": || Set warn=no
+If "%warn%"=="no" exit
+If /i "%warn%"=="I AGREE" goto oscheckpass
 :oscheckpass
-echo.Using supported version of Windows.
+echo.Using Supported version of windows.
 timeout 1 > nul
 md bin
 cd %maindir%\bin
@@ -228,7 +228,7 @@ set /p localver= <.\Ventoy2Disk\ventoy\version
 echo.Current Local Version - %VENVER:~-6%
 if "%localver%" == "%vencurver%" (goto uptodate) else (goto ventoyget)
 :ventoyget
-echo.Update found. Downloading latest Ventoy.
+echo.Update Found. Downloading Latest Ventoy.
 timeout 1 >nul
 wget https://github.com/ventoy/Ventoy/releases/download/v%vencurver%/ventoy-%vencurver%-windows.zip -O ./ventoy.zip -q
 7z x ventoy.zip -r -aoa
@@ -255,12 +255,12 @@ title Medicat Installer [CHOOSEINSTALL]
 mode con:cols=100 lines=15
 echo.We now need to find out what drive you will be installing to.
 REM - FOLDER PROMPT STARTS
-for /f "delims=" %%A in ('folderbrowse.exe "Please select the drive you want to install Medicat on"') do set "folder=%%A"
+for /f "delims=" %%A in ('folderbrowse.exe "Please select the drive you want to install medicat on"') do set "folder=%%A"
 REM - AND ENDS
 set drivepath=%folder:~0,1%
 IF "%drivepath%" == "~0,1" GOTO install2
-echo.Installing to (%drivepath%). If this is correct just hit Enter.
-Set /P drivepath=If this is wrong, type the correct drive letter now: || Set drivepath=%drivepath%
+echo.Installing to (%drivepath%). If this is correct just hit enter.
+Set /P drivepath=if this is wrong type the correct drive letter now: || Set drivepath=%drivepath%
 IF "%drivepath%" == "C" GOTO IMPORTANTDRIVE
 if "%format%" == "Yes" (goto formatdrive) else (goto updateventoy)
 
@@ -274,7 +274,7 @@ echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
-echo.IIII               WOULD YOU LIKE TO USE GPT?              IIII
+echo.IIII               WOULD YOU LIKE TO USE GPT               IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
@@ -300,7 +300,7 @@ echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
-echo.IIII           WOULD YOU LIKE TO USE SECURE BOOT?          IIII
+echo.IIII           WOULD YOU LIKE TO USE SECUREBOOT?           IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
@@ -323,16 +323,16 @@ goto sbask
 
 
 :ventoyinstall
-echo.Please wait, installing Ventoy. Please close the File Explorer when done.
+echo.Please Wait, Installing Ventoy. Please close the file explorer when done.
 cd .\Ventoy2Disk\
 Ventoy2Disk.exe VTOYCLI /I /Drive:%drivepath%: %arg1% %arg2% 
 cd %maindir%
-echo.[101mPlease hit Enter, the format dialogue is dumb[0m
+echo.[101mPlease hit enter, The format diolouge is dumb[0m
 format %drivepath%: /FS:NTFS /X /Q /V:Medicat
 goto installversion
 
 :error
-echo.Nothing was chosen, try again
+echo.nothing was chosen, try again
 timeout 5
 goto install2
 :importantdrive
@@ -344,7 +344,7 @@ echo.IIII                   IMPORTANT WARNING                   IIII
 echo.IIII                                                       IIII
 echo.IIII       IT LOOKS LIKE YOU SELECTED THE C DRIVE          IIII
 echo.IIII        THIS MAY CAUSE IRREPARABLE DAMAGE TO           IIII
-echo.IIII               YOUR COMPUTER SYSTEM.                   IIII
+echo.IIII               YOUR COMPUTER SYSTEM..                  IIII
 echo.IIII           THE PROGRAM WILL NOW ASK AGAIN              IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
@@ -359,7 +359,7 @@ REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
 
 
 :updateventoy
-echo.Please wait, updating Ventoy but not formatting
+echo.Please Wait, Updating Ventoy but not formatting
 cd .\Ventoy2Disk\
 Ventoy2Disk.exe VTOYCLI /U /Drive:%drivepath%:
 cd %maindir%
@@ -394,8 +394,8 @@ echo.IIII                  DRIVE FILES MISSING                  IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII   IT LOOKS LIKE YOU DOWNLOADED MEDICAT IN PARTS.      IIII
-echo.IIII             WE COULDN'T FIND ONE OF THEM              IIII
-echo.IIII              DID YOU DOWNLOAD ALL SIX?                IIII
+echo.IIII              WE COULDNT FIND ONE OF THEM              IIII
+echo.IIII              DID YOU DOWNLOAD ALL SIX??               IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
@@ -483,7 +483,7 @@ exit
 
 :hasher
 wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/drivefiles.md5" -O ./drivefiles.md5 -q
-echo.THIS WILL LOOK FROZEN, DON'T PANIC, IT'S WORKING!
+echo.THIS WILL LOOK FROZEN, DONT PANIC, ITS WORKING!
 echo.CANCEL AT ANY TIME BY CLOSING THE QUICKSFV BOX!
 QuickSFV.EXE drivefiles.md5
 DEL drivefiles.md5 /Q
@@ -542,16 +542,16 @@ echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
-call Button 14 6 F2 "DRIVE" 27 6 F2 "TORRENT" 42 6 F2 "FTP" X _Var_Box _Var_Hover
+call Button 14 6 F2 "DRIVE" 27 6 F2 "TORRENT" 42 6 F2 "CDN" X _Var_Box _Var_Hover
 GetInput /M %_Var_Box% /H %_Var_Hover% 
 If /I "%Errorlevel%"=="1" (
-	cls & goto drivedown
-)
-If /I "%Errorlevel%"=="2" (
 	cls & goto tordown
 )
+If /I "%Errorlevel%"=="2" (
+	cls & goto drivedown
+)
 If /I "%Errorlevel%"=="3" (
-	cls & goto ftpdown
+	cls & goto cdndown
 )
 :drivedown
 cls
@@ -567,12 +567,11 @@ call tor.bat
 del tor.bat /Q
 goto installversion
 
-:ftpdown
+:cdndown
 cls
-echo.IF THE DOWNLOAD CANCELS PLEASE RERUN FTP.BAT TO CONTINUE DOWNLOAD!!!! IT WILL KEEP PROGRESS!!!!
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/ftp.bat" -O ./ftp.bat -q
-call ftp.bat
-del ftp.bat /Q
+wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/cdn.bat" -O ./cdn.bat -q
+call cdn.bat
+del cdn.bat /Q
 goto installversion
 
 :renameprogram
