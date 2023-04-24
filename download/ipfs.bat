@@ -12,9 +12,9 @@ if "%size%" == "%propersize%" (goto done)
 :download
 cls
 echo.This May take a while. IPFS is a Distributed filesharing platform. its dependant on how many others are using it..
-ipget QmVRySjFZ5xFAjQ6waAseMw8DfiDkJWsgdyxR5Uc4W215h
-MOVE ".\QmVRySjFZ5xFAjQ6waAseMw8DfiDkJWsgdyxR5Uc4W215h\v21.12\MediCat.USB.v21.12.7z" ".\MediCat.USB.v21.12.7z"
-RD /S /Q "QmVRySjFZ5xFAjQ6waAseMw8DfiDkJWsgdyxR5Uc4W215h"
+ipget QmZ4c4QuujGK2e4kyL975Hg2LLAzsgbzq7CbuYAvAzrAhb
+::MOVE ".\QmVRySjFZ5xFAjQ6waAseMw8DfiDkJWsgdyxR5Uc4W215h\v21.12\MediCat.USB.v21.12.7z" ".\MediCat.USB.v21.12.7z"
+::RD /S /Q "QmVRySjFZ5xFAjQ6waAseMw8DfiDkJWsgdyxR5Uc4W215h"
 
 
 
