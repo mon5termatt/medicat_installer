@@ -9,7 +9,7 @@ if "%size%" == "%propersize%" (goto done)
 
 :download
 echo.Downloading from Medicat server.
-curl --progress-bar -L -o MediCat.USB.v21.12.7z -C - https://medicatcdn.com/files/v21.12/MediCat.USB.v21.12.7z
+curl -# -L -o MediCat.USB.v21.12.7z -C - https://medicatcdn.com/files/v21.12/MediCat.USB.v21.12.7z
 
 :done
 cls
