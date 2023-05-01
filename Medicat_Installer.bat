@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3500
+set localver=3501
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -50,11 +50,11 @@ Set /P warn=bypass this warning by typing "I AGREE": || Set warn=no
 If "%warn%"=="no" exit
 If /i "%warn%"=="I AGREE" goto oscheckpass
 :oscheckpass
-echo.Using Supported version of windows.
+echo.Using Supported version of windows. (10/11)
 timeout 1 > nul
 md bin
 cd %maindir%\bin
-curl -O -s https://eternallybored.org/misc/wget/1.21.3/%bit%/wget.exe
+curl https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/wget-%bit%.exe -o wget.exe
 cd %maindir% 
 
 
@@ -326,8 +326,7 @@ echo.Please Wait, Installing Ventoy. Please close the file explorer when done.
 cd .\Ventoy2Disk\
 Ventoy2Disk.exe VTOYCLI /I /Drive:%drivepath%: %arg1% %arg2% 
 cd %maindir%
-echo.[101mPlease hit enter, The format diolouge is dumb[0m
-format %drivepath%: /FS:NTFS /X /Q /V:Medicat
+format %drivepath%: /FS:NTFS /X /Q /V:Medicat /Y
 goto installversion
 
 :error
