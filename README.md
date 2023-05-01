@@ -31,31 +31,25 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
 
   ### Files Downloaded
   
-  1. [aria2](https://github.com/aria2/aria2)
+  A. [aria2](https://github.com/aria2/aria2)
       * For downloading from torrent file.
-  2. [7Zip](https://www.7-zip.org/)
+  B. [7Zip](https://www.7-zip.org/)
       * For File Extraction
-  3. [Wget](https://eternallybored.org/misc/wget/)
+  C. [Wget](https://eternallybored.org/misc/wget/)
       * For downloading files from the internet. Because I hate curl...
-  4. [gdown](https://github.com/wkentaro/gdown)
-      * New Google Drive Method
-  5. [WinPython](https://winpython.github.io/)
-      * Portable Python
-  6. [IPget](https://github.com/ipfs/ipget)
+  D. [IPget](https://github.com/ipfs/ipget)
       * IPFS wget basically
-  7. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
+  E. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
       * To find out what drive you want to install to without typing stuff
-  8. [QuickSFV](http://www.quicksfv.org/)
+  F. [QuickSFV](http://www.quicksfv.org/)
       * For hashing the big files somewhat quickly...
-  9. [MD5](https://github.com/npocmaka/batch.scripts/blob/master/fileUtils/md5.bat)
-      * For hashing downloads and small files
       
   #### The Following are for the menu system.
-  10. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
-  11. [Box](https://github.com/TheBATeam/Box-Function-2.0)
-  12. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
-  13. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
-  14. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
+  A. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
+  B. [Box](https://github.com/TheBATeam/Box-Function-2.0)
+  C. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
+  D. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
+  E. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
 
 # Credits
 * [@SkeletonMan03](https://github.com/SkeletonMan03)
