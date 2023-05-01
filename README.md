@@ -31,25 +31,25 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
 
   ### Files Downloaded
   
-  A. [aria2](https://github.com/aria2/aria2)
+  1. [aria2](https://github.com/aria2/aria2)
       * For downloading from torrent file.
-  B. [7Zip](https://www.7-zip.org/)
+  2. [7Zip](https://www.7-zip.org/)
       * For File Extraction
-  C. [Wget](https://eternallybored.org/misc/wget/)
+  3. [Wget](https://eternallybored.org/misc/wget/)
       * For downloading files from the internet. Because I hate curl...
-  D. [IPget](https://github.com/ipfs/ipget)
+  4. [IPget](https://github.com/ipfs/ipget)
       * IPFS wget basically
-  E. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
+  5. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
       * To find out what drive you want to install to without typing stuff
-  F. [QuickSFV](http://www.quicksfv.org/)
+  6. [QuickSFV](http://www.quicksfv.org/)
       * For hashing the big files somewhat quickly...
       
   #### The Following are for the menu system.
-  A. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
-  B. [Box](https://github.com/TheBATeam/Box-Function-2.0)
-  C. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
-  D. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
-  E. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
+  1. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
+  2. [Box](https://github.com/TheBATeam/Box-Function-2.0)
+  3. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
+  4. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
+  5. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
 
 # Credits
 * [@SkeletonMan03](https://github.com/SkeletonMan03)
