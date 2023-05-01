@@ -45,6 +45,8 @@ fi
 if ! [ $(which 7z 2>/dev/null) ]; then
 	if [[ -e /etc/arch-release ]]; then
 		sudo $pkgmgr $install_arg p7zip
+	elif [[ -e /etc/fedora-release  ]]; then
+		sudo $pkgmgr $install_arg p7zip-full p7zip-plugins
 	else
 		sudo $pkgmgr $install_arg p7zip-full
 	fi
