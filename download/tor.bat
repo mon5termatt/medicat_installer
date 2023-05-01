@@ -1,4 +1,4 @@
-wget "http://cdn.medicatusb.com/files/install/download/MediCat_USB_v21.12.torrent" -O ./medicat.torrent -q
+wget "https://medicatcdn.com/files/v21.12/MediCat_USB_v21.12.torrent" -O ./medicat.torrent -q
 powershell -c "$data = wget https://api.github.com/repos/aria2/aria2/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './ariaversion.txt'"
 set /p ARIAVER= <./ariaversion.txt
 set ARIACURVER=%ARIAVER:~-6%
