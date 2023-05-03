@@ -95,7 +95,7 @@ goto curver
 :curver
 mode con:cols=64 lines=18
 cls
-powershell -c "$data = wget https://api.github.com/repos/mon5termatt/medicat_installer/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './curver.ini'"
+powershell -c "$data = curl https://api.github.com/repos/mon5termatt/medicat_installer/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './curver.ini'"
 set /p remver= < curver.ini
 set remver=%remver:~-4%
 del curver.ini /Q
