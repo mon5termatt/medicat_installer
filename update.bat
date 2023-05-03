@@ -14,10 +14,9 @@ if exist "bin\wget.exe" (goto curver) else (goto curlwget)
 echo.
 echo.Attempting to download wget using curl.
 echo.This requires windows 10 version 1703 or higher.
-echo.If your OS is older then 1703, first off. Update ffs.
-echo.second off. Manually download wget from https://eternallybored.org/misc/wget/1.21.3/64/wget.exe
-curl -O -s https://eternallybored.org/misc/wget/1.21.3/64/wget.exe
-move .\wget.exe .\bin\wget.exe
+if not exist bin md bin
+if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
+curl https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/wget-%bit%.exe -o ./bin/wget.exe
 goto checkwget
 :curver
 wget "http://url.medicatusb.com/installerupdate" -O ./Medicat_Installer.bat -q
