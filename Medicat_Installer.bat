@@ -52,10 +52,8 @@ If /i "%warn%"=="I AGREE" goto oscheckpass
 :oscheckpass
 echo.Using Supported version of windows. (10/11)
 timeout 1 > nul
-md bin
-cd %maindir%\bin
-curl https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/wget-%bit%.exe -o wget.exe
-cd %maindir% 
+if not exist bin md bin
+curl https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/wget-%bit%.exe -o ./bin/wget.exe
 
 
 
