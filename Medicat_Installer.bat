@@ -108,19 +108,20 @@ exit
 
 
 :startup
+echo.[101m
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
-echo.IIII           DUE TO THE PACKED FILES IN THIS             IIII
-echo.IIII          PROGRAM THE ANTIVIRUS MUST BE OFF            IIII
+echo.IIII           MEDICAT CONTAINS TOOLS THAT MAY             IIII
+echo.IIII          TRIGGER YOUR ANTIVIRUS DUE TO HOW            IIII
+echo.IIII               SOME OF THE TOOLS WORK.                 IIII
 echo.IIII                                                       IIII
-echo.IIII          PLEASE MAKE SURE ANTIVIRUS IS OFF            IIII
-echo.IIII        BEFORE CONTINUING TO USE THIS PROGRAM          IIII
-echo.IIII                                                       IIII
-echo.IIII                                                       IIII
+echo.IIII         WE CANT DO ANYTHING TO CHANGE THAT.           IIII
+echo.IIII       IF YOU DONT TRUST THE TOOL DONT USE IT.         IIII
+echo.IIII         GIANT THANKS, MON5TERMATT AND JAYRO           IIII
 echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II     
-echo.                          Press any key to bypass this warning.&& pause >nul
+echo.II-----------------------------------------------------------II[0m     
+echo.                          Press any key to accept this warning.&& pause >nul
 :checkupdateprogram
 title Medicat Installer [FILECHECK]
 cls
