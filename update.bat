@@ -19,7 +19,7 @@ if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
 curl https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/wget-%bit%.exe -o ./bin/wget.exe
 goto checkwget
 :curver
-wget "http://url.medicatusb.com/installerupdate" -O ./Medicat_Installer.bat -q
+curl http://url.medicatusb.com/installerupdate -o Medicat_Installer.bat -q -L
 cls
 start cmd /k Medicat_Installer.bat Medicat_Installer.bat
 del %0 && exit
