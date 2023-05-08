@@ -102,7 +102,7 @@ if "%localver%" == "%remver%" (goto startup)
 :updateprogram
 cls
 echo.A new version of the program has been released. The program will now restart.
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.bat" -O ./update.bat -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.bat" -o ./update.bat -s
 start cmd /k update.bat
 exit
 
@@ -127,32 +127,32 @@ title Medicat Installer [FILECHECK]
 cls
 echo.Please wait. Files are being downloaded. 
 echo.1/13  [====                                                ]
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -O ./bin/QuickSFV.exe -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -o ./bin/QuickSFV.exe -s
 echo.2/13  [========                                            ]
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini" -O ./bin/QuickSFV.ini -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini" -o ./bin/QuickSFV.ini -s
 echo.3/13  [============                                        ]
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat" -O ./bin/Box.bat -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat" -o ./bin/Box.bat -s
 echo.4/13  [================                                    ]
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat" -O ./bin/Button.bat -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat" -o ./bin/Button.bat -s
 echo.5/13  [====================                                ]
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe" -O ./bin/GetInput.exe -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe" -o ./bin/GetInput.exe -s
 echo.6/13  [========================                            ]
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat" -O ./bin/Getlen.bat -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat" -o ./bin/Getlen.bat -s
 echo.7/13  [============================                        ]
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe" -O ./bin/batbox.exe -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe" -o ./bin/batbox.exe -s
 echo.8/13  [================================                    ]
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe" -O ./bin/folderbrowse.exe -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe" -o ./bin/folderbrowse.exe -s
 echo.9/13  [====================================                ]
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/ver.ini" -O ./ver.ini -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/ver.ini" -o ./ver.ini -s
 echo.10/13 [========================================            ]
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/motd.txt" -O ./bin/motd.txt -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/motd.txt" -o ./bin/motd.txt -s
 echo.11/13 [============================================        ]
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/LICENSE.txt" -O ./bin/LICENSE.txt -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/LICENSE.txt" -o ./bin/LICENSE.txt -s
 echo.12/13 [================================================    ]
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.exe" -O ./bin/7z.exe -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.exe" -o ./bin/7z.exe -s
 echo.13/13 [====================================================]
 
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.dll" -O ./bin/7z.dll -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.dll" -o ./bin/7z.dll -s
 set /p medicatver= < ver.ini
 DEL ver.ini /Q
 
@@ -212,7 +212,7 @@ goto menu2
 :check5
 echo.Getting Current Ventoy Version
 timeout 0 >nul
-powershell -c "$data = wget https://api.github.com/repos/ventoy/ventoy/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './ventoyversion.txt'"
+powershell -c "$data = curl https://api.github.com/repos/ventoy/ventoy/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './ventoyversion.txt'"
 set /p VENVER= <./ventoyversion.txt
 set vencurver=%VENVER:~-6%
 echo.Current Online Version - %VENVER:~-6%
@@ -228,7 +228,7 @@ if "%localver%" == "%vencurver%" (goto uptodate) else (goto ventoyget)
 :ventoyget
 echo.Update Found. Downloading Latest Ventoy.
 timeout 1 >nul
-wget https://github.com/ventoy/Ventoy/releases/download/v%vencurver%/ventoy-%vencurver%-windows.zip -O ./ventoy.zip -q
+curl https://github.com/ventoy/Ventoy/releases/download/v%vencurver%/ventoy-%vencurver%-windows.zip -o ./ventoy.zip -s
 7z x ventoy.zip -r -aoa
 RMDIR Ventoy2Disk /S /Q
 REN ventoy-%vencurver% Ventoy2Disk
@@ -451,8 +451,8 @@ goto finishup
 REM -- FILE CLEANUP
 
 :finishup
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/icon.ico" -O %drivepath%:/autorun.ico -q
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -O %drivepath%:/CheckFiles.bat -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/icon.ico" -o %drivepath%:/autorun.ico -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -o %drivepath%:/CheckFiles.bat -s
 cd /d %drivepath%:
 start cmd /k CheckFiles.bat
 echo.The Installer Has Completed.
@@ -479,7 +479,7 @@ exit
 
 
 :hasher
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/drivefiles.md5" -O ./drivefiles.md5 -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/drivefiles.md5" -o ./drivefiles.md5 -s
 echo.THIS WILL LOOK FROZEN, DONT PANIC, ITS WORKING!
 echo.CANCEL AT ANY TIME BY CLOSING THE QUICKSFV BOX!
 QuickSFV.EXE drivefiles.md5
@@ -549,21 +549,21 @@ If /I "%Errorlevel%"=="2" (
 )
 :drivedown
 cls
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/drive.bat" -O ./drive.bat -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/drive.bat" -o ./drive.bat -s
 call drive.bat
 del drive.bat /Q
 goto installversion
 
 :tordown
 cls
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -O ./tor.bat -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -o ./tor.bat -s
 call tor.bat
 del tor.bat /Q
 goto installversion
 
 :cdndown
 cls
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/cdn.bat" -O ./cdn.bat -q
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/cdn.bat" -o ./cdn.bat -s
 call cdn.bat
 del cdn.bat /Q
 goto installversion
