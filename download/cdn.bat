@@ -9,7 +9,14 @@ if "%size%" == "%propersize%" (goto done)
 
 :download
 echo.Downloading from Medicat server.
-curl -# -L -o MediCat.USB.v21.12.7z -C - https://medicatcdn.com/files/v21.12/MediCat.USB.v21.12.7z
+
+::Normally Use this file
+::curl -# -L -o MediCat.USB.v21.12.7z -C - https://medicatcdn.com/files/v21.12/MediCat.USB.v21.12.7z
+
+::TEMP File until CDN comes back online
+curl -# -L -o MediCat.USB.v21.12.7z -C - "https://files.medicatusb.com/?download&weblink=24507515e83f89d2abd8640c756d87cb&realfilename=MediCat.USB.v21.12.7z"
+
+
 
 :done
 cls
