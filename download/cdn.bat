@@ -11,18 +11,11 @@ if "%size%" == "%propersize%" (goto done)
 
 :: TEMP CODE
 
-:tempsolution
-echo.Unfortunatly the CDN has died for the time being. TOR Will be used in its place. 
-timeout 5 > nul
-Set "Path=%Path%;%CD%;%CD%\bin;"
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/MediCat_USB_v21.12.torrent" -O ./medicat.torrent -q 
-if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
-wget "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/aria2c-%bit%.exe" -O ./aria2c.exe -q
-aria2c.exe --file-allocation=none --seed-time=0 medicat.torrent
-MOVE ".\MediCat USB v21.12\MediCat.USB.v21.12.7z" ".\MediCat.USB.v21.12.7z"
-RD /S /Q "MediCat USB v21.12"
-del medicat.torrent /Q
-del aria2c.exe /Q
+:tordown
+cls
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -o ./tor.bat -s
+call tor.bat
+del tor.bat /Q
 exit /b
 
 :END TEMP CODE
