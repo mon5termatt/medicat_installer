@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3501
+set localver=3502
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
