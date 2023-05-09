@@ -35,13 +35,11 @@ Coded by [@SkeletonMan03](https://github.com/SkeletonMan03)
       * For downloading from torrent file.
   2. [7Zip](https://www.7-zip.org/)
       * For File Extraction
-  3. [Wget](https://eternallybored.org/misc/wget/)
-      * For downloading files from the internet. Because I hate curl...
-  4. [IPget](https://github.com/ipfs/ipget)
+  3. [IPget](https://github.com/ipfs/ipget)
       * IPFS wget basically
-  5. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
+  4. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
       * To find out what drive you want to install to without typing stuff
-  6. [QuickSFV](http://www.quicksfv.org/)
+  5. [QuickSFV](http://www.quicksfv.org/)
       * For hashing the big files somewhat quickly...
       
   #### The Following are for the menu system.
