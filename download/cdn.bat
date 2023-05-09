@@ -8,38 +8,13 @@ if "%size%" == "%propersize%" (goto done)
 )
 
 
-
-:: TEMP CODE
-
-:tordown
-cls
-echo.the cdn is down for the time being due to 6tb in 24 hours downloaded. 
-echo.using tor
-timeout 5 >nul
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -o ./tor.bat -s
-call tor.bat
-del tor.bat /Q
-exit /b
-
-:END TEMP CODE
-
-
-
-
-
-
-
-
-
-
 :download
 echo.Downloading from Medicat server.
 
 ::Normally Use this file
-::curl -# -L -o MediCat.USB.v21.12.7z -C - https://medicatcdn.com/files/v21.12/MediCat.USB.v21.12.7z
+::curl -# -L -o MediCat.USB.v21.12.7z -C - https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z
 
-::TEMP File until CDN comes back online
-curl -# -L -o MediCat.USB.v21.12.7z -C - "https://files.medicatusb.com/?download&weblink=24507515e83f89d2abd8640c756d87cb&realfilename=MediCat.USB.v21.12.7z"
+
 
 
 
