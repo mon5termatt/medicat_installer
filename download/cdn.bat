@@ -13,6 +13,9 @@ if "%size%" == "%propersize%" (goto done)
 
 :tordown
 cls
+echo.the cdn is down for the time being due to 6tb in 24 hours downloaded. 
+echo.using tor
+timeout 5 >nul
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -o ./tor.bat -s
 call tor.bat
 del tor.bat /Q
