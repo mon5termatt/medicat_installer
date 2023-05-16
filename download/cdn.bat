@@ -9,6 +9,10 @@ if "%size%" == "%propersize%" (goto done)
 
 
 :download
+echo.Please note download speeds are currently limited due to high traffic
+echo.Consider using the torrent as it will be a faster option
+sleep 3 > nul
+
 echo.Downloading from Medicat server.
 curl -# -L -o MediCat.USB.v21.12.7z -C - https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z
 
