@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3502
+set localver=3503
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -102,7 +102,7 @@ if "%localver%" == "%remver%" (goto startup)
 :updateprogram
 cls
 echo.A new version of the program has been released. The program will now restart.
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.bat" -o ./update.bat -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.bat" -o ./update.bat -s -L
 start cmd /k update.bat
 exit
 
@@ -127,32 +127,32 @@ title Medicat Installer [FILECHECK]
 cls
 echo.Please wait. Files are being downloaded. 
 echo.1/13  [====                                                ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -o ./bin/QuickSFV.exe -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -o ./bin/QuickSFV.exe -s -L
 echo.2/13  [========                                            ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini" -o ./bin/QuickSFV.ini -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini" -o ./bin/QuickSFV.ini -s -L
 echo.3/13  [============                                        ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat" -o ./bin/Box.bat -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat" -o ./bin/Box.bat -s -L
 echo.4/13  [================                                    ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat" -o ./bin/Button.bat -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat" -o ./bin/Button.bat -s -L
 echo.5/13  [====================                                ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe" -o ./bin/GetInput.exe -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe" -o ./bin/GetInput.exe -s -L
 echo.6/13  [========================                            ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat" -o ./bin/Getlen.bat -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat" -o ./bin/Getlen.bat -s -L
 echo.7/13  [============================                        ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe" -o ./bin/batbox.exe -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe" -o ./bin/batbox.exe -s -L
 echo.8/13  [================================                    ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe" -o ./bin/folderbrowse.exe -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe" -o ./bin/folderbrowse.exe -s -L
 echo.9/13  [====================================                ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/ver.ini" -o ./ver.ini -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/ver.ini" -o ./ver.ini -s -L
 echo.10/13 [========================================            ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/motd.txt" -o ./bin/motd.txt -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/motd.txt" -o ./bin/motd.txt -s -L
 echo.11/13 [============================================        ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/LICENSE.txt" -o ./bin/LICENSE.txt -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/LICENSE.txt" -o ./bin/LICENSE.txt -s -L
 echo.12/13 [================================================    ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.exe" -o ./bin/7z.exe -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.exe" -o ./bin/7z.exe -s -L
 echo.13/13 [====================================================]
 
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.dll" -o ./bin/7z.dll -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.dll" -o ./bin/7z.dll -s -L
 set /p medicatver= < ver.ini
 DEL ver.ini /Q
 
@@ -171,7 +171,7 @@ pause
 :menu2
 mode con:cols=64 lines=20
 echo.  %installertext%   %installertext%   %installertext%
-call Button 1 2 F2 "INSTALL MEDICAT" 23 2 %formatcolor% "TOGGLE DRIVE FORMAT (CURRENTLY %format%)" 1 7 F9 "JOIN THE DISCORD" 24 7 F9 "  VISIT THE SITE  " 49 7 FC "  EXIT.  "  X _Var_Box _Var_Hover
+call Button 1 2 F2 "INSTALL MEDICAT" 23 2 %formatcolor% "TOGGLE DRIVE FORMAT (CURRENTLY %format%)" 1 7 F9 "MEDICAT DISCORD" 23 7 F9 "VISIT SITE" 40 7 F9 "CHECK USB FILES"  X _Var_Box _Var_Hover
 echo.
 echo.
 echo.
@@ -193,7 +193,9 @@ If /I "%Errorlevel%"=="3" (
 If /I "%Errorlevel%"=="4" (
 	cls & goto medicatsite
 )
-If /I "%Errorlevel%"=="5" exit
+If /I "%Errorlevel%"=="5" (
+	cls & goto recheck
+)
 
 :formatswitch
 if "%format%" == "Yes" (goto fs2) else (echo.>nul)
@@ -228,7 +230,7 @@ if "%localver%" == "%vencurver%" (goto uptodate) else (goto ventoyget)
 :ventoyget
 echo.Update Found. Downloading Latest Ventoy.
 timeout 1 >nul
-curl https://github.com/ventoy/Ventoy/releases/download/v%vencurver%/ventoy-%vencurver%-windows.zip -o ./ventoy.zip -s
+curl https://github.com/ventoy/Ventoy/releases/download/v%vencurver%/ventoy-%vencurver%-windows.zip -o ./ventoy.zip -s -L
 7z x ventoy.zip -r -aoa
 RMDIR Ventoy2Disk /S /Q
 REN ventoy-%vencurver% Ventoy2Disk
@@ -451,16 +453,13 @@ goto finishup
 REM -- FILE CLEANUP
 
 :finishup
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/icon.ico" -o %drivepath%:/autorun.ico -s
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -o %drivepath%:/CheckFiles.bat -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/icon.ico" -o %drivepath%:/autorun.ico -s -L
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -o %drivepath%:/CheckFiles.bat -s -L
 cd /d %drivepath%:
 start cmd /k CheckFiles.bat
 echo.The Installer Has Completed.
 pause
 exit
-
-
-
 
 
 
@@ -479,13 +478,10 @@ exit
 
 
 :hasher
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/drivefiles.md5" -o ./drivefiles.md5 -s
-echo.THIS WILL LOOK FROZEN, DONT PANIC, ITS WORKING!
-echo.CANCEL AT ANY TIME BY CLOSING THE QUICKSFV BOX!
-QuickSFV.EXE drivefiles.md5
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/drivefiles.md5" -o ./drivefiles.md5 -s -L
+start QuickSFV.EXE drivefiles.md5
 DEL drivefiles.md5 /Q
 goto install5
-
 
 :medicatsite
 start https://medicatusb.com
@@ -495,7 +491,13 @@ goto menu2
 start https://url.medicatusb.com/discord
 goto menu2
 
-
+:recheck
+for /f "delims=" %%A in ('folderbrowse.exe "Please select the drive you want to install medicat on"') do set "folder=%%A"
+set drivepath=%folder:~0,1%
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -o %drivepath%:/CheckFiles.bat -s -L
+cd /d %drivepath%:
+start cmd /k CheckFiles.bat
+goto menu2
 
 
 
@@ -532,7 +534,7 @@ echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII         HOW WOULD YOU LIKE TO GRAB THE FILES?         IIII
 echo.IIII                                                       IIII
-echo.IIII                                                       IIII
+echo.IIII         FASTER                         SLOWER         IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
@@ -549,21 +551,21 @@ If /I "%Errorlevel%"=="2" (
 )
 :drivedown
 cls
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/drive.bat" -o ./drive.bat -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/drive.bat" -o ./drive.bat -s -L
 call drive.bat
 del drive.bat /Q
 goto installversion
 
 :tordown
 cls
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -o ./tor.bat -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -o ./tor.bat -s -L
 call tor.bat
 del tor.bat /Q
 goto installversion
 
 :cdndown
 cls
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/cdn.bat" -o ./cdn.bat -s
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/cdn.bat" -o ./cdn.bat -s -L
 call cdn.bat
 del cdn.bat /Q
 goto installversion
