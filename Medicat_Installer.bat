@@ -15,7 +15,7 @@ if errorlevel 1 (Echo.Could not Ping 1.1.1.1, Attempting backup pings.) else (go
 ping 8.8.8.8 -n 1 -w 2000 > nul
 if errorlevel 1 (Echo.Could not Ping 8.8.8.8, Attempting backup pings.) else (goto foundinternet)
 ping github.com -n 1 -w 2000 > nul
-if errorlevel 1 (Echo.Could not Ping gihub.com, Exiting Script && timeout 5 > nul && exit) else (goto foundinternet)
+if errorlevel 1 (Echo.Could not Ping github.com, Exiting Script && timeout 5 > nul && exit) else (goto foundinternet)
 :foundinternet
 echo.Found Internet
 curl.exe -V > nul
