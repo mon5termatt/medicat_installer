@@ -276,9 +276,9 @@ echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII               WOULD YOU LIKE TO USE GPT               IIII
 echo.IIII                                                       IIII
-echo.IIII                                                       IIII
-echo.IIII                                                       IIII
-echo.IIII                                                       IIII
+echo.IIII              If your computer uses UEFI               IIII
+echo.IIII              select YES. If your computer             IIII
+echo.IIII              uses a BIOS, select NO.                  IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
@@ -302,7 +302,7 @@ echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII           WOULD YOU LIKE TO USE SECUREBOOT?           IIII
 echo.IIII                                                       IIII
-echo.IIII                                                       IIII
+echo.IIII            Recommended for most computers             IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
