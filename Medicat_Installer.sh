@@ -114,7 +114,43 @@ if ! [[ -d MedicatUSB/ ]] ; then
 	mkdir MedicatUSB
 fi
 sudo mount $drive2 ./MedicatUSB
-7z x -O./MedicatUSB "$location"
+
+#TEST menu to select what tools from medicat tools
+PS3='Please Select Tool Options for this USB'
+options=("Install-All-The-Things" "Install-Backup-and-Repair-Tools" "Install-Diagnostics-Tools-Only")
+select opt in "${options[@]}"
+do
+	case $opt in
+		"Install-All-The-Things")
+			7z x -O./MedicatUSB "$location"
+			wait
+		break
+		;;
+		"Install-Backup-and-Repair-Tools")
+			7z x -O '-i!$location/Backup/.ventoyignore'  "MediCat.USB.v21.12.7z"
+			7z x -O '-i!$location/Backup_and_Recovery/Acronis_Cyber_Backup/Acronis_Cyber_Backup.iso'  "MediCat.USB.v21.12.7z"
+			7z x -O '-i!$location/autorun.inf'  "MediCat.USB.v21.12.7z"
+			7z x -O '-i!$location/CDUsb.y'  "MediCat.USB.v21.12.7z"
+			7z x -O '-i!$location/LICENSE.txt'  "MediCat.USB.v21.12.7z"
+			7z x -O '-i!$location/Start.exe'  "MediCat.USB.v21.12.7z"
+			wait
+		break
+		;;
+		"Install-Diagnostics-Tools-Only"
+			7z x -O '-i!$location/Diagnostic_Tools/HDAT2/HDAT2.iso'  "MediCat.USB.v21.12.7z"
+			7z x -O '-i!$location/Diagnostic_Tools/MemTest86/*'  "MediCat.USB.v21.12.7z"
+			7z x -O '-i!$location/Diagnostic_Tools/MemTest86+/*'  "MediCat.USB.v21.12.7z"
+			7z x -O '-i!$location/autorun.inf'  "MediCat.USB.v21.12.7z"
+			7z x -O '-i!$location/CDUsb.y'  "MediCat.USB.v21.12.7z"
+			7z x -O '-i!$location/LICENSE.txt'  "MediCat.USB.v21.12.7z"
+			7z x -O '-i!$location/Start.exe'  "MediCat.USB.v21.12.7z"
+			wait
+		break
+		;;
+		*) echo "invalid option $REPLY";;
+	esac
+done
+
 echo "MedicatUSB has been created!"
 unmountcheck=""
 while [[ "$unmountcheck" != [NnYy]* ]]; do
