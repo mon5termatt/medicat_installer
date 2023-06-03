@@ -452,7 +452,7 @@ goto installmenu
 
 :installmenu
 echo === INSTALL MENU ===
-echo 1. Full MetiCat Install
+echo 1. Full MediCat Install
 echo 2. Install only Backup and Recovery Tools
 echo 3. Install only Diagnostic Tools
 echo ====================
@@ -479,7 +479,7 @@ if "%choice%"=="1" (
 		7z x -O%drivepath%: %file% -r -aoa -i!Diagnostic_Tools/* -i!autorun.inf -i!CDUsb.y -i!LICENSE.txt -i!Start.exe
 ) else (
     echo Invalid choice. Please try again.
-    goto menu
+    goto installmenu
 )
 
 pause

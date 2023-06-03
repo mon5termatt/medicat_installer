@@ -127,7 +127,7 @@ do
             break
             ;;
         "Install-Backup-and-Repair-Tools-Only")
-            7z x -O "$location" -i'!Backup/*' -i'!Backup_and_Recovery/*' -i'!autorun.inf' -i'!CDUsb.y' -i'!LICENSE.txt' -i'!Start.exe' "MediCat.USB.v21.12.7z"
+            7z x -O "$location" -i'!Backup/*' -i'!Backup_and_Recovery/*' -i'!Partition_Tools/*' -i'!Windows_Recovery/*' -i'!autorun.inf' -i'!CDUsb.y' -i'!LICENSE.txt' -i'!Start.exe' "MediCat.USB.v21.12.7z"
             wait
             break
             ;;
