@@ -434,10 +434,55 @@ goto install6
 REM -- ACTUALLY EXTRACT/INSTALL
 
 :install4
-set file="MediCat.USB.v21.12.7z"
-set sha256=a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4
-set sha1=2cbf5f337849a11084124a79a1b8d7e77eaca7d5
-7z x -O%drivepath%: %file% -r -aoa
+mode con:cols=64 lines=18
+echo.[101mII-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.IIII                                                       IIII
+echo.IIII                   PLEASE SELECT                       IIII
+echo.IIII                                                       IIII
+echo.IIII       THERE ARE SEVERAL QUICK USB VERSIONS            IIII
+echo.IIII         OF MEDICAT. YOU CAN SELECT THE ONE            IIII
+echo.IIII                 THAT WORKS FOR YOU                    IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.                                     Press any key to continue.[0m&& pause >nul
+goto installmenu
+
+:installmenu
+echo === INSTALL MENU ===
+echo 1. Full MetiCat Install
+echo 2. Install only Backup and Recovery Tools
+echo 3. Install only Diagnostic Tools
+echo ====================
+
+set /p choice=Enter your choice (1-3): 
+
+if "%choice%"=="1" (
+    echo You selected Option 1.
+    	set file="MediCat.USB.v21.12.7z"
+		set sha256=a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4
+		set sha1=2cbf5f337849a11084124a79a1b8d7e77eaca7d5
+		7z x -O%drivepath%: %file% -r -aoa
+) else if "%choice%"=="2" (
+    echo You selected Option 2.
+    	set file="MediCat.USB.v21.12.7z"
+		set sha256=a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4
+		set sha1=2cbf5f337849a11084124a79a1b8d7e77eaca7d5
+		7z x -O%drivepath%: %file% -r -aoa -i!Backup/* -i!Backup_and_Recovery/* -i!Partition_Tools/* -i!Windows_Recovery/* -i!autorun.inf -i!CDUsb.y -i!LICENSE.txt -i!Start.exe
+) else if "%choice%"=="3" (
+    echo You selected Option 3.
+    	set file="MediCat.USB.v21.12.7z"
+		set sha256=a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4
+		set sha1=2cbf5f337849a11084124a79a1b8d7e77eaca7d5
+		7z x -O%drivepath%: %file% -r -aoa -i!Diagnostic_Tools/* -i!autorun.inf -i!CDUsb.y -i!LICENSE.txt -i!Start.exe
+) else (
+    echo Invalid choice. Please try again.
+    goto menu
+)
+
+pause
 goto finishup
 
 :install5

@@ -114,7 +114,34 @@ if ! [[ -d MedicatUSB/ ]] ; then
 	mkdir MedicatUSB
 fi
 sudo mount $drive2 ./MedicatUSB
-7z x -O./MedicatUSB "$location"
+
+###TEST menu to select what tools from medicat tools
+PS3='Please Select Tool Options for this USB'
+options=("Install-All-The-Things" "Install-Backup-and-Repair-Tools-Only" "Install-Diagnostics-Tools-Only")
+select opt in "${options[@]}"
+do
+    case $opt in
+        "Install-All-The-Things")
+            7z x -O./MedicatUSB "$location"
+            wait
+            break
+            ;;
+        "Install-Backup-and-Repair-Tools-Only")
+            7z x -O "$location" -i'!Backup/*' -i'!Backup_and_Recovery/*' -i'!autorun.inf' -i'!CDUsb.y' -i'!LICENSE.txt' -i'!Start.exe' "MediCat.USB.v21.12.7z"
+            wait
+            break
+            ;;
+        "Install-Diagnostics-Tools-Only")
+            7z x -O "$location" -i'!Diagnostic_Tools/*' -i'!autorun.inf' -i'!CDUsb.y' -i'!LICENSE.txt' -i'!Start.exe' "MediCat.USB.v21.12.7z"
+            wait
+            break
+            ;;
+        *)
+            echo "invalid option $REPLY"
+            ;;
+    esac
+done
+
 echo "MedicatUSB has been created!"
 unmountcheck=""
 while [[ "$unmountcheck" != [NnYy]* ]]; do
