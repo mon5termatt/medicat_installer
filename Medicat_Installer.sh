@@ -19,6 +19,7 @@ elif [[ -e /etc/debian_version ]]; then
 	install_arg="install"
 	update_arg="update"
 elif [[ -e /etc/almalinux-release || -e /etc/rocky-release || -e /etc/centos-release ]]; then
+	echo "Fuck Red-Hat for putting source code behind paywalls."
 	os="centos"
 	pkgmgr="yum"
 	install_arg="install"
