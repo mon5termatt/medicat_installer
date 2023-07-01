@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3503
+set localver=3505
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -53,9 +53,6 @@ If /i "%warn%"=="I AGREE" goto oscheckpass
 echo.Using Supported version of windows. (10/11)
 timeout 1 > nul
 if not exist bin md bin
-curl https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/wget-%bit%.exe -o ./bin/wget.exe
-
-
 
 :lang
 FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
@@ -97,7 +94,7 @@ powershell -c "$data = curl https://api.github.com/repos/mon5termatt/medicat_ins
 set /p remver= < curver.ini
 set remver=%remver:~-4%
 del curver.ini /Q
-if "%localver%" == "%remver%" (goto startup)
+if "%localver%" GEQ "%remver%" (goto startup)
 
 :updateprogram
 cls
@@ -108,7 +105,7 @@ exit
 
 
 :startup
-echo.[101m
+echo.[41m
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
@@ -120,7 +117,9 @@ echo.IIII         WE CANT DO ANYTHING TO CHANGE THAT.           IIII
 echo.IIII       IF YOU DONT TRUST THE TOOL DONT USE IT.         IIII
 echo.IIII         GIANT THANKS, MON5TERMATT AND JAYRO           IIII
 echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II[0m     
+echo.II-----------------------------------------------------------II[0m
+echo.Please wait for 5 seconds, Read the above.  
+PING localhost -n 6 >NUL
 echo.                          Press any key to accept this warning.&& pause >nul
 :checkupdateprogram
 title Medicat Installer [FILECHECK]
@@ -234,7 +233,6 @@ curl https://github.com/ventoy/Ventoy/releases/download/v%vencurver%/ventoy-%ven
 7z x ventoy.zip -r -aoa
 RMDIR Ventoy2Disk /S /Q
 REN ventoy-%vencurver% Ventoy2Disk
-move .\Ventoy2Disk\altexe\Ventoy2Disk_X64.exe .\Ventoy2Disk\Ventoy2Disk.exe
 cls
 echo.Downloaded newest version.
 goto doneventoy
@@ -276,9 +274,9 @@ echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII               WOULD YOU LIKE TO USE GPT               IIII
 echo.IIII                                                       IIII
-echo.IIII              If your computer uses UEFI               IIII
-echo.IIII              select YES. If your computer             IIII
-echo.IIII              uses a BIOS, select NO.                  IIII
+echo.IIII              Most computers should be ok              IIII
+echo.IIII              with GPT. However some very              IIII
+echo.IIII             old machines may have issues.             IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
@@ -325,10 +323,10 @@ goto sbask
 :ventoyinstall
 echo.Please Wait, Installing Ventoy. Please close the file explorer when done.
 cd .\Ventoy2Disk\
-Ventoy2Disk.exe VTOYCLI /I /Drive:%drivepath%: %arg1% %arg2% 
-cd %maindir%
+Ventoy2Disk.exe VTOYCLI /I /Drive:%drivepath%: /NOUSBCheck %arg1% %arg2% 
+cd %maindir% 
 format %drivepath%: /FS:NTFS /X /Q /V:Medicat /Y
-goto installversion
+goto installver
 
 :error
 echo.nothing was chosen, try again
@@ -336,7 +334,7 @@ timeout 5
 goto install2
 :importantdrive
 mode con:cols=64 lines=18
-echo.[101mII-----------------------------------------------------------II
+echo.[41mII-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII                   IMPORTANT WARNING                   IIII
@@ -347,8 +345,9 @@ echo.IIII               YOUR COMPUTER SYSTEM..                  IIII
 echo.IIII           THE PROGRAM WILL NOW ASK AGAIN              IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.                          Press any key to bypass this warning.[0m&& pause >nul
+echo.II-----------------------------------------------------------II[0m
+echo.                                                  Press any key 
+pause >nul
 goto install2
 
 
@@ -362,48 +361,38 @@ echo.Please Wait, Updating Ventoy but not formatting
 cd .\Ventoy2Disk\
 Ventoy2Disk.exe VTOYCLI /U /Drive:%drivepath%:
 cd %maindir%
-:installversion
+goto installver
+
+:installver
 title Medicat Installer [INSTALL!]
 if exist "%CD%\MediCat.USB.v%medicatver%.7z" (goto install4) else (goto installversion2)
 :installversion2
-if exist "%CD%\MediCat.USB.v%medicatver%.zip.001" (goto warnhash) else (goto dlcheck3)
-
-REM -- INSTALLER
-
-:warnhash
-title Medicat Installer [HASHCHECK]
+if exist "%CD%\MediCat.USB.v%medicatver%.zip.001" (goto hasher)
 cls
-if exist "%CD%\MediCat.USB*.001" (echo..001 Exists) else (goto gdriveerror)
-if exist "%CD%\MediCat.USB*.002" (echo..002 Exists) else (goto gdriveerror)
-if exist "%CD%\MediCat.USB*.003" (echo..003 Exists) else (goto gdriveerror)
-if exist "%CD%\MediCat.USB*.004" (echo..004 Exists) else (goto gdriveerror)
-if exist "%CD%\MediCat.USB*.005" (echo..005 Exists) else (goto gdriveerror)
-if exist "%CD%\MediCat.USB*.006" (echo..006 Exists) else (goto gdriveerror)
-echo.Hashing files to verify they are not corrupted
-timeout 2 >nul
-goto hasher
-
-
-:gdriveerror
 mode con:cols=64 lines=18
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
-echo.IIII                  DRIVE FILES MISSING                  IIII
+echo.IIII         COULD NOT FIND THE MEDICAT FILE(S).           IIII
+echo.IIII            (EITHER *.001 or the main .7z)             IIII
+echo.IIII             are they in The same folder?              IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
-echo.IIII   IT LOOKS LIKE YOU DOWNLOADED MEDICAT IN PARTS.      IIII
-echo.IIII              WE COULDNT FIND ONE OF THEM              IIII
-echo.IIII              DID YOU DOWNLOAD ALL SIX??               IIII
-echo.IIII                                                       IIII
+echo.IIII           WOULD YOU LIKE TO DOWNLOAD THEM?            IIII
+echo.IIII       SELECTING NO WILL LET YOU FIND THE FILE.        IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
-echo.
-echo.
-pause
-goto bigboi
+call Button 10 12 F2 "YES" 46 12 F4 "NO" X _Var_Box _Var_Hover
+GetInput /M %_Var_Box% /H %_Var_Hover% 
 
-REM -- CHECK WHICH VERSION USER DOWNLOADED
+If /I "%Errorlevel%"=="1" (
+	cls & goto bigboi
+)
+If /I "%Errorlevel%"=="2" (
+	cls & goto installerror
+)
+
+
 
 
 :installerror
@@ -414,13 +403,12 @@ echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII        THE INSTALLER COULD NOT FIND MEDICAT           IIII
-echo.IIII        PLEASE MANUALLY SELECT THE .7z FILE!           IIII
 echo.IIII                                                       IIII
-echo.IIII       PRESS ANY KEY TO OPEN THE FILE PROMPT!          IIII
+echo.IIII          PLEASE MANUALLY SELECT THE FILE!             IIII
+echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
-pause> nul
 
 set dialog="about:<input type=file id=FILE><script>FILE.click();new ActiveXObject
 set dialog=%dialog%('Scripting.FileSystemObject').GetStandardStream(1).WriteLine(FILE.value);
@@ -497,34 +485,11 @@ set drivepath=%folder:~0,1%
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -o %drivepath%:/CheckFiles.bat -s -L
 cd /d %drivepath%:
 start cmd /k CheckFiles.bat
+cd /d %maindir%
 goto menu2
 
 
 
-:dlcheck3
-cls
-mode con:cols=64 lines=18
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-echo.IIII                                                       IIII
-echo.IIII         COULD NOT FIND THE MEDICAT FILE(S).           IIII
-echo.IIII                                                       IIII
-echo.IIII            (EITHER *.001 or the main .7z)             IIII
-echo.IIII                                                       IIII
-echo.IIII                                                       IIII
-echo.IIII           WOULD YOU LIKE TO DOWNLOAD THEM?            IIII
-echo.IIII                       ( Y / N )                       IIII
-echo.II-----------------------------------------------------------II
-echo.II-----------------------------------------------------------II
-call Button 10 12 F2 "YES" 46 12 F4 "NO" X _Var_Box _Var_Hover
-GetInput /M %_Var_Box% /H %_Var_Hover% 
-
-If /I "%Errorlevel%"=="1" (
-	cls & goto bigboi
-)
-If /I "%Errorlevel%"=="2" (
-	cls & goto installerror
-)
 
 :bigboi
 cls
@@ -554,21 +519,21 @@ cls
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/drive.bat" -o ./drive.bat -s -L
 call drive.bat
 del drive.bat /Q
-goto installversion
+goto installver
 
 :tordown
 cls
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -o ./tor.bat -s -L
 call tor.bat
 del tor.bat /Q
-goto installversion
+goto installver
 
 :cdndown
 cls
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/cdn.bat" -o ./cdn.bat -s -L
 call cdn.bat
 del cdn.bat /Q
-goto installversion
+goto installver
 
 :renameprogram
 
