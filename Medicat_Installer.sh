@@ -18,6 +18,13 @@ elif which yum >/dev/null; then
 	pkgmgr="yum"
 	install_arg="install"
 	update_arg="update"
+elif which emerge >/dev/null; then
+	pkgmgr="emerge"
+	update_arg="--sync"
+elif which zypper >/dev/null; then
+	pkgmgr="zypper"
+	install_arg="in"
+	update_arg="ref"
 elif which pkg >/dev/null; then
 	pkgmgr="pkg"
 	install_arg="install"
