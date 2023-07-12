@@ -5,37 +5,23 @@ echo "Waiting for 10 seconds"
 sleep 10
 
 
-if grep -qs "ubuntu" /etc/os-release; then
-	os="ubuntu"
-	pkgmgr="apt"
-	install_arg="install"
-	update_arg="update"
-elif grep -qs "freebsd" /etc/os-release; then
-	os="freebsd"
-	pkgmgr="pkg"
-	install_arg="install"
-	update_arg="update"
-elif [[ -e /etc/debian_version ]]; then
-	os="debian"
-	pkgmgr="apt"
-	install_arg="install"
-	update_arg="update"
-elif [[ -e /etc/almalinux-release || -e /etc/rocky-release || -e /etc/centos-release ]]; then
-	echo "Fuck Red-Hat for putting source code behind paywalls."
-	os="centos"
-	pkgmgr="yum"
-	install_arg="install"
-	update_arg="update"
-elif [[ -e /etc/fedora-release ]]; then
-	os="fedora"
-	pkgmgr="yum"
-	install_arg="install"
-	update_arg="update"
-elif [[ -e /etc/arch-release ]]; then
-	os="arch"
+if which pacman >/dev/null; then
 	pkgmgr="pacman"
 	install_arg="-S --needed --noconfirm"
 	update_arg="-Syy"
+elif which apt >/dev/null; then
+	pkgmgr="apt"
+	install_arg="install"
+	update_arg="update"
+elif which yum >/dev/null; then
+	echo "Fuck Red-Hat for putting source code behind paywalls."
+	pkgmgr="yum"
+	install_arg="install"
+	update_arg="update"
+elif which pkg >/dev/null; then
+	pkgmgr="pkg"
+	install_arg="install"
+	update_arg="update"
 fi
 echo "Acquiring any dependencies"
 sudo $pkgmgr $update_arg
