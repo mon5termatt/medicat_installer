@@ -39,13 +39,12 @@ if ! [ $(which curl 2>/dev/null) ]; then
 	sudo $pkgmgr $install_arg curl
 fi
 if ! [ $(which 7z 2>/dev/null) ]; then
-	if [[ -e /etc/arch-release ]]; then
-		sudo $pkgmgr $install_arg p7zip
-	elif [[ -e /etc/fedora-release  ]]; then
-		sudo $pkgmgr $install_arg p7zip-full p7zip-plugins
-	else
-		sudo $pkgmgr $install_arg p7zip-full
-	fi
+	case $pkgmgr in
+		"pacman") sudo $pkgmgr $install_arg p7zip ;;
+		"emerge") sudo $pkgmgr $install_arg app-arch/p7zip ;;
+		"yum") sudo $pkgmgr $install_arg p7zip p7zip-plugins ;;
+		*) sudo $pkgmgr $install_arg p7zip-full ;;
+	esac
 fi
 if ! [ $(sudo which mkntfs 2>/dev/null) ]; then 
 	sudo $pkgmgr $install_arg ntfs-3g
