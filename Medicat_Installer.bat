@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3505
+set localver=3506
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -214,9 +214,15 @@ goto menu2
 echo.Getting Current Ventoy Version
 timeout 0 >nul
 powershell -c "$data = curl https://api.github.com/repos/ventoy/ventoy/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './ventoyversion.txt'"
-set /p VENVER= <./ventoyversion.txt
+
+::----------------------------------------------------------
+::START TEMP CODE 
+::set /p VENVER= <./ventoyversion.txt
+set VENVER=v1.0.91
 set vencurver=%VENVER:~-6%
-echo.Current Online Version - %VENVER:~-6%
+::echo.Current Online Version - %VENVER:~-6%
+::----------------------------------------------------------
+
 goto checkventoyver
 :checkventoyver
 echo.Checking if current version found on system.
