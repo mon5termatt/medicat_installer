@@ -3,6 +3,8 @@ echo -e "WELCOME TO THE MEDICAT INSTALLER, PLEASE DO NOT RUN THIS AS ROOT\nThis 
 echo "Updated for efficiency and cross-distro use by SkeletonMan"
 echo "Waiting for 10 seconds"
 sleep 10
+
+
 if grep -qs "ubuntu" /etc/os-release; then
 	os="ubuntu"
 	pkgmgr="apt"
@@ -66,15 +68,16 @@ tar -xf ventoy.tar.gz
 rm -rf ventoy.tar.gz ./ventoy/ventoy-${venver: -6}
 mv ventoy-${venver: -6} ventoy
 echo -e "\n\n\n\n\n\n"
+sha256hash='a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4'
 if [[ -f MediCat.USB.v21.12.7z ]]; then
-location='MediCat.USB.v21.12.7z'
+	location='MediCat.USB.v21.12.7z'
 fi
 if ! [[ -f MediCat.USB.v21.12.7z ]]; then
 	if  [[ -f MediCat\ USB\ v21.12/MediCat.USB.v21.12.7z ]]; then
 		location=''MediCat\ USB\ v21.12/MediCat.USB.v21.12.7z''
 	else
-	echo "Please enter location of MediCat.USB.v21.12.7z if it exists or just press enter to download it via tor."
-	read location
+	echo "Please enter location of MediCat.USB.v21.12.7z if it exists or just press enter to download it via torrent."
+	read location	
 	fi
 	if [ -z "$location" ] ; then
 		echo "Starting to download torrent"
@@ -83,6 +86,21 @@ if ! [[ -f MediCat.USB.v21.12.7z ]]; then
 		location=''MediCat\ USB\ v21.12/MediCat.USB.v21.12.7z''
 	fi
 fi
+
+echo -e "Checking Sha256 hash of MediCat.USB.v21.12.7z.."
+checksha256=$(sha256sum MediCat.USB.v21.12.7z | awk '{print $1}')
+if [[ checksha256 -ne $sha256hash ]]; then
+	echo -e "Your MediCat.USB.v21.12.7z SHA256 hash does not match!!!"
+	echo -e "Hash is $checksha256"
+	echo -e "Exiting for your safety!"
+	exit
+else
+	echo -e "Your MediCat.USB.v21.12.7z sha256 hash matches!"
+	echo -e "Hash is $checksha256"
+	echo -e "We are safe to proceed"
+fi
+
+
 echo -e "\n\n\n"
 echo "Please Plug your USB in now if it is not already"
 echo "Waiting 15 seconds..."
