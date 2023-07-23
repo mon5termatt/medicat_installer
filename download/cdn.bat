@@ -35,7 +35,7 @@ if %server% == 3 set url="https://mirror.fangshdow.trade/medicat-usb/MediCat%%20
 
 
 :download
-echo.Downloading from Medicat server.
+echo.Downloading from selected server.
 curl -# -L -o MediCat.USB.v21.12.7z -C - %url%
 
 :done
