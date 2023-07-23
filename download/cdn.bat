@@ -30,17 +30,23 @@ curl --max-time 3 %url% -o server%server%.7z -s
 set /a server=(%server%)+1
 goto startchecks
 
-:dlcheckdone
-for %%I in (server1.7z) do set /a size1=%%~zI
-for %%I in (server2.7z) do set /a size2=%%~zI
-for %%I in (server3.7z) do set /a size3=%%~zI
+
+
+@echo OFF
+echo Testing Server 1 - Medicat CDN
+FOR /F %%I in ('curl --max-time 6 https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z -o server1.7z -s -w "%%{speed_download}"') do set server1=%%I
+echo Testing Server 2 - medicat.itrio.xyz
+FOR /F %%I in ('curl --max-time 6 https://mirrors.itrio.xyz/unpacked/MediCat.USB.v21.12.7z -o server2.7z -s -w "%%{speed_download}"') do set server2=%%I
+echo Testing Server 3 - mirror.fangshdow.trade
+FOR /F %%I in ('curl --max-time 6 "https://mirror.fangshdow.trade/medicat-usb/MediCat%%20USB%%20v21.12/MediCat.USB.v21.12.7z" -o server3.7z -s -w "%%{speed_download}"') do set server3=%%I
+
 del server1.7z /q
 del server2.7z /q
 del server3.7z /q
 echo.Please Select the LARGEST number from the following
-echo.Mirror 1 - %size1%
-echo.Mirror 2 - %size2%
-echo.Mirror 3 - %size3%
+echo.%server1% - Server 1 - Medicat CDN
+echo.%server2% - Server 2 - medicat.itrio.xyz
+echo.%server3% - Server 3 - mirror.fangshdow.trade
 echo.
 choice /C:123 /N /M "1/2/3"
 
