@@ -48,7 +48,6 @@ if errorlevel 3 set /a server=3 && goto set
 if errorlevel 2 set /a server=2 && goto set 
 if errorlevel 1 set /a server=1 && goto set
 
-
 :set
 if %server% == 1 set url="https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z"
 if %server% == 2 set url="https://mirrors.itrio.xyz/archive/MediCatUSBv21.12.7z"
@@ -56,16 +55,8 @@ if %server% == 3 set url="https://mirror.fangshdow.trade/medicat-usb/MediCat%%20
 
 
 :download
-echo.Please note download speeds are currently limited due to high traffic
-echo.Consider using the torrent as it will be a faster option
-
-
 echo.Downloading from Medicat server.
 curl -# -L -o MediCat.USB.v21.12.7z -C - %url%
-
-
-
-
 
 :done
 cls
