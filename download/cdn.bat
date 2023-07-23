@@ -20,7 +20,7 @@ set /a server3=%server3% / 1000000
 del server1.7z /q
 del server2.7z /q
 del server3.7z /q
-echo.Please Select the LARGEST number from the following
+echo.Please Select the fastest server for you.
 echo.%server1% Mbp/s - Server 1 - Medicat CDN
 echo.%server2% Mbp/s - Server 2 - medicat.itrio.xyz
 echo.%server3% Mbp/s - Server 3 - mirror.fangshdow.trade
