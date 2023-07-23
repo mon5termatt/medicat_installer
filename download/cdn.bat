@@ -44,19 +44,21 @@ echo.Mirror 3 - %size3%
 echo.
 choice /C:123 /N /M "1/2/3"
 
-if errorlevel 3 set server=3 && goto download
-if errorlevel 2 set server=3 && goto download
-if errorlevel 1 set server=3 && goto download
+if errorlevel 3 set /a server=3 && goto set
+if errorlevel 2 set /a server=2 && goto set 
+if errorlevel 1 set /a server=1 && goto set
+
+
+:set
+if %server% == 1 set url="https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z"
+if %server% == 2 set url="https://mirrors.itrio.xyz/archive/MediCatUSBv21.12.7z"
+if %server% == 3 set url="https://mirror.fangshdow.trade/medicat-usb/MediCat%%20USB%%20v21.12/MediCat.USB.v21.12.7z"
 
 
 :download
 echo.Please note download speeds are currently limited due to high traffic
 echo.Consider using the torrent as it will be a faster option
-sleep 3 > nul
 
-if %server%=1 set url="https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z"
-if %server%=1 set url="https://mirrors.itrio.xyz/archive/MediCatUSBv21.12.7z"
-if %server%=1 set url="https://mirror.fangshdow.trade/medicat-usb/MediCat%%20USB%%20v21.12/MediCat.USB.v21.12.7z"
 
 echo.Downloading from Medicat server.
 curl -# -L -o MediCat.USB.v21.12.7z -C - %url%
