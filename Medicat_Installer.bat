@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3506
+set localver=3507
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -124,34 +124,58 @@ echo.                          Press any key to accept this warning.&& pause >nu
 :checkupdateprogram
 title Medicat Installer [FILECHECK]
 cls
-echo.Please wait. Files are being downloaded. 
+echo.Downloading Initial Files, Please wait.
 echo.1/13  [====                                                ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -o ./bin/QuickSFV.exe -s -L
+cls
+echo.Downloading Initial Files, Please wait.
 echo.2/13  [========                                            ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini" -o ./bin/QuickSFV.ini -s -L
+cls
+echo.Downloading Initial Files, Please wait.
 echo.3/13  [============                                        ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat" -o ./bin/Box.bat -s -L
+cls
+echo.Downloading Initial Files, Please wait.
 echo.4/13  [================                                    ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat" -o ./bin/Button.bat -s -L
+cls
+echo.Downloading Initial Files, Please wait.
 echo.5/13  [====================                                ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe" -o ./bin/GetInput.exe -s -L
+cls
+echo.Downloading Initial Files, Please wait.
 echo.6/13  [========================                            ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat" -o ./bin/Getlen.bat -s -L
+cls
+echo.Downloading Initial Files, Please wait.
 echo.7/13  [============================                        ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe" -o ./bin/batbox.exe -s -L
+cls
+echo.Downloading Initial Files, Please wait.
 echo.8/13  [================================                    ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe" -o ./bin/folderbrowse.exe -s -L
+cls
+echo.Downloading Initial Files, Please wait.
 echo.9/13  [====================================                ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/ver.ini" -o ./ver.ini -s -L
+cls
+echo.Downloading Initial Files, Please wait.
 echo.10/13 [========================================            ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/motd.txt" -o ./bin/motd.txt -s -L
+cls
+echo.Downloading Initial Files, Please wait.
 echo.11/13 [============================================        ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/LICENSE.txt" -o ./bin/LICENSE.txt -s -L
+cls
+echo.Downloading Initial Files, Please wait.
 echo.12/13 [================================================    ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.exe" -o ./bin/7z.exe -s -L
+cls
+echo.Downloading Initial Files, Please wait.
 echo.13/13 [====================================================]
-
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.dll" -o ./bin/7z.dll -s -L
+
 set /p medicatver= < ver.ini
 DEL ver.ini /Q
 
@@ -215,15 +239,12 @@ echo.Getting Current Ventoy Version
 timeout 0 >nul
 powershell -c "$data = curl https://api.github.com/repos/ventoy/ventoy/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './ventoyversion.txt'"
 
-::----------------------------------------------------------
 ::START TEMP CODE 
-::set /p VENVER= <./ventoyversion.txt
-set VENVER=v1.0.91
+set /p VENVER= <./ventoyversion.txt
+::set VENVER=v1.0.91
 set vencurver=%VENVER:~-6%
-::echo.Current Online Version - %VENVER:~-6%
-::----------------------------------------------------------
+echo.Current Online Version - %VENVER:~-6%
 
-goto checkventoyver
 :checkventoyver
 echo.Checking if current version found on system.
 timeout 1 >nul
@@ -402,7 +423,7 @@ If /I "%Errorlevel%"=="2" (
 
 
 :installerror
-mode con:cols=64 lines=18
+mode con:cols=64 lines=20
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
@@ -428,6 +449,7 @@ goto install6
 REM -- ACTUALLY EXTRACT/INSTALL
 
 :install4
+mode con:cols=100 lines=20
 set file="MediCat.USB.v21.12.7z"
 set sha256=a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4
 set sha1=2cbf5f337849a11084124a79a1b8d7e77eaca7d5
@@ -435,18 +457,27 @@ set sha1=2cbf5f337849a11084124a79a1b8d7e77eaca7d5
 goto finishup
 
 :install5
+mode con:cols=100 lines=20
 set file="MediCat.USB.v%medicatver%.zip.001"
 7z x -O%drivepath%: %file% -r -aoa
 goto finishup
 
 :install6
+mode con:cols=100 lines=20
 7z x -O%drivepath%: "%file%" -r -aoa
 goto finishup
 
-
-REM -- FILE CLEANUP
-
 :finishup
+if errorlevel 255 goto finisherror
+if errorlevel 8 goto finisherror
+if errorlevel 7 goto finisherror
+if errorlevel 2 goto finisherror
+if errorlevel 1 goto finisherror
+
+::it worked
+if errorlevel 0 goto finishup2
+
+:finishup2
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/icon.ico" -o %drivepath%:/autorun.ico -s -L
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -o %drivepath%:/CheckFiles.bat -s -L
 cd /d %drivepath%:
@@ -455,8 +486,14 @@ echo.The Installer Has Completed.
 pause
 exit
 
-
-
+:finisherror
+echo.[41m
+echo.Error has occured. Please look above.
+echo.If you come to the discord for support we will need this error. 
+echo.COMMON ERRORS: Unexpected end of archive - FIX: Redownload Main File
+echo.[0m
+pause
+exit
 
 ::---------------------------------------------------------------------------------------------------------------------------------------------------
 ::---------------------------------------------------------------------------------------------------------------------------------------------------
@@ -520,12 +557,14 @@ If /I "%Errorlevel%"=="1" (
 If /I "%Errorlevel%"=="2" (
 	cls & goto cdndown
 )
-:drivedown
-cls
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/drive.bat" -o ./drive.bat -s -L
-call drive.bat
-del drive.bat /Q
-goto installver
+goto bigboi
+
+::drivedown
+::cls
+::curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/drive.bat" -o ./drive.bat -s -L
+::call drive.bat
+::del drive.bat /Q
+::goto installver
 
 :tordown
 cls
@@ -540,12 +579,6 @@ curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/downl
 call cdn.bat
 del cdn.bat /Q
 goto installver
-
-:renameprogram
-
-
-
-
 
 :ascii
 mode con:cols=100 lines=55
