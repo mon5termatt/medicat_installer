@@ -16,6 +16,10 @@ echo Testing Server 3 - mirror.fangshdow.trade
 FOR /F %%I in ('curl -e https://installer.medicatusb.com --max-time 1 "https://mirror.fangshdow.trade/medicat-usb/MediCat%%20USB%%20v21.12/MediCat.USB.v21.12.7z" -o server3.7z -s -w "%%{speed_download}"') do set server3=%%I
 set /a server3=%server3% / 1000000
 
+del server1.7z /q
+del server2.7z /q
+del server3.7z /q
+
 if %server1% geq %server2% (
     if %server1% geq %server3% (
         set url="https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z" & goto download
