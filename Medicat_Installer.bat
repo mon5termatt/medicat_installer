@@ -78,10 +78,6 @@ If /I "%Errorlevel%"=="4" (
 set lang=gr
 goto curver
 )
-If /I "%Errorlevel%"=="4" (
-set lang=gr
-goto curver
-)
 If /I "%Errorlevel%"=="5" (
 set lang=tr
 goto curver
