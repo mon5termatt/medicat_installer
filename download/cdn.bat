@@ -6,16 +6,22 @@ set propersize=22994783619
 call :filesize "MediCat.USB.v21.12.7z"
 if "%size%" == "%propersize%" (goto done)
 echo.Testing Server Download speeds.
-echo Testing Server 1 - Medicat CDN
-FOR /F %%I in ('curl -e https://installer.medicatusb.com --max-time 1 "https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z" -o server1.7z -s -w "%%{speed_download}"') do set server1=%%I
+echo Testing Server 1 - files.medicatusb.com
+FOR /F %%I in ('curl -e https://installer.medicatusb.com --max-time 3 "https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z" -o server1.7z -s -w "%%{speed_download}"') do set server1=%%I
 set /a server1=%server1% / 1000000
+echo.%server1%mbps
 echo Testing Server 2 - medicat.itrio.xyz
-FOR /F %%I in ('curl -e https://installer.medicatusb.com --max-time 1 "https://mirrors.itrio.xyz/unpacked/MediCat.USB.v21.12.7z" -o server2.7z -s -w "%%{speed_download}"') do set server2=%%I
+FOR /F %%I in ('curl -e https://installer.medicatusb.com --max-time 3 "https://mirrors.itrio.xyz/unpacked/MediCat.USB.v21.12.7z" -o server2.7z -s -w "%%{speed_download}"') do set server2=%%I
 set /a server2=%server2% / 1000000
+echo.%server2%mbps
 echo Testing Server 3 - mirror.fangshdow.trade
-FOR /F %%I in ('curl -e https://installer.medicatusb.com --max-time 1 "https://mirror.fangshdow.trade/medicat-usb/MediCat%%20USB%%20v21.12/MediCat.USB.v21.12.7z" -o server3.7z -s -w "%%{speed_download}"') do set server3=%%I
+FOR /F %%I in ('curl -e https://installer.medicatusb.com --max-time 3 "https://mirror.fangshdow.trade/medicat-usb/MediCat%%20USB%%20v21.12/MediCat.USB.v21.12.7z" -o server3.7z -s -w "%%{speed_download}"') do set server3=%%I
 set /a server3=%server3% / 1000000
+echo.%server3%mbps
 
+
+
+timeout 1 >nul
 del server1.7z /q
 del server2.7z /q
 del server3.7z /q
