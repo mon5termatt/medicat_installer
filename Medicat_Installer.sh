@@ -5,27 +5,27 @@ echo "Waiting for 10 seconds"
 sleep 10
 
 
-if which pacman >/dev/null; then
+if which pacman >/dev/null 2>&1; then
 	pkgmgr="pacman"
 	install_arg="-S --needed --noconfirm"
 	update_arg="-Syy"
-elif which apt >/dev/null; then
+elif which apt >/dev/null 2>&1; then
 	pkgmgr="apt"
 	install_arg="install"
 	update_arg="update"
-elif which yum >/dev/null; then
+elif which yum >/dev/null 2>&1; then
 	echo "Fuck Red-Hat for putting source code behind paywalls."
 	pkgmgr="yum"
 	install_arg="install"
 	update_arg="update"
-elif which emerge >/dev/null; then
+elif which emerge >/dev/null 2>&1; then
 	pkgmgr="emerge"
 	update_arg="--sync"
-elif which zypper >/dev/null; then
+elif which zypper >/dev/null 2>&1; then
 	pkgmgr="zypper"
 	install_arg="in"
 	update_arg="ref"
-elif which pkg >/dev/null; then
+elif which pkg >/dev/null 2>&1; then
 	pkgmgr="pkg"
 	install_arg="install"
 	update_arg="update"
