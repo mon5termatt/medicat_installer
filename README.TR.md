@@ -2,6 +2,8 @@
 
 ![Logo](icon.png)
 
+> Oku: [![İspanyolca](https://img.shields.io/badge/%C4%B0spanyolca-blue)](README.ES.md) [![İngilizce](https://img.shields.io/badge/%C4%B0ngilizce-blue)](README.md)
+
 # [Medicat Sitesine Gidin](https://medicatusb.com/)
 
 ### [Bu kodu ve Medicat'ı iyileştirmeye yardımcı olmak isteyen insanlar arıyoruz, Discord'da uğrayın. :D](https://url.medicatusb.com/discord)

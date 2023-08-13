@@ -1,6 +1,8 @@
 # Medicat Installer
 ![Logo](icon.png)
 
+> Read in: [![Spanish](https://img.shields.io/badge/Spanish-blue)](README.ES.md) [![Turkish](https://img.shields.io/badge/Turkish-blue)](README.TR.md)
+
 # [Visit the Medicat Site](https://medicatusb.com/)
 
 ### [We are always looking for people to help improve this code and medicat, Inquire in the discord :D](https://url.medicatusb.com/discord)
