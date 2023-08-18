@@ -2,7 +2,7 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3507
+set localver=3508
 set maindir=%CD%
 set format=Yes
 set formatcolor=2F
@@ -57,31 +57,6 @@ if not exist bin md bin
 :lang
 FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
 set lang=%OSLanguage:~0,2%
-IF "%lang%"=="en" (goto curver)
-IF "%lang%"=="fr" (goto curver)
-echo.Select Your Language
-call Button 1 2 F2 "English" 14 2 F2 "Francais" 28 2 F2 "Portugues" 43 2 F2 "Deutsch" 56 2 F2 "Turkish" X _Var_Box _Var_Hover
-GetInput /M %_Var_Box% /H %_Var_Hover%  
-If /I "%Errorlevel%"=="1" (
-set lang=en
-goto curver
-)
-If /I "%Errorlevel%"=="2" (
-set lang=fr
-goto curver
-)
-If /I "%Errorlevel%"=="3" (
-set lang=pt
-goto curver
-)
-If /I "%Errorlevel%"=="4" (
-set lang=gr
-goto curver
-)
-If /I "%Errorlevel%"=="5" (
-set lang=tr
-goto curver
-)
 
 :curver
 mode con:cols=64 lines=18
@@ -158,11 +133,11 @@ curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/ver.i
 cls
 echo.Downloading Initial Files, Please wait.
 echo.10/13 [========================================            ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/motd.txt" -o ./bin/motd.txt -s -L
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/motd.ps1" -o ./bin/motd.ps1 -s -L
 cls
 echo.Downloading Initial Files, Please wait.
 echo.11/13 [============================================        ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/%lang%/LICENSE.txt" -o ./bin/LICENSE.txt -s -L
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/licence.ps1" -o ./bin/licence.ps1 -s -L
 cls
 echo.Downloading Initial Files, Please wait.
 echo.12/13 [================================================    ]
@@ -184,7 +159,7 @@ set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS
 title Medicat Installer [%localver%]
 mode con:cols=100 lines=30
 cls
-type bin\LICENSE.txt
+powershell bin\licence.ps1 %lang%
 echo.
 pause
 :menu2
@@ -196,7 +171,7 @@ echo.
 echo.
 echo.VERSION %localver% BY MON5TERMATT. 
 echo.
-type bin\motd.txt
+powershell bin\motd.ps1 %lang%
 GetInput /M %_Var_Box% /H %_Var_Hover% 
 
 
