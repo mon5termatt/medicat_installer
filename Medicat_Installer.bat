@@ -149,6 +149,7 @@ curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%b
 cls
 echo.Setting Powershell Settings for Scripts.
 Powershell -c "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine"
+Powershell -c "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"
 set /p medicatver= < ver.ini
 DEL ver.ini /Q
 
