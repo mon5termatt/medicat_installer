@@ -25,11 +25,11 @@ if errorlevel 1 (Echo.Could not Ping github.com, Exiting Script && timeout 5 > n
 :foundinternet
 echo.Found Internet
 curl.exe -V > nul
-if errorlevel 1 (echo Filed to find curl. && pause && exit)
+if errorlevel 1 (echo Failed to find curl. && pause && exit)
 echo.Found cURL
 for %%# in (powershell.exe) do @if "%%~$PATH:#"=="" (echo.Could not find Powershell. && pause && exit) 
 echo.Found Powershell
-echo.Promting for admin permissions if not run as admin.
+echo.Prompting for admin permissions if not run as admin.
 timeout 1 >nul
 set _elev=
 if /i "%~1"=="-el" set _elev=1
