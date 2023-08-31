@@ -2,11 +2,17 @@
 title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
-set localver=3508
 set maindir=%CD%
+set localver=3510
+set medicatver=21.12
+set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
 set format=Yes
 set formatcolor=2F
+FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
+set lang=%OSLanguage:~0,2%
 if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
+
+
 REM GET ADMIN CODE MUST GO FIRST
 :initialchecks
 echo.Running Initial Checks
@@ -54,10 +60,6 @@ echo.Using Supported version of windows. (10/11)
 timeout 1 > nul
 if not exist bin md bin
 
-:lang
-FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
-set lang=%OSLanguage:~0,2%
-
 :curver
 mode con:cols=64 lines=18
 cls
@@ -96,69 +98,110 @@ echo.                          Press any key to accept this warning.&& pause >nu
 title Medicat Installer [FILECHECK]
 cls
 echo.Downloading Initial Files, Please wait.
-echo.1/13  [====                                                ]
+echo.1/12  [====                                                ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -o ./bin/QuickSFV.exe -s -L
+CertUtil -hashfile  "./bin/QuickSFV.exe" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
+set /p hash= < tmpFile 
+if %hash% NEQ 4b1d5ec11b2b5db046233a28dba73b83 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
-echo.2/13  [========                                            ]
+echo.2/12  [========                                            ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini" -o ./bin/QuickSFV.ini -s -L
+CertUtil -hashfile  "./bin/QuickSFV.ini" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
+set /p hash= < tmpFile 
+if %hash% NEQ 7be5a47066edccd7aa0d3b0d69d607ff (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
-echo.3/13  [============                                        ]
+echo.3/12  [============                                        ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat" -o ./bin/Box.bat -s -L
+CertUtil -hashfile  "./bin/Box.bat" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
+set /p hash= < tmpFile 
+if %hash% NEQ e5ce0008212c431baacb5b208f2575bd (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
-echo.4/13  [================                                    ]
+echo.4/12  [================                                    ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat" -o ./bin/Button.bat -s -L
+CertUtil -hashfile  "./bin/Button.bat" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
+set /p hash= < tmpFile 
+if %hash% NEQ 5b727eff91de52000cea8e61694f2a03 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
-echo.5/13  [====================                                ]
+echo.5/12  [====================                                ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe" -o ./bin/GetInput.exe -s -L
+CertUtil -hashfile  "./bin/GetInput.exe" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
+set /p hash= < tmpFile 
+if %hash% NEQ 2ba62ae6f88b11d0e262af35d8db8ca9 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
-echo.6/13  [========================                            ]
+echo.6/12  [========================                            ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat" -o ./bin/Getlen.bat -s -L
+CertUtil -hashfile  "./bin/Getlen.bat" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
+set /p hash= < tmpFile 
+if %hash% NEQ 8c1812e76ba7bf09cb87384089a0ab7f (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
-echo.7/13  [============================                        ]
+echo.7/12  [============================                        ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe" -o ./bin/batbox.exe -s -L
+CertUtil -hashfile  "./bin/batbox.exe" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
+set /p hash= < tmpFile 
+if %hash% NEQ cb4a44baa20ad26bf74615a7fc515a84 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
-echo.8/13  [================================                    ]
+echo.8/12  [================================                    ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe" -o ./bin/folderbrowse.exe -s -L
+CertUtil -hashfile  "./bin/folderbrowse.exe" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
+set /p hash= < tmpFile 
+if %hash% NEQ 574aec8f205beeeb937e066b021a2673 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
-echo.9/13  [====================================                ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/ver.ini" -o ./ver.ini -s -L
-cls
-echo.Downloading Initial Files, Please wait.
-echo.10/13 [========================================            ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/motd.ps1" -o ./bin/motd.ps1 -s -L
-cls
-echo.Downloading Initial Files, Please wait.
-echo.11/13 [============================================        ]
-curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/licence.ps1" -o ./bin/licence.ps1 -s -L
-cls
-echo.Downloading Initial Files, Please wait.
-echo.12/13 [================================================    ]
+echo.9/12  [========================================            ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.exe" -o ./bin/7z.exe -s -L
 cls
 echo.Downloading Initial Files, Please wait.
-echo.13/13 [====================================================]
+echo.10/12 [============================================        ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.dll" -o ./bin/7z.dll -s -L
+
+if defined ProgramFiles(x86) (goto check64) else (goto check32)
+
+:check64
+CertUtil -hashfile  "./bin/7z.exe" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
+set /p hash= < tmpFile 
+if %hash% NEQ 71dfb0de05c1d6bc433caa9a36af87af (goto check32)
+CertUtil -hashfile  "./bin/7z.dll" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
+set /p hash= < tmpFile 
+if %hash% NEQ 58fdbf10d3dce4d2e270c03e8311d9db (goto check32)
+goto checkdone
+
+:check32
+CertUtil -hashfile  "./bin/7z.exe" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
+set /p hash= < tmpFile 
+if %hash% NEQ 90aac6489f6b226bf7dc1adabfdb1259 (goto hasherror)
+CertUtil -hashfile  "./bin/7z.dll" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
+set /p hash= < tmpFile 
+if %hash% NEQ b54e2dcd1a3d593ca0ae4cb71910710e (goto hasherror)
+goto checkdone
+
+:checkdone
+del tmpfile /Q
+::dont hash these they change
+cls
+echo.Downloading Initial Files, Please wait.
+echo.11/12 [================================================    ]
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/motd.ps1" -o ./bin/motd.ps1 -s -L
+cls
+echo.Downloading Initial Files, Please wait.
+echo.12/12 [====================================================]
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/licence.ps1" -o ./bin/licence.ps1 -s -L
 cls
 echo.Setting Powershell Settings for Scripts.
 Powershell -c "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine"
 Powershell -c "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"
-set /p medicatver= < ver.ini
-DEL ver.ini /Q
-
+cls
 
 :start
 call:ascii
 pause
 :menu
-set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
 title Medicat Installer [%localver%]
 mode con:cols=100 lines=30
 cls
@@ -166,6 +209,7 @@ powershell bin\licence.ps1 %lang%
 echo.
 pause
 :menu2
+cls
 mode con:cols=64 lines=20
 echo.  %installertext%   %installertext%   %installertext%
 call Button 1 2 F2 "INSTALL MEDICAT" 23 2 %formatcolor% "TOGGLE DRIVE FORMAT (CURRENTLY %format%)" 1 7 F9 "MEDICAT DISCORD" 23 7 F9 "VISIT SITE" 40 7 F9 "CHECK USB FILES"  X _Var_Box _Var_Hover
