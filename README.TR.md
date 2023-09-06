@@ -2,7 +2,7 @@
 
 ![Logo](icon.png)
 
-> Oku: [![İspanyolca](https://img.shields.io/badge/%C4%B0spanyolca-blue)](README.ES.md) [![İngilizce](https://img.shields.io/badge/%C4%B0ngilizce-blue)](README.md)
+> Oku: [![Fransızca](https://img.shields.io/badge/Frans%C4%B1zca-blue)](README.FR.md) [![İspanyolca](https://img.shields.io/badge/%C4%B0spanyolca-blue)](README.ES.md) [![İngilizce](https://img.shields.io/badge/%C4%B0ngilizce-blue)](README.md)
 
 # [Medicat Sitesine Gidin](https://medicatusb.com/)
 
