@@ -1,7 +1,7 @@
 # Installeur Medicat
 ![Logo](icon.png)
 
-> À lire en: [![Anglais](https://img.shields.io/badge/Anglais-blue)](README.md) [![Espagnol](https://img.shields.io/badge/Espagnol-blue)](README.ES.md) [![Turque](https://img.shields.io/badge/Turque-blue)](README.TR.md)
+> À lire en: [![Anglais](https://img.shields.io/badge/Anglais-blue)](README.md) [![Espagnol](https://img.shields.io/badge/Espagnol-blue)](README.ES.md) [![Turque](https://img.shields.io/badge/Turque-blue)](README.TR.md)  
 > Traduction française par [@EDM115](https://github.com/EDM115)
 
 # [Visiter le site Medicat](https://medicatusb.com/)
