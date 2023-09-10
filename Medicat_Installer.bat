@@ -3,7 +3,7 @@ title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
 set maindir=%CD%
-set localver=3510
+set localver=3511
 set medicatver=21.12
 set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
 set format=Yes
@@ -11,9 +11,9 @@ set formatcolor=2F
 FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
 set lang=%OSLanguage:~0,2%
 if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
+if not exist bin md bin
 
 
-REM GET ADMIN CODE MUST GO FIRST
 :initialchecks
 echo.Running Initial Checks
 ping 1.1.1.1 -n 1 -w 1000 > nul
@@ -58,7 +58,6 @@ If /i "%warn%"=="I AGREE" goto oscheckpass
 :oscheckpass
 echo.Using Supported version of windows. (10/11)
 timeout 1 > nul
-if not exist bin md bin
 
 :curver
 mode con:cols=64 lines=18
@@ -103,57 +102,49 @@ cls
 echo.Downloading Initial Files, Please wait.
 echo.1/12  [====                                                ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -o ./bin/QuickSFV.exe -s -L
-CertUtil -hashfile  "./bin/QuickSFV.exe" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
-set /p hash= < tmpFile 
+call :md5 bin/QuickSFV.exe hash
 if %hash% NEQ 4b1d5ec11b2b5db046233a28dba73b83 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.2/12  [========                                            ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini" -o ./bin/QuickSFV.ini -s -L
-CertUtil -hashfile  "./bin/QuickSFV.ini" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
-set /p hash= < tmpFile 
+call :md5 bin/QuickSFV.ini hash
 if %hash% NEQ 7be5a47066edccd7aa0d3b0d69d607ff (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.3/12  [============                                        ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat" -o ./bin/Box.bat -s -L
-CertUtil -hashfile  "./bin/Box.bat" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
-set /p hash= < tmpFile 
+call :md5 bin/Box.bat hash
 if %hash% NEQ e5ce0008212c431baacb5b208f2575bd (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.4/12  [================                                    ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat" -o ./bin/Button.bat -s -L
-CertUtil -hashfile  "./bin/Button.bat" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
-set /p hash= < tmpFile 
+call :md5 bin/Button.bat hash
 if %hash% NEQ 5b727eff91de52000cea8e61694f2a03 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.5/12  [====================                                ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe" -o ./bin/GetInput.exe -s -L
-CertUtil -hashfile  "./bin/GetInput.exe" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
-set /p hash= < tmpFile 
+call :md5 bin/GetInput.exe hash
 if %hash% NEQ 2ba62ae6f88b11d0e262af35d8db8ca9 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.6/12  [========================                            ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat" -o ./bin/Getlen.bat -s -L
-CertUtil -hashfile  "./bin/Getlen.bat" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
-set /p hash= < tmpFile 
+call :md5 bin/Getlen.bat hash
 if %hash% NEQ 8c1812e76ba7bf09cb87384089a0ab7f (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.7/12  [============================                        ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe" -o ./bin/batbox.exe -s -L
-CertUtil -hashfile  "./bin/batbox.exe" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
-set /p hash= < tmpFile 
+call :md5 bin/batbox.exe hash
 if %hash% NEQ cb4a44baa20ad26bf74615a7fc515a84 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.8/12  [================================                    ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe" -o ./bin/folderbrowse.exe -s -L
-CertUtil -hashfile  "./bin/folderbrowse.exe" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
-set /p hash= < tmpFile 
+call :md5 bin/folderbrowse.exe hash
 if %hash% NEQ 574aec8f205beeeb937e066b021a2673 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
@@ -167,26 +158,22 @@ curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%b
 if defined ProgramFiles(x86) (goto check64) else (goto check32)
 
 :check64
-CertUtil -hashfile  "./bin/7z.exe" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
-set /p hash= < tmpFile 
+call :md5 bin/7z.exe hash
 if %hash% NEQ 71dfb0de05c1d6bc433caa9a36af87af (goto check32)
-CertUtil -hashfile  "./bin/7z.dll" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
-set /p hash= < tmpFile 
+call :md5 bin/7z.dll hash
 if %hash% NEQ 58fdbf10d3dce4d2e270c03e8311d9db (goto check32)
 goto checkdone
 
 :check32
-CertUtil -hashfile  "./bin/7z.exe" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
-set /p hash= < tmpFile 
+call :md5 bin/7z.exe hash
 if %hash% NEQ 90aac6489f6b226bf7dc1adabfdb1259 (goto hasherror)
-CertUtil -hashfile  "./bin/7z.dll" md5 | findstr -vrc:"[^0123-9aAb-Cd-EfF ]" > tmpfile
-set /p hash= < tmpFile 
+call :md5 bin/7z.dll hash
 if %hash% NEQ b54e2dcd1a3d593ca0ae4cb71910710e (goto hasherror)
 goto checkdone
 
 :checkdone
 del tmpfile /Q
-::dont hash these they change
+rem dont hash these they change
 cls
 echo.Downloading Initial Files, Please wait.
 echo.11/12 [================================================    ]
@@ -203,10 +190,10 @@ cls
 goto start
 
 :hasherror
-echo.ERROR DOWNLOADING BIN FILES
-echo.ONE OF THE HASHES DOES NOT MATCH.
-echo.PLEASE CHECK YOUR FIREWALL AND CURL
-echo.AND TRY AGAIN. CLOSING.
+echo.ERROR DOWNLOADING BIN FILES. ONE OF THE HASHES DOES NOT MATCH.
+echo.PLEASE MAKE SURE THE MD5 BATCH FILE HAS DOWNLOADED.
+echo.PLEASE CHECK YOUR FIREWALL AND CURL AND TRY AGAIN. CLOSING.
+
 pause > nul
 exit 
 
@@ -260,8 +247,6 @@ echo.              .oo0@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@0oo.
 echo.                  .oo0@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@0oo.                  
 echo.                      ..ooo000@@@@@@@@@@@@@@@@@@@@@@@@000ooo..                      
 echo.                              ....oooooooooooooooo....                              
-echo.CODED BY MON5TERMATT With Help from AAA3A, Daan Breur, Jayro, and many others. Thanks!
-echo.TRANSLATED BY MON5TERMATT
 pause
 :menu
 title Medicat Installer [%localver%]
@@ -639,13 +624,6 @@ If /I "%Errorlevel%"=="2" (
 )
 goto bigboi
 
-::drivedown
-::cls
-::curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/drive.bat" -o ./drive.bat -s -L
-::call drive.bat
-::del drive.bat /Q
-::goto installver
-
 :tordown
 cls
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -o ./tor.bat -s -L
@@ -662,3 +640,63 @@ goto installver
 
 :exit
 exit
+
+:md5
+@echo off
+setlocal enableDelayedExpansion
+if "%~1" equ "" (
+	echo no file passed
+	echo pass -help to see the help message
+	exit /b 1
+)
+
+for %%# in (-h -help /h /help) do (
+	if "%~1" equ "%%~#" (
+		echo generates MD5 checksum for a given file
+		(echo()
+		echo USAGE:
+		(echo()
+		echo %~nx0 file [variable]
+		(echo()
+		echo variable string in which the generated checksum will be stored
+		(echo()
+		exit /b 0
+	)
+)
+
+if not exist "%~1" (
+	echo file %~1 does not exist
+	exit /b 2
+)
+
+if exist "%~1\" (
+	echo %~1 is a directory
+	exit /b 3
+)
+
+for %%# in (certutil.exe) do (
+	if not exist "%%~f$PATH:#" (
+		echo no certutil installed
+		echo for Windows XP professional and Windows 2003
+		echo you need Windows Server 2003 Administration Tools Pack
+		echo https://www.microsoft.com/en-us/download/details.aspx?id=3725
+		exit /b 4
+	)
+)
+
+set "md5="
+for /f "skip=1 tokens=* delims=" %%# in ('certutil -hashfile "%~f1" MD5') do (
+	if not defined md5 (
+		for %%Z in (%%#) do set "md5=!md5!%%Z"
+	)
+)
+
+if "%~2" neq "" (
+	endlocal && (
+		set "%~2=%md5%"
+	) 
+) else (
+	echo %md5%
+)
+endlocal
+exit /b
