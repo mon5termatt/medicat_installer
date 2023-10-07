@@ -569,7 +569,10 @@ exit
 echo.[41m
 echo.Error has occured. Please look above.
 echo.If you come to the discord for support we will need this error. 
-echo.COMMON ERRORS: Unexpected end of archive - FIX: Redownload Main File
+echo.COMMON ERRORS: 
+echo.Error: Unexpected end of archive		FIX: Redownload Main File.  (download issue)
+echo.Error: Cannot find the path specified	FIX: Check Disk is Mounted. (ventoy issue)
+echo.Error: XYZ					FIX: XYZ
 echo.[0m
 pause
 exit
