@@ -425,12 +425,28 @@ echo.IIII  THIS IS A VENTOY BUG AND CANNOT BE FIXED ON OUR END  IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II[0m
-echo.                                                  Press any key... 
-pause >nul
-echo.Please Wait, Installing Ventoy. Please close the file explorer when done.
+echo.Please Wait, Installing Ventoy. 
+echo.Please close the file explorer when done.
+echo.IF FROZEN FOR MORE THEN 60 SECONDS INSTALL VENTOY MANUALLY.
 cd .\Ventoy2Disk\
 Ventoy2Disk.exe VTOYCLI /I /Drive:%drivepath%: /NOUSBCheck %arg1% %arg2% 
 cd %maindir% 
+:vencheck
+cls
+echo.[41mII-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.IIII                                                       IIII
+echo.IIII                   IMPORTANT WARNING                   IIII
+echo.IIII                                                       IIII
+echo.IIII    PLEASE VERIFY THE DRIVE LETTER HAS NOT CHANGED     IIII
+echo.IIII               CURRENTLY INSTALLING TO: %drivepath%              IIII
+echo.IIII  IF THIS IS INCORRECT PLEASE TYPE THE CORRECT LETTER  IIII
+echo.IIII                                                       IIII
+echo.IIII                                                       IIII
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II[0m
+Set /P drivepath=enter drive letter or hit ENTER: && goto vencheck || Set drivepath=%drivepath%
+REM when done
 format %drivepath%: /FS:NTFS /X /Q /V:Medicat /Y
 goto installver
 
