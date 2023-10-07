@@ -3,7 +3,7 @@ title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
 set maindir=%CD%
-set localver=3511
+set localver=3512
 set medicatver=21.12
 set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
 set format=Yes
@@ -191,6 +191,7 @@ goto start
 
 :hasherror
 echo.ERROR DOWNLOADING BIN FILES. ONE OF THE HASHES DOES NOT MATCH.
+echo.PLEASE MAKE SURE THE MD5 BATCH FILE HAS DOWNLOADED.
 echo.PLEASE CHECK YOUR FIREWALL AND CURL AND TRY AGAIN. CLOSING.
 
 pause > nul
@@ -412,6 +413,20 @@ goto sbask
 
 
 :ventoyinstall
+echo.[41mII-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II
+echo.IIII                                                       IIII
+echo.IIII                   IMPORTANT WARNING                   IIII
+echo.IIII                                                       IIII
+echo.IIII           SOMETIMES VENTOY MESSES UP A DRIVE          IIII
+echo.IIII   IF THE DRIVE DISAPPEARS PLEASE CHECK DISK MANAGER   IIII
+echo.IIII         AND SEE IF THE DRIVE FAILED TO REMOUNT        IIII
+echo.IIII  THIS IS A VENTOY BUG AND CANNOT BE FIXED ON OUR END  IIII
+echo.IIII                                                       IIII
+echo.II-----------------------------------------------------------II
+echo.II-----------------------------------------------------------II[0m
+echo.                                                  Press any key... 
+pause >nul
 echo.Please Wait, Installing Ventoy. Please close the file explorer when done.
 cd .\Ventoy2Disk\
 Ventoy2Disk.exe VTOYCLI /I /Drive:%drivepath%: /NOUSBCheck %arg1% %arg2% 
