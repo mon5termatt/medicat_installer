@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Version 0006
+
 # Check if the terminal supports colour and set up variables if it does.
 NumColours=$(tput colors)
 
