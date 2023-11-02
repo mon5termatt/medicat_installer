@@ -3,10 +3,14 @@
 ## Supported Versions
 
 #### Windows
+
+Additionally all EXE versions (Including the one in the original file) are no longer supported.
+
 | Version  | Supported          |
 | -------- | ------------------ |
 | v 3513   | :white_check_mark: |
-| < 3500   | :x:                |
+| < 3512   | :x:                |
+
 
 #### Linux
 | Version  | Supported          |
