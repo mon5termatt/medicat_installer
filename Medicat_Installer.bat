@@ -3,7 +3,7 @@ title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
 set maindir=%CD%
-set localver=3512
+set localver=3513
 set medicatver=21.12
 set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
 set format=Yes
@@ -102,50 +102,50 @@ cls
 echo.Downloading Initial Files, Please wait.
 echo.1/12  [====                                                ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -o ./bin/QuickSFV.exe -s -L
-call :md5 bin/QuickSFV.exe hash
-if %hash% NEQ 4b1d5ec11b2b5db046233a28dba73b83 (goto hasherror)
+::call :md5 bin/QuickSFV.exe hash
+::if %hash% NEQ 4b1d5ec11b2b5db046233a28dba73b83 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.2/12  [========                                            ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini" -o ./bin/QuickSFV.ini -s -L
-call :md5 bin/QuickSFV.ini hash
-if %hash% NEQ 7be5a47066edccd7aa0d3b0d69d607ff (goto hasherror)
+::call :md5 bin/QuickSFV.ini hash
+::if %hash% NEQ 7be5a47066edccd7aa0d3b0d69d607ff (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.3/12  [============                                        ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat" -o ./bin/Box.bat -s -L
-call :md5 bin/Box.bat hash
-if %hash% NEQ e5ce0008212c431baacb5b208f2575bd (goto hasherror)
+::call :md5 bin/Box.bat hash
+::if %hash% NEQ e5ce0008212c431baacb5b208f2575bd (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.4/12  [================                                    ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat" -o ./bin/Button.bat -s -L
-call :md5 bin/Button.bat hash
-if %hash% NEQ 5b727eff91de52000cea8e61694f2a03 (goto hasherror)
+::call :md5 bin/Button.bat hash
+::if %hash% NEQ 5b727eff91de52000cea8e61694f2a03 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.5/12  [====================                                ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe" -o ./bin/GetInput.exe -s -L
-call :md5 bin/GetInput.exe hash
-if %hash% NEQ 2ba62ae6f88b11d0e262af35d8db8ca9 (goto hasherror)
+::call :md5 bin/GetInput.exe hash
+::if %hash% NEQ 2ba62ae6f88b11d0e262af35d8db8ca9 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.6/12  [========================                            ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat" -o ./bin/Getlen.bat -s -L
-call :md5 bin/Getlen.bat hash
-if %hash% NEQ 8c1812e76ba7bf09cb87384089a0ab7f (goto hasherror)
+::call :md5 bin/Getlen.bat hash
+::if %hash% NEQ 8c1812e76ba7bf09cb87384089a0ab7f (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.7/12  [============================                        ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe" -o ./bin/batbox.exe -s -L
-call :md5 bin/batbox.exe hash
-if %hash% NEQ cb4a44baa20ad26bf74615a7fc515a84 (goto hasherror)
+::call :md5 bin/batbox.exe hash
+::if %hash% NEQ cb4a44baa20ad26bf74615a7fc515a84 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.8/12  [================================                    ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe" -o ./bin/folderbrowse.exe -s -L
-call :md5 bin/folderbrowse.exe hash
-if %hash% NEQ 574aec8f205beeeb937e066b021a2673 (goto hasherror)
+::call :md5 bin/folderbrowse.exe hash
+::if %hash% NEQ 574aec8f205beeeb937e066b021a2673 (goto hasherror)
 cls
 echo.Downloading Initial Files, Please wait.
 echo.9/12  [========================================            ]
@@ -155,7 +155,9 @@ echo.Downloading Initial Files, Please wait.
 echo.10/12 [============================================        ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.dll" -o ./bin/7z.dll -s -L
 
-if defined ProgramFiles(x86) (goto check64) else (goto check32)
+goto checkdone
+
+::if defined ProgramFiles(x86) (goto check64) else (goto check32)
 
 :check64
 call :md5 bin/7z.exe hash
