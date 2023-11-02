@@ -192,6 +192,7 @@ fi
 
 # Advise user to connect and select the required USB device.
 colEcho $yellowB "\nPlease Plug your USB in now if it is not already connected..."
+colEcho $yellowB "\nPress any key once it has been detected by your system..."
 UserWait
 
 colEcho $yellowB "Please Find the ID of your USB below:"
