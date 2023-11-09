@@ -23,8 +23,11 @@ DEL "MediCat_Installer.bat" 2>nul
 
 cls
 echo.Updating Medicat Installer. Please wait while the new file is downloaded.
-curl http://url.medicatusb.com/installerupdate -o Medicat_Installer.bat -q -L
-
+powershell -c "$data = curl https://api.github.com/repos/mon5termatt/medicat_installer/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './ver.ini'"
+set /p ver= < ver.ini
+set ver=%ver:~-4%
+del ver.ini /Q
+curl https://github.com/mon5termatt/medicat_installer/releases/download/%remver%/Medicat_Installer.bat -o Medicat_Installer.bat -q -L
 REM Check if the download was successful
 IF NOT EXIST "Medicat_Installer.bat" (
     echo ERROR: Failed to download the new file.
