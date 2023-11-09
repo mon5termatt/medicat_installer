@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Version 0006
+# Version 0007
 
 # Check if the terminal supports colour and set up variables if it does.
 NumColours=$(tput colors)
@@ -9,7 +9,7 @@ if test -n "$NumColours" && test $NumColours -ge 8; then
 
     clear="$(tput sgr0)"
     blackN="$(tput setaf 0)";		blackN="$(tput bold setaf 0)"
-    redN="$(tput setaf 1)";			redB="$(tput bold setaf 1)"
+    redN="$(tput setaf 1)";		redB="$(tput bold setaf 1)"
     greenN="$(tput setaf 2)";		greenB="$(tput bold setaf 2)"
     yellowN="$(tput setaf 3)";		yellowB="$(tput bold setaf 3)"
     blueN="$(tput setaf 4)";		blueB="$(tput bold setaf 4)"
@@ -55,6 +55,7 @@ colEcho $cyanB "This Installer will install Ventoy and Medicat.\n"
 colEcho $yellowB "THIS IS IN BETA. PLEASE CONTACT MATT IN THE DISCORD FOR ALL ISSUES.\n"
 colEcho $cyanB "Updated for efficiency and cross-distro use by SkeletonMan.\n"
 colEcho $cyanB "Enhancements by Manganar.\n"
+colEcho $cyanB "Thanks to @m3p89goljrf7fu9eched in the Medicat Discord for pointing out a bug.\n"
 
 # Set variables to support different distros.
 if grep -qs "ubuntu" /etc/os-release; then
@@ -180,7 +181,7 @@ colEcho $cyanB "Checking SHA256 hash of$whiteB $Medicat7zFile$cyanB..."
 
 checksha256=$(sha256sum "$location" | awk '{print $1}')
 
-if [[ "$checksha256" -ne "$Medicat256Hash" ]]; then
+if [[ "$checksha256" != "$Medicat256Hash" ]]; then
 	colEcho $redB "$Medicat7zFile SHA256 hash does not match."
 	colEcho $redB "File may be corrupted or compromised."
 	colEcho $cyanB "Hash is$whiteB $checksha256"
@@ -199,7 +200,7 @@ UserWait
 
 colEcho $yellowB "Please Find the ID of your USB below:"
 
-lsblk --scsi --nodeps --output "NAME,SIZE,MOUNTPOINTS"
+lsblk --nodeps --output "NAME,SIZE,VENDOR,MODEL,SERIAL" | grep -v loop
 
 colEcho $yellowB "Enter the device for the USB drive NOT INCLUDING /dev/ OR the Number After."
 colEcho $yellowB "for example enter sda or sdb"
