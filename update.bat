@@ -13,14 +13,10 @@ IF EXIST "Medicat Installer.bat" (
 IF EXIST "MediCat_Installer.bat" (
     copy "MediCat_Installer.bat" "MediCat_Installer.bat.bak"
 )
-
-timeout 2 > nul
-
 DEL "Medicat Installer.exe" 2>nul
 DEL "MediCat_Installer.exe" 2>nul
 DEL "Medicat Installer.bat" 2>nul
 DEL "MediCat_Installer.bat" 2>nul
-
 cls
 echo.Updating Medicat Installer. Please wait while the new file is downloaded.
 powershell -c "$data = curl https://api.github.com/repos/mon5termatt/medicat_installer/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './ver.ini'"
