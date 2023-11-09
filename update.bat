@@ -27,7 +27,8 @@ powershell -c "$data = curl https://api.github.com/repos/mon5termatt/medicat_ins
 set /p ver= < ver.ini
 set ver=%ver:~-4%
 del ver.ini /Q
-curl https://github.com/mon5termatt/medicat_installer/releases/download/%remver%/Medicat_Installer.bat -o Medicat_Installer.bat -q -L
+echo.Version %ver% found
+curl https://github.com/mon5termatt/medicat_installer/releases/download/%ver%/Medicat_Installer.bat -o Medicat_Installer.bat -q -L
 REM Check if the download was successful
 IF NOT EXIST "Medicat_Installer.bat" (
     echo ERROR: Failed to download the new file.
@@ -40,5 +41,5 @@ IF NOT EXIST "Medicat_Installer.bat" (
 )
 
 cls
-start cmd /k Medicat_Installer.bat
+start cmd /k Medicat_Installer.bat Medicat_Installer.bat
 del %0 && exit
