@@ -41,5 +41,5 @@ IF NOT EXIST "Medicat_Installer.bat" (
 )
 
 cls
-start cmd /k Medicat_Installer.bat Medicat_Installer.bat
+start cmd /k Medicat_Installer.bat
 del %0 && exit
