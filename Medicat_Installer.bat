@@ -3,7 +3,7 @@ title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
 set maindir=%CD%
-set localver=3513
+set localver=3514
 set medicatver=21.12
 set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
 set format=Yes
@@ -98,108 +98,73 @@ echo.                          Press any key to accept this warning.&& pause >nu
 :startbinfiles
 title Medicat Installer [FILECHECK]
 cls
-
+set flag=0
+set size=0
 echo.Downloading Initial Files, Please wait.
-echo.1/12  [====                                                ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -o ./bin/QuickSFV.exe -s -L
-::call :md5 bin/QuickSFV.exe hash
-::if %hash% NEQ 4b1d5ec11b2b5db046233a28dba73b83 (goto hasherror)
-cls
-echo.Downloading Initial Files, Please wait.
-echo.2/12  [========                                            ]
+call :filesize bin/QuickSFV.exe
+if "%size%" == "103424" (echo [GOOD] QuickSFV.exe) else (echo [BAD]  QuickSFV.exe && set flag=1)
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini" -o ./bin/QuickSFV.ini -s -L
-::call :md5 bin/QuickSFV.ini hash
-::if %hash% NEQ 7be5a47066edccd7aa0d3b0d69d607ff (goto hasherror)
-cls
-echo.Downloading Initial Files, Please wait.
-echo.3/12  [============                                        ]
+call :filesize bin/QuickSFV.ini
+if "%size%" == "158" (echo [GOOD] QuickSFV.ini) else (echo [BAD]  QuickSFV.ini && set flag=1)
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat" -o ./bin/Box.bat -s -L
-::call :md5 bin/Box.bat hash
-::if %hash% NEQ e5ce0008212c431baacb5b208f2575bd (goto hasherror)
-cls
-echo.Downloading Initial Files, Please wait.
-echo.4/12  [================                                    ]
+call :filesize bin/Box.bat
+if "%size%" == "5874" (echo [GOOD] Box.bat) else (echo [BAD]  Box.bat && set flag=1)
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat" -o ./bin/Button.bat -s -L
-::call :md5 bin/Button.bat hash
-::if %hash% NEQ 5b727eff91de52000cea8e61694f2a03 (goto hasherror)
-cls
-echo.Downloading Initial Files, Please wait.
-echo.5/12  [====================                                ]
+call :filesize bin/Button.bat
+if "%size%" == "5254" (echo [GOOD] Button.bat) else (echo [BAD]  Button.bat && set flag=1)
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe" -o ./bin/GetInput.exe -s -L
-::call :md5 bin/GetInput.exe hash
-::if %hash% NEQ 2ba62ae6f88b11d0e262af35d8db8ca9 (goto hasherror)
-cls
-echo.Downloading Initial Files, Please wait.
-echo.6/12  [========================                            ]
+call :filesize bin/GetInput.exe
+if "%size%" == "3584" (echo [GOOD] GetInput.exe) else (echo [BAD]  GetInput.exe && set flag=1)
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat" -o ./bin/Getlen.bat -s -L
-::call :md5 bin/Getlen.bat hash
-::if %hash% NEQ 8c1812e76ba7bf09cb87384089a0ab7f (goto hasherror)
-cls
-echo.Downloading Initial Files, Please wait.
-echo.7/12  [============================                        ]
+call :filesize bin/Getlen.bat
+if "%size%" == "1897" (echo [GOOD] Getlen.bat) else (echo [BAD]  Getlen.bat && set flag=1)
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe" -o ./bin/batbox.exe -s -L
-::call :md5 bin/batbox.exe hash
-::if %hash% NEQ cb4a44baa20ad26bf74615a7fc515a84 (goto hasherror)
-cls
-echo.Downloading Initial Files, Please wait.
-echo.8/12  [================================                    ]
+call :filesize bin/batbox.exe
+if "%size%" == "1536" (echo [GOOD] batbox.exe) else (echo [BAD]  batbox.exe && set flag=1)
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe" -o ./bin/folderbrowse.exe -s -L
-::call :md5 bin/folderbrowse.exe hash
-::if %hash% NEQ 574aec8f205beeeb937e066b021a2673 (goto hasherror)
-cls
-echo.Downloading Initial Files, Please wait.
-echo.9/12  [========================================            ]
+call :filesize bin/folderbrowse.exe
+if "%size%" == "8192" (echo [GOOD] folderbrowse.exe) else (echo [BAD]  folderbrowse.exe && set flag=1)
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.exe" -o ./bin/7z.exe -s -L
-cls
-echo.Downloading Initial Files, Please wait.
-echo.10/12 [============================================        ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.dll" -o ./bin/7z.dll -s -L
 
 goto checkdone
-
 ::if defined ProgramFiles(x86) (goto check64) else (goto check32)
 
 :check64
-call :md5 bin/7z.exe hash
-if %hash% NEQ 71dfb0de05c1d6bc433caa9a36af87af (goto check32)
-call :md5 bin/7z.dll hash
-if %hash% NEQ 58fdbf10d3dce4d2e270c03e8311d9db (goto check32)
+call :filesize bin/7z.exe
+if "%size%" == "1269760" (echo [GOOD] 7z.exe) else (echo [BAD]  7z.exe && set flag=1)
+call :filesize bin/7z.dll
+if "%size%" == "389120" (echo [GOOD] 7z.dll) else (echo [BAD]  7z.dll && set flag=1)
 goto checkdone
 
 :check32
-call :md5 bin/7z.exe hash
-if %hash% NEQ 90aac6489f6b226bf7dc1adabfdb1259 (goto hasherror)
-call :md5 bin/7z.dll hash
-if %hash% NEQ b54e2dcd1a3d593ca0ae4cb71910710e (goto hasherror)
+call :filesize bin/7z.exe
+if "%size%" == "" (echo GOOD) else (echo BAD && set flag=1)
+call :filesize bin/7z.dll
+if "%size%" == "" (echo GOOD) else (echo BAD && set flag=1)
 goto checkdone
 
 :checkdone
-del tmpfile /Q
 rem dont hash these they change
-cls
-echo.Downloading Initial Files, Please wait.
-echo.11/12 [================================================    ]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/motd.ps1" -o ./bin/motd.ps1 -s -L
-cls
-echo.Downloading Initial Files, Please wait.
-echo.12/12 [====================================================]
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/licence.ps1" -o ./bin/licence.ps1 -s -L
-cls
 echo.Setting Powershell Settings for Scripts.
 Powershell -c "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine"
 Powershell -c "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"
-cls
+if "%flag%" == "1" goto hasherror
 goto start
 
 :hasherror
 echo.ERROR DOWNLOADING BIN FILES. ONE OF THE HASHES DOES NOT MATCH.
-echo.PLEASE MAKE SURE THE MD5 BATCH FILE HAS DOWNLOADED.
-echo.PLEASE CHECK YOUR FIREWALL AND CURL AND TRY AGAIN. CLOSING.
-
+echo.PLEASE CHECK YOUR FIREWALL AND CURL AND TRY AGAIN. 
+echo.IF YOU CHOOSE TO CONTINUE YOU MAY ENCOUNTER ERRORS
+pause
 pause > nul
-exit 
+pause > nul
 
 :start
+cls
 mode con:cols=100 lines=55
 echo.@@   @@  @@@@@@  @@       @@@@    @@@@   @@   @@  @@@@@@          @@@@@@   @@@@                 
 echo.@@   @@  @@      @@      @@  @@  @@  @@  @@@ @@@  @@                @@    @@  @@                
@@ -590,7 +555,6 @@ echo.If you come to the discord for support we will need this error.
 echo.COMMON ERRORS: 
 echo.Error: Unexpected end of archive		FIX: Redownload Main File.  (download issue)
 echo.Error: Cannot find the path specified	FIX: Check Disk is Mounted. (ventoy issue)
-echo.Error: XYZ					FIX: XYZ
 echo.[0m
 pause
 exit
@@ -642,7 +606,7 @@ echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII         HOW WOULD YOU LIKE TO GRAB THE FILES?         IIII
 echo.IIII                                                       IIII
-echo.IIII         FASTER                         SLOWER         IIII
+echo.IIII         FASTER                         DIRECT         IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
@@ -676,62 +640,6 @@ goto installver
 :exit
 exit
 
-:md5
-@echo off
-setlocal enableDelayedExpansion
-if "%~1" equ "" (
-	echo no file passed
-	echo pass -help to see the help message
-	exit /b 1
-)
-
-for %%# in (-h -help /h /help) do (
-	if "%~1" equ "%%~#" (
-		echo generates MD5 checksum for a given file
-		(echo()
-		echo USAGE:
-		(echo()
-		echo %~nx0 file [variable]
-		(echo()
-		echo variable string in which the generated checksum will be stored
-		(echo()
-		exit /b 0
-	)
-)
-
-if not exist "%~1" (
-	echo file %~1 does not exist
-	exit /b 2
-)
-
-if exist "%~1\" (
-	echo %~1 is a directory
-	exit /b 3
-)
-
-for %%# in (certutil.exe) do (
-	if not exist "%%~f$PATH:#" (
-		echo no certutil installed
-		echo for Windows XP professional and Windows 2003
-		echo you need Windows Server 2003 Administration Tools Pack
-		echo https://www.microsoft.com/en-us/download/details.aspx?id=3725
-		exit /b 4
-	)
-)
-
-set "md5="
-for /f "skip=1 tokens=* delims=" %%# in ('certutil -hashfile "%~f1" MD5') do (
-	if not defined md5 (
-		for %%Z in (%%#) do set "md5=!md5!%%Z"
-	)
-)
-
-if "%~2" neq "" (
-	endlocal && (
-		set "%~2=%md5%"
-	) 
-) else (
-	echo %md5%
-)
-endlocal
-exit /b
+:filesize
+  set size=%~z1
+  exit /b 0
