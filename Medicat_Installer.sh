@@ -119,6 +119,8 @@ if ! [ $(which 7z 2>/dev/null) ]; then
 		sudo $pkgmgr $install_arg p7zip
 	elif [[ -e /etc/fedora-release  ]]; then
 		sudo $pkgmgr $install_arg p7zip-full p7zip-plugins
+  	elif [[ -e /etc/nobara  ]]; then
+		sudo $pkgmgr $install_arg p7zip-full p7zip-plugins
 	elif [ "$os" == "centos" ]; then
 		sudo $pkgmgr $install_arg p7zip p7zip-plugins
 	else
