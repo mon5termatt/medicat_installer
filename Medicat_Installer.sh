@@ -84,6 +84,12 @@ elif [[ -e /etc/fedora-release ]]; then
 	pkgmgr="yum"
 	install_arg="install"
 	update_arg="update"
+ elif [[ -e /etc/nobara ]]; then
+ colEcho $redB "gaming moment"
+	os="fedora"
+	pkgmgr="yum"
+	install_arg="install"
+	update_arg="update"
 elif [[ -e /etc/arch-release ]]; then
 	os="arch"
 	pkgmgr="pacman"
