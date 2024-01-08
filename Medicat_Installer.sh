@@ -84,6 +84,12 @@ elif [[ -e /etc/fedora-release ]]; then
 	pkgmgr="yum"
 	install_arg="install"
 	update_arg="update"
+ elif [[ -e /etc/nobara ]]; then
+ colEcho $redB "gaming moment"
+	os="fedora"
+	pkgmgr="yum"
+	install_arg="install"
+	update_arg="update"
 elif [[ -e /etc/arch-release ]]; then
 	os="arch"
 	pkgmgr="pacman"
@@ -112,6 +118,8 @@ if ! [ $(which 7z 2>/dev/null) ]; then
 	if [[ -e /etc/arch-release ]]; then
 		sudo $pkgmgr $install_arg p7zip
 	elif [[ -e /etc/fedora-release  ]]; then
+		sudo $pkgmgr $install_arg p7zip-full p7zip-plugins
+  	elif [[ -e /etc/nobara  ]]; then
 		sudo $pkgmgr $install_arg p7zip-full p7zip-plugins
 	elif [ "$os" == "centos" ]; then
 		sudo $pkgmgr $install_arg p7zip p7zip-plugins
