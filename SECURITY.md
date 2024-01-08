@@ -8,8 +8,8 @@ Additionally all EXE versions (Including the one in the original file) are no lo
 
 | Version  | Supported          |
 | -------- | ------------------ |
-| v 3513   | :white_check_mark: |
-| < 3512   | :x:                |
+| v 3514   | :white_check_mark: |
+| < 3513   | :x:                |
 
 
 #### Linux
