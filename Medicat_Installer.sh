@@ -84,8 +84,8 @@ elif [[ -e /etc/fedora-release ]]; then
 	pkgmgr="yum"
 	install_arg="install"
 	update_arg="update"
- elif [[ -e /etc/nobara ]]; then
- colEcho $redB "gaming moment"
+elif [[ -e /etc/nobara ]]; then
+	colEcho $redB "gaming moment"
 	os="fedora"
 	pkgmgr="yum"
 	install_arg="install"
@@ -102,7 +102,20 @@ fi
 
 colEcho $cyanB "Operating System Identified:$whiteB $os \n"
 
-# Ensure dependencies are installed: wget, 7z, mkntfs, aria2c
+# Ensure dependencies are installed: wget, 7z, mkntfs, and aria2c only if Medicat 7z file is not present
+colEcho $cyanB "\nLocating the Medicat 7z file..."
+
+if [[ -f "$Medicat7zFile" ]]; then
+	location="$Medicat7zFile"
+else
+	if  [[ -f "$Medicat7zFull" ]]; then
+		location="$Medicat7zFull"
+	else
+		colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to download it via bittorrent."
+		read location
+	fi
+fi
+
 colEcho $cyanB "Acquiring any dependencies..."
 
 sudo $pkgmgr $update_arg
@@ -132,7 +145,7 @@ if ! [ $(sudo which mkntfs 2>/dev/null) ]; then
 	fi
 fi
 
-if ! [ $(which aria2c 2>/dev/null) ]; then
+if ! [ $(which aria2c 2>/dev/null)] && [ -z "$location" ]; then
 	sudo $pkgmgr $install_arg aria2
 fi
 
@@ -158,24 +171,12 @@ fi
 colEcho $cyanB "Renaming ventoy folder to remove the version number..."
 mv ventoy-${venver: -6} ventoy
 
-colEcho $cyanB "\nLocating the Medicat 7z file..."
-
-if [[ -f "$Medicat7zFile" ]]; then
-	location="$Medicat7zFile"
-else
-	if  [[ -f "$Medicat7zFull" ]]; then
-		location="$Medicat7zFull"
-	else
-		colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to download it via bittorrent."
-		read location
-	fi
-
-	if [ -z "$location" ] ; then
-		colEcho $cyanB "Starting to download torrent"
-		wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_v21.12.torrent -O medicat.torrent
-		aria2c --file-allocation=none --seed-time=0 medicat.torrent
-		location="$Medicat7zFull"
-	fi
+# Download the missing Medicat 7z file
+if [ -z "$location" ] ; then
+	colEcho $cyanB "Starting to download torrent"
+	wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_v21.12.torrent -O medicat.torrent
+	aria2c --file-allocation=none --seed-time=0 medicat.torrent
+	location="$Medicat7zFull"
 fi
 
 colEcho $cyanB "Medicat 7z file found:$whiteB $location"
