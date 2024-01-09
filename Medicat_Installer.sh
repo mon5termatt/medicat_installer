@@ -102,16 +102,12 @@ fi
 
 colEcho $cyanB "Operating System Identified:$whiteB $os \n"
 
-# Ensure dependencies are installed: wget, curl, 7z, mkntfs, aria2c
+# Ensure dependencies are installed: wget, 7z, mkntfs, aria2c
 colEcho $cyanB "Acquiring any dependencies..."
 
 sudo $pkgmgr $update_arg
 if ! [ $(which wget 2>/dev/null) ]; then
 	sudo $pkgmgr $install_arg wget
-fi
-
-if ! [ $(which curl 2>/dev/null) ]; then
-	sudo $pkgmgr $install_arg curl
 fi
 
 if ! [ $(which 7z 2>/dev/null) ]; then
@@ -141,7 +137,7 @@ if ! [ $(which aria2c 2>/dev/null) ]; then
 fi
 
 # Identify latest Ventoy release.
-venver=$(curl -sL https://api.github.com/repos/ventoy/Ventoy/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
+venver=$(wget -q -O - https://api.github.com/repos/ventoy/Ventoy/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
 
 # Download latest verion of Ventoy.
 colEcho $cyanB "\nDownloading Ventoy Version:$whiteB ${venver: -6}"
