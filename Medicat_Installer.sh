@@ -68,6 +68,11 @@ elif grep -qs "freebsd" /etc/os-release; then
 	pkgmgr="pkg"
 	install_arg="install"
 	update_arg="update"
+elif grep -qs "alpine" /etc/os-release; then
+	os="alpine"
+	pkgmgr="apk"
+	install_arg="add"
+	update_arg="update"
 elif [[ -e /etc/debian_version ]]; then
 	os="debian"
 	pkgmgr="apt"
@@ -132,6 +137,8 @@ if ! [ $(which 7z 2>/dev/null) ]; then
 		sudo $pkgmgr $install_arg p7zip-full p7zip-plugins
 	elif [ "$os" == "centos" ]; then
 		sudo $pkgmgr $install_arg p7zip p7zip-plugins
+	elif [ "$os" == "alpine" ]; then
+		sudo $pkgmgr $install_arg 7zip
 	else
 		sudo $pkgmgr $install_arg p7zip-full
 	fi
