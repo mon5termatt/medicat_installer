@@ -68,6 +68,11 @@ elif grep -qs "freebsd" /etc/os-release; then
 	pkgmgr="pkg"
 	install_arg="install"
 	update_arg="update"
+elif grep -qs "alpine" /etc/os-release; then
+	os="alpine"
+	pkgmgr="apk"
+	install_arg="add"
+	update_arg="update"
 elif [[ -e /etc/debian_version ]]; then
 	os="debian"
 	pkgmgr="apt"
@@ -84,8 +89,8 @@ elif [[ -e /etc/fedora-release ]]; then
 	pkgmgr="yum"
 	install_arg="install"
 	update_arg="update"
- elif [[ -e /etc/nobara ]]; then
- colEcho $redB "gaming moment"
+elif [[ -e /etc/nobara ]]; then
+	colEcho $redB "gaming moment"
 	os="fedora"
 	pkgmgr="yum"
 	install_arg="install"
@@ -102,16 +107,25 @@ fi
 
 colEcho $cyanB "Operating System Identified:$whiteB $os \n"
 
-# Ensure dependencies are installed: wget, curl, 7z, mkntfs, aria2c
+# Ensure dependencies are installed: wget, 7z, mkntfs, and aria2c only if Medicat 7z file is not present
+colEcho $cyanB "\nLocating the Medicat 7z file..."
+
+if [[ -f "$Medicat7zFile" ]]; then
+	location="$Medicat7zFile"
+else
+	if  [[ -f "$Medicat7zFull" ]]; then
+		location="$Medicat7zFull"
+	else
+		colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to download it via bittorrent."
+		read location
+	fi
+fi
+
 colEcho $cyanB "Acquiring any dependencies..."
 
 sudo $pkgmgr $update_arg
 if ! [ $(which wget 2>/dev/null) ]; then
 	sudo $pkgmgr $install_arg wget
-fi
-
-if ! [ $(which curl 2>/dev/null) ]; then
-	sudo $pkgmgr $install_arg curl
 fi
 
 if ! [ $(which 7z 2>/dev/null) ]; then
@@ -123,6 +137,8 @@ if ! [ $(which 7z 2>/dev/null) ]; then
 		sudo $pkgmgr $install_arg p7zip-full p7zip-plugins
 	elif [ "$os" == "centos" ]; then
 		sudo $pkgmgr $install_arg p7zip p7zip-plugins
+	elif [ "$os" == "alpine" ]; then
+		sudo $pkgmgr $install_arg 7zip
 	else
 		sudo $pkgmgr $install_arg p7zip-full
 	fi
@@ -136,12 +152,12 @@ if ! [ $(sudo which mkntfs 2>/dev/null) ]; then
 	fi
 fi
 
-if ! [ $(which aria2c 2>/dev/null) ]; then
+if ! [ $(which aria2c 2>/dev/null)] && [ -z "$location" ]; then
 	sudo $pkgmgr $install_arg aria2
 fi
 
 # Identify latest Ventoy release.
-venver=$(curl -sL https://api.github.com/repos/ventoy/Ventoy/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
+venver=$(wget -q -O - https://api.github.com/repos/ventoy/Ventoy/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
 
 # Download latest verion of Ventoy.
 colEcho $cyanB "\nDownloading Ventoy Version:$whiteB ${venver: -6}"
@@ -162,24 +178,12 @@ fi
 colEcho $cyanB "Renaming ventoy folder to remove the version number..."
 mv ventoy-${venver: -6} ventoy
 
-colEcho $cyanB "\nLocating the Medicat 7z file..."
-
-if [[ -f "$Medicat7zFile" ]]; then
-	location="$Medicat7zFile"
-else
-	if  [[ -f "$Medicat7zFull" ]]; then
-		location="$Medicat7zFull"
-	else
-		colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to download it via bittorrent."
-		read location
-	fi
-
-	if [ -z "$location" ] ; then
-		colEcho $cyanB "Starting to download torrent"
-		wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_v21.12.torrent -O medicat.torrent
-		aria2c --file-allocation=none --seed-time=0 medicat.torrent
-		location="$Medicat7zFull"
-	fi
+# Download the missing Medicat 7z file
+if [ -z "$location" ] ; then
+	colEcho $cyanB "Starting to download torrent"
+	wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_v21.12.torrent -O medicat.torrent
+	aria2c --file-allocation=none --seed-time=0 medicat.torrent
+	location="$Medicat7zFull"
 fi
 
 colEcho $cyanB "Medicat 7z file found:$whiteB $location"
