@@ -144,6 +144,10 @@ if ! [ $(which 7z 2>/dev/null) ]; then
 	fi
 fi
 
+if ! [ $(which mkfs.vfat 2>/dev/null) ]; then
+	sudo $pkgmgr $install_arg dosfstools
+fi
+
 if ! [ $(sudo which mkntfs 2>/dev/null) ]; then 
 	if [ "$os" == "centos" ]; then
 		sudo $pkgmgr $install_arg ntfsprogs
