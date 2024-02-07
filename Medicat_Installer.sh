@@ -8,7 +8,7 @@ NumColours=$(tput colors)
 if test -n "$NumColours" && test $NumColours -ge 8; then
 
     clear="$(tput sgr0)"
-    blackN="$(tput setaf 0)";		blackN="$(tput bold setaf 0)"
+    blackN="$(tput setaf 0)";		blackB="$(tput bold setaf 0)"
     redN="$(tput setaf 1)";		redB="$(tput bold setaf 1)"
     greenN="$(tput setaf 2)";		greenB="$(tput bold setaf 2)"
     yellowN="$(tput setaf 3)";		yellowB="$(tput bold setaf 3)"
@@ -157,7 +157,7 @@ if ! [ $(sudo which mkntfs 2>/dev/null) ]; then
 	fi
 fi
 
-if ! [ $(which aria2c 2>/dev/null)] && [ -z "$location" ]; then
+if ! [ $(which aria2c 2>/dev/null) ] && [ -z "$location" ]; then
 	sudo $pkgmgr $install_arg aria2
 fi
 
@@ -243,7 +243,8 @@ done
 colEcho $cyanB "Installing Ventoy on$whiteB $drive"
 
 while [[ "$usegpt" != [NnYy]* ]]; do
-	read -e -p "Would you like to use GPT? (defaults to MBR) (Y/N)" usegpt
+	colEcho $blueB "MBR at max can do up to approximately 2.2 TB and will work with older BIOS systems and UEFI systems that support legacy operating systems. GPT can do up to 18 exabytes and will work with UEFI systems."
+	read -e -p "Device partition layout defaults to MBR.  Would you like to use GPT instead? (Y/N)" usegpt
 	if [[ "$usegpt" == [Nn]* ]]; then
 		colEcho $yellowB "Using MBR"
 		sudo sh ./ventoy/Ventoy2Disk.sh -I $drive
