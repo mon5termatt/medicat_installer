@@ -58,6 +58,7 @@ colEcho $cyanB "Enhancements by Manganar.\n"
 colEcho $cyanB "Thanks to @m3p89goljrf7fu9eched in the Medicat Discord for pointing out a bug.\n"
 
 # Set variables to support different distros.
+# This needs to be fixed later, there is a better way, but I don't currently have the time - LordSkeletonMan
 if grep -qs "ubuntu" /etc/os-release; then
 	os="ubuntu"
 	pkgmgr="apt"
@@ -240,11 +241,25 @@ while [[ "$checkingconfirm" != [NnYy]* ]]; do
 done
 
 colEcho $cyanB "Installing Ventoy on$whiteB $drive"
-sudo sh ./ventoy/Ventoy2Disk.sh -I $drive
-if [ "$?" != "0" ]; then
-	colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
-	exit 1
-fi
+
+while [[ "$usegpt" != [NnYy]* ]]; do
+	read -e -p "Would you like to use GPT? (defaults to MBR) (Y/N)" usegpt
+	if [[ "$usegpt" == [Nn]* ]]; then
+		colEcho $yellowB "Using MBR"
+		sudo sh ./ventoy/Ventoy2Disk.sh -I $drive
+		if [ "$?" != "0" ]; then
+			colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
+			exit 1
+		fi
+	elif [[ "$usegpt" == [Yy]* ]]; then
+		colEcho $yellowB "Using GPT"
+		sudo sh ./ventoy/Ventoy2Disk.sh -I -g $drive
+		if [ "$?" != "0" ]; then
+			colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
+			exit 1
+		fi
+	fi
+done
 
 colEcho $cyanB "Unmounting drive$whiteB $drive"
 sudo umount $drive
