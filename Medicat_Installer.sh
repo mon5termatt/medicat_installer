@@ -8,7 +8,7 @@ NumColours=$(tput colors)
 if test -n "$NumColours" && test $NumColours -ge 8; then
 
     clear="$(tput sgr0)"
-    blackN="$(tput setaf 0)";		blackN="$(tput bold setaf 0)"
+    blackN="$(tput setaf 0)";		blackB="$(tput bold setaf 0)"
     redN="$(tput setaf 1)";		redB="$(tput bold setaf 1)"
     greenN="$(tput setaf 2)";		greenB="$(tput bold setaf 2)"
     yellowN="$(tput setaf 3)";		yellowB="$(tput bold setaf 3)"
@@ -58,6 +58,7 @@ colEcho $cyanB "Enhancements by Manganar.\n"
 colEcho $cyanB "Thanks to @m3p89goljrf7fu9eched in the Medicat Discord for pointing out a bug.\n"
 
 # Set variables to support different distros.
+# This needs to be fixed later, there is a better way, but I don't currently have the time - LordSkeletonMan
 if grep -qs "ubuntu" /etc/os-release; then
 	os="ubuntu"
 	pkgmgr="apt"
@@ -156,7 +157,7 @@ if ! [ $(sudo which mkntfs 2>/dev/null) ]; then
 	fi
 fi
 
-if ! [ $(which aria2c 2>/dev/null)] && [ -z "$location" ]; then
+if ! [ $(which aria2c 2>/dev/null) ] && [ -z "$location" ]; then
 	sudo $pkgmgr $install_arg aria2
 fi
 
@@ -240,11 +241,26 @@ while [[ "$checkingconfirm" != [NnYy]* ]]; do
 done
 
 colEcho $cyanB "Installing Ventoy on$whiteB $drive"
-sudo sh ./ventoy/Ventoy2Disk.sh -I $drive
-if [ "$?" != "0" ]; then
-	colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
-	exit 1
-fi
+
+while [[ "$usegpt" != [NnYy]* ]]; do
+	colEcho $blueB "MBR at max can do up to approximately 2.2 TB and will work with older BIOS systems and UEFI systems that support legacy operating systems. GPT can do up to 18 exabytes and will work with UEFI systems."
+	read -e -p "Device partition layout defaults to MBR.  Would you like to use GPT instead? (Y/N)" usegpt
+	if [[ "$usegpt" == [Nn]* ]]; then
+		colEcho $yellowB "Using MBR"
+		sudo sh ./ventoy/Ventoy2Disk.sh -I $drive
+		if [ "$?" != "0" ]; then
+			colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
+			exit 1
+		fi
+	elif [[ "$usegpt" == [Yy]* ]]; then
+		colEcho $yellowB "Using GPT"
+		sudo sh ./ventoy/Ventoy2Disk.sh -I -g $drive
+		if [ "$?" != "0" ]; then
+			colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
+			exit 1
+		fi
+	fi
+done
 
 colEcho $cyanB "Unmounting drive$whiteB $drive"
 sudo umount $drive
