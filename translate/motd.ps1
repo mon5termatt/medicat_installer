@@ -1,10 +1,13 @@
-﻿$TargetLanguage = $Args[0]
+$TargetLanguage = $Args[0]
+$actualdate = Get-Date -Format "yyyy/MM/dd"
+$newyeardate = Get-Date -Month 1 -Day 1 -Year (Get-Date).Year -Format "yyyy/MM/dd"
 
-$text1 = "Happy New Year."
+if ($actualdate -eq $newyeardate) {
+    $newyeartext = "Happy New Year!"
+    $Uri1 = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$newyeartext"
+    $Response = Invoke-RestMethod -Uri $Uri1 -Method Get
+    $Translation1 = $Response[0][0][0]
+    Write-Host $Translation1
+}
 
-$Uri1 = “https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$text1”
-$Response = Invoke-RestMethod -Uri $Uri1 -Method Get
-$Translation1 = $Response[0].SyncRoot | foreach { $_[0] }
-
-write-host $Translation1
-write-host "https://discord.gg/medicat"
+Write-Host "https://discord.gg/medicat"
