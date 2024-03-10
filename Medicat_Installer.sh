@@ -74,6 +74,16 @@ elif grep -qs "alpine" /etc/os-release; then
 	pkgmgr="apk"
 	install_arg="add"
 	update_arg="update"
+elif grep -qs "opensuse-tumbleweed" /etc/os-release; then
+	os="opensuse-tumbleweed"
+	pkgmgr="zypper"
+	install_arg="install"
+	update_arg="update"
+elif grep -qs "opensuse-leap" /etc/os-release; then
+	os="opensuse-leap"
+	pkgmgr="zypper"
+	install_arg="install"
+	update_arg="update"
 elif [[ -e /etc/debian_version ]]; then
 	os="debian"
 	pkgmgr="apt"
@@ -140,6 +150,10 @@ if ! [ $(which 7z 2>/dev/null) ]; then
 		sudo $pkgmgr $install_arg p7zip p7zip-plugins
 	elif [ "$os" == "alpine" ]; then
 		sudo $pkgmgr $install_arg 7zip
+	elif [ "$os" == "opensuse-tumbleweed" ]; then
+		sudo $pkgmgr $install_arg 7zip
+	elif [ "$os" == "opensuse-leap" ]; then
+		sudo $pkgmgr $install_arg p7zip
 	else
 		sudo $pkgmgr $install_arg p7zip-full
 	fi
@@ -149,9 +163,11 @@ if ! [ $(which mkfs.vfat 2>/dev/null) ]; then
 	sudo $pkgmgr $install_arg dosfstools
 fi
 
-if ! [ $(sudo which mkntfs 2>/dev/null) ]; then 
+if ! [ $(sudo which mkntfs 2>/dev/null) ]; then
 	if [ "$os" == "centos" ]; then
 		sudo $pkgmgr $install_arg ntfsprogs
+	elif [ "$os" == "opensuse-tumbleweed" ] || [ "$os" == "opensuse-leap" ]; then
+	  sudo $pkgmgr $install_arg ntfsprogs ntfs-3g
 	else
 		sudo $pkgmgr $install_arg ntfs-3g
 	fi
