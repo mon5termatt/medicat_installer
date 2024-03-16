@@ -3,7 +3,7 @@ title Medicat Installer [STARTING]
 cd /d %~dp0
 Set "Path=%Path%;%CD%;%CD%\bin;"
 set maindir=%CD%
-set localver=3516
+set localver=3517
 set medicatver=21.12
 set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
 set format=Yes
@@ -317,6 +317,13 @@ REM - AND ENDS
 set drivepath=%folder:~0,1%
 IF "%drivepath%" == "~0,1" GOTO install2
 echo.Installing to (%drivepath%). If this is correct just hit enter.
+echo.[41m
+echo.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+echo.PLEASE CONFIRM NOW THAT THIS IS YOUR USB DRIVE.
+echo.MEDICAT IS NOT RESPOSIBLE FOR WIPED HARD DRIVES.
+echo.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+echo.[0m waiting for 5 seconds...
+PING localhost -n 6 >NUL
 Set /P drivepath=if this is wrong type the correct drive letter now: || Set drivepath=%drivepath%
 IF "%drivepath%" == "C" GOTO IMPORTANTDRIVE
 if "%format%" == "Yes" (goto formatdrive) else (goto updateventoy)
