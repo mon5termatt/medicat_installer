@@ -98,8 +98,6 @@ echo.                          Press any key to accept this warning.&& pause >nu
 :startbinfiles
 title Medicat Installer [FILECHECK]
 cls
-set flag=0
-set size=0
 echo.Downloading Initial Files, Please wait.
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -o ./bin/QuickSFV.exe -s -L
 call :filesize bin/QuickSFV.exe
@@ -647,6 +645,7 @@ goto installver
 :exit
 exit
 
+:checkfile
 :filesize
   set size=%~z1
   exit /b 0
