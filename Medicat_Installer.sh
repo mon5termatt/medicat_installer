@@ -1,6 +1,50 @@
 #!/usr/bin/env bash
 
-# Version 0007
+# Script Version 0008
+
+#--------------------------------Variables------------------------------------#
+
+# Key variables used throughout the script to make maintenance easier.
+MedicatVersion="v21.12"
+Medicat256Hash='a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4'
+Medicat7zFile="MediCat.USB.$MedicatVersion.7z"
+Medicat7zFull=''MediCat\ USB\ $MedicatVersion/MediCat.USB.$MedicatVersion.7z''
+
+# Dependencies
+declare -A depCommands
+depCommands["wget"]="wget"
+depCommands["7z"]="zip"
+depCommands["mkfs.vfat"]="mkfs"
+depCommands["mkntfs"]="ntfs"
+declare -A wget
+wget["nixos"]="nixos.wget"
+wget["default"]="wget"
+declare -A zip
+zip["arch"]="p7zip"
+zip["nixos"]="nixos.p7zip"
+zip["fedora"]="p7zip-full p7zip-plugins"
+zip["nobara"]="p7zip-full p7zip-plugins"
+zip["centos"]="p7zip p7zip-plugins"
+zip["alpine"]="7zip"
+zip["default"]="p7zip-full"
+declare -A mkfs
+mkfs["nixos"]="nixos.dosfstools"
+mkfs["default"]="dosfstools"
+declare -A ntfs
+ntfs["centos"]="ntfsprogs"
+ntfs["nixos"]="nixos.ntfs3g"
+ntfs["default"]="ntfs-3g"
+declare -A aria
+aria["nixos"]="nixos.aria"
+aria["default"]="aria2"
+declare -A ventoy
+ventoy["nixos"]="nixos.ventoy-full"
+ventoy["default"]="ventoy"
+
+# Other Variables
+sudo="sudo" # By default use sudo with package manager
+ventoyFS=true  # By default install ventoy from github(FromSource)
+ventoyLauncher="sh ./ventoy/Ventoy2Disk.sh" # By default use the ventoy script
 
 # Check if the terminal supports colour and set up variables if it does.
 NumColours=$(tput colors)
@@ -9,7 +53,7 @@ if test -n "$NumColours" && test $NumColours -ge 8; then
 
     clear="$(tput sgr0)"
     blackN="$(tput setaf 0)";		blackB="$(tput bold setaf 0)"
-    redN="$(tput setaf 1)";		redB="$(tput bold setaf 1)"
+    redN="$(tput setaf 1)";		    redB="$(tput bold setaf 1)"
     greenN="$(tput setaf 2)";		greenB="$(tput bold setaf 2)"
     yellowN="$(tput setaf 3)";		yellowB="$(tput bold setaf 3)"
     blueN="$(tput setaf 4)";		blueB="$(tput bold setaf 4)"
@@ -18,33 +62,101 @@ if test -n "$NumColours" && test $NumColours -ge 8; then
     whiteN="$(tput setaf 7)";		whiteB="$(tput bold setaf 7)"
 
 fi
+#-----------------------------------------------------------------------------#
 
-# Function to echo text using terminal colour codes ###########################
+
+#--------------------------------Functions------------------------------------#
+
+# Function to echo text using terminal colour codes.
 function colEcho() {
     echo -e "$1$2$clear"
 }
 
 # Function to wait for a user keypress.
-UserWait () {
+function UserWait() {
     read -n 1 -s -r -p "Press any key to continue"
     echo -e "\r                         \r"
 }
 
-# Function to check we are not running with the elevated privileges. ##########
-function CheckNotElevated {
+# Function to ask a Yes/No question and return true or false.
+function YesNo() {
+	local setCheck=""
+	while [[ "$setCheck" != [NnYy]* ]]; do
+		read -e -p "$1" setCheck
+		if [[ $setCheck == [Yy]* ]]; then
+			echo true
+		elif [[ $setCheck == [Nn]* ]]; then	
+			echo false
+		else
+			colEcho $redB "Invalid input. Please enter 'Y' or 'N'." > /dev/stderr
+		fi
+	done
+}
 
+# Function to check we are not running with the elevated privileges.
+function CheckNotElevated {
     if (( "$EUID" == "0" )); then
         colEcho $redB "ERROR: Running with elevated privileges - do not run using sudo\n"
         exit 1
     fi
 }
 
-# Main Code Start. ############################################################
+# Function to handle dependecies list
+function dependenciesHandler() {
+	$sudo $pkgmgr $update_arg
+	local toInstall=""
+	for command in "${!depCommands[@]}"; do
+		if ! [ $(which $command 2>/dev/null) ]; then
+		    declare -n ref="${depCommands[$command]}"
+			if [ -z "${ref[$os]}" ]; then
+				toInstall+=" "${ref['default']}
+			else
+				toInstall+=" "${ref[$os]}
+			fi
+		fi
+	done
+	if [ "$toInstall" != "" ]; then
+		if $os == "unknown"; then
+			colEcho $redB "ERROR: Distro is unknown and some dependencies were not found. \n Please install the following dependencies manually: $toInstall"
+			exit 1
+		fi
+		colEcho $cyanB "The following dependencies will be installed: $toInstall"
+		UserWait
+		$sudo $pkgmgr $install_arg $toInstall
+	else
+		colEcho $cyanB "All dependencies are already installed.\n"
+	fi
+}
 
-# Key variables used throughout the script to make maintenance easier.
-Medicat256Hash='a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4'
-Medicat7zFile="MediCat.USB.v21.12.7z"
-Medicat7zFull=''MediCat\ USB\ v21.12/MediCat.USB.v21.12.7z''
+# Function to download ventoy
+function downloadVentoy() {
+	local os="$1"
+  	local ventoyPackage=$2
+  	# Identify latest Ventoy release.
+  	venver=$(wget -q -O - https://api.github.com/repos/ventoy/Ventoy/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
+
+	# Download latest verion of Ventoy.
+	colEcho $cyanB "\nDownloading Ventoy Version:$whiteB ${venver: -6}"
+	wget -q --show-progress https://github.com/ventoy/Ventoy/releases/download/v${venver: -6}/ventoy-${venver: -6}-linux.tar.gz -O ventoy.tar.gz
+
+	colEcho $cyanB "\nExtracting Ventoy..."
+	tar -xf ventoy.tar.gz
+
+	colEcho $cyanB "Removing the extracted Ventory tar.gz file..."
+	rm -rf ventoy.tar.gz
+
+	# Remove the ./ventoy folder if it exists before renaming ventoy folder.
+	if [ -d ./ventoy ]; then
+		colEcho $cyanB "Removing the previous ./ventoy folder..."
+		rm -rf ./ventoy/
+	fi
+
+	colEcho $cyanB "Renaming ventoy folder to remove the version number..."
+	mv ventoy-${venver: -6} ventoy
+}
+#-----------------------------------------------------------------------------#
+
+#----------------------------------Main Code----------------------------------#
 
 clear
 colEcho $yellowB "WELCOME TO THE MEDICAT INSTALLER.\n"
@@ -56,6 +168,7 @@ colEcho $yellowB "THIS IS IN BETA. PLEASE CONTACT MATT IN THE DISCORD FOR ALL IS
 colEcho $cyanB "Updated for efficiency and cross-distro use by SkeletonMan.\n"
 colEcho $cyanB "Enhancements by Manganar.\n"
 colEcho $cyanB "Thanks to @m3p89goljrf7fu9eched in the Medicat Discord for pointing out a bug.\n"
+colEcho $cyanB "Refactored by id3v1669.\n"
 
 # Set variables to support different distros.
 # This needs to be fixed later, there is a better way, but I don't currently have the time - LordSkeletonMan
@@ -69,6 +182,13 @@ elif grep -qs "freebsd" /etc/os-release; then
 	pkgmgr="pkg"
 	install_arg="install"
 	update_arg="update"
+elif grep -qs "nixos" /etc/os-release; then
+	os="nixos"
+	sudo=""
+	pkgmgr="nix-env"
+	install_arg="-iA"
+	update_arg="--upgrade"
+	ventoyFS=false
 elif grep -qs "alpine" /etc/os-release; then
 	os="alpine"
 	pkgmgr="apk"
@@ -102,96 +222,50 @@ elif [[ -e /etc/arch-release ]]; then
 	install_arg="-S --needed --noconfirm"
 	update_arg="-Syy"
 else
-	colEcho "ERROR: Distro not recognised - exiting..."
-	exit 1
+	os="unknown"
+	colEcho "WARNING: Distro not recognised - trying to continue...\n"
 fi
 
-colEcho $cyanB "Operating System Identified:$whiteB $os \n"
+colEcho $cyanB "Operating System Identified as:$whiteB $os"
 
 # Ensure dependencies are installed: wget, 7z, mkntfs, and aria2c only if Medicat 7z file is not present
 colEcho $cyanB "\nLocating the Medicat 7z file..."
 
 if [[ -f "$Medicat7zFile" ]]; then
 	location="$Medicat7zFile"
+	colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFile\n"
+elif  [[ -f "$Medicat7zFull" ]]; then
+	location="$Medicat7zFull"
+	colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFull\n"
 else
-	if  [[ -f "$Medicat7zFull" ]]; then
-		location="$Medicat7zFull"
-	else
-		colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to download it via bittorrent."
-		read location
-	fi
+	colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to download it via bittorrent."
+	read location
 fi
 
 colEcho $cyanB "Acquiring any dependencies..."
 
-sudo $pkgmgr $update_arg
-if ! [ $(which wget 2>/dev/null) ]; then
-	sudo $pkgmgr $install_arg wget
+if [ -z "$location" ] ; then
+	depCommands["aria2c"]="aria"
 fi
 
-if ! [ $(which 7z 2>/dev/null) ]; then
-	if [[ -e /etc/arch-release ]]; then
-		sudo $pkgmgr $install_arg p7zip
-	elif [[ -e /etc/fedora-release  ]]; then
-		sudo $pkgmgr $install_arg p7zip-full p7zip-plugins
-  	elif [[ -e /etc/nobara  ]]; then
-		sudo $pkgmgr $install_arg p7zip-full p7zip-plugins
-	elif [ "$os" == "centos" ]; then
-		sudo $pkgmgr $install_arg p7zip p7zip-plugins
-	elif [ "$os" == "alpine" ]; then
-		sudo $pkgmgr $install_arg 7zip
-	else
-		sudo $pkgmgr $install_arg p7zip-full
-	fi
+if $ventoyFS ; then
+    dependenciesHandler
+	downloadVentoy
+else
+	colEcho $cyanB "INFO: Handling ventoy as a package."
+	depCommands["ventoy"]="ventoy"
+	dependenciesHandler
+	ventoyLauncher="ventoy"
 fi
-
-if ! [ $(which mkfs.vfat 2>/dev/null) ]; then
-	sudo $pkgmgr $install_arg dosfstools
-fi
-
-if ! [ $(sudo which mkntfs 2>/dev/null) ]; then 
-	if [ "$os" == "centos" ]; then
-		sudo $pkgmgr $install_arg ntfsprogs
-	else
-		sudo $pkgmgr $install_arg ntfs-3g
-	fi
-fi
-
-if ! [ $(which aria2c 2>/dev/null) ] && [ -z "$location" ]; then
-	sudo $pkgmgr $install_arg aria2
-fi
-
-# Identify latest Ventoy release.
-venver=$(wget -q -O - https://api.github.com/repos/ventoy/Ventoy/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
-
-# Download latest verion of Ventoy.
-colEcho $cyanB "\nDownloading Ventoy Version:$whiteB ${venver: -6}"
-wget -q --show-progress https://github.com/ventoy/Ventoy/releases/download/v${venver: -6}/ventoy-${venver: -6}-linux.tar.gz -O ventoy.tar.gz
-
-colEcho $cyanB "\nExtracting Ventoy..."
-tar -xf ventoy.tar.gz
-
-colEcho $cyanB "Removing the extracted Ventory tar.gz file..."
-rm -rf ventoy.tar.gz
-
-# Remove the ./ventoy folder if it exists before renaming ventoy folder.
-if [ -d ./ventoy ]; then
-	colEcho $cyanB "Removing the previous ./ventoy folder..."
-	rm -rf ./ventoy/
-fi
-
-colEcho $cyanB "Renaming ventoy folder to remove the version number..."
-mv ventoy-${venver: -6} ventoy
 
 # Download the missing Medicat 7z file
 if [ -z "$location" ] ; then
-	colEcho $cyanB "Starting to download torrent"
-	wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_v21.12.torrent -O medicat.torrent
+	colEcho $cyanB "Starting to download Medicat via bittorrent"
+	wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_$MedicatVersion.torrent -O medicat.torrent
 	aria2c --file-allocation=none --seed-time=0 medicat.torrent
 	location="$Medicat7zFull"
+	colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"
 fi
-
-colEcho $cyanB "Medicat 7z file found:$whiteB $location"
 
 # Check the SHA256 hash of the Medicat zip file.
 colEcho $cyanB "Checking SHA256 hash of$whiteB $Medicat7zFile$cyanB..."
@@ -225,42 +299,33 @@ read letter
 
 drive=/dev/$letter
 drive2="$drive""1"
-checkingconfirm=""
 
-while [[ "$checkingconfirm" != [NnYy]* ]]; do
-	read -e -p "You want to install Ventoy and Medicat to $drive / $drive2? (Y/N) " checkingconfirm
-	if [[ "$checkingconfirm" == [Nn]* ]]; then
-		colEcho $yellowB "Installation Cancelled."
-		exit
-	elif [[ "$checkingconfirm" == [Yy]* ]]; then
-		colEcho $cyanB "Installation confirmed and will commence in 5 seconds..."
-		sleep 5
-	else
-		colEcho $redB "Invalid input. Please enter 'Y' or 'N'."
-	fi
-done
+if $(YesNo "You want to install Ventoy and Medicat to $drive / $drive2? (Y/N) "); then
+	colEcho $cyanB "Installation confirmed and will commence in 5 seconds..."
+	sleep 5
+else
+	colEcho $yellowB "Installation Cancelled."
+	exit 0
+fi
 
 colEcho $cyanB "Installing Ventoy on$whiteB $drive"
 
-while [[ "$usegpt" != [NnYy]* ]]; do
-	colEcho $blueB "MBR at max can do up to approximately 2.2 TB and will work with older BIOS systems and UEFI systems that support legacy operating systems. GPT can do up to 18 exabytes and will work with UEFI systems."
-	read -e -p "Device partition layout defaults to MBR.  Would you like to use GPT instead? (Y/N)" usegpt
-	if [[ "$usegpt" == [Nn]* ]]; then
-		colEcho $yellowB "Using MBR"
-		sudo sh ./ventoy/Ventoy2Disk.sh -I $drive
-		if [ "$?" != "0" ]; then
-			colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
-			exit 1
-		fi
-	elif [[ "$usegpt" == [Yy]* ]]; then
-		colEcho $yellowB "Using GPT"
-		sudo sh ./ventoy/Ventoy2Disk.sh -I -g $drive
-		if [ "$?" != "0" ]; then
-			colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
-			exit 1
-		fi
+colEcho $blueB "MBR at max can do up to approximately 2.2 TB and will work with older BIOS systems and UEFI systems that support legacy operating systems. GPT can do up to 18 exabytes and will work with UEFI systems."
+if $(YesNo "Device partition layout defaults to MBR.  Would you like to use GPT instead? (Y/N)"); then
+	colEcho $yellowB "Using GPT"
+	sudo $ventoyLauncher -I -g $drive
+	if [ "$?" != "0" ]; then
+		colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
+		exit 1
 	fi
-done
+else
+	colEcho $yellowB "Using MBR"
+	sudo $ventoyLauncher -I $drive
+	if [ "$?" != "0" ]; then
+		colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
+		exit 1
+	fi
+fi
 
 colEcho $cyanB "Unmounting drive$whiteB $drive"
 sudo umount $drive
@@ -275,23 +340,17 @@ if ! [[ -d MedicatUSB/ ]] ; then
 fi
 
 colEcho $cyanB "Mounting Medicat NTFS volume..."
-sudo mount $drive2 ./MedicatUSB
+sudo mount $drive2 ./MedicatUSB -t ntfs3
 
 colEcho $cyanB "Extracting Medicat to NTFS volume..."
 7z x -O./MedicatUSB "$location"
 
 colEcho $cyanB "MedicatUSB has been created."
 
-unmountcheck=""
-while [[ "$unmountcheck" != [NnYy]* ]]; do
-	read -e -p "Would you like to unmount ./MedicatUSB? (Y/N) " unmountcheck
-	if [[ $unmountcheck == [Yy]* ]]; then
-		colEcho $cyanB "Unmounting MedicatUSB..."
-		sudo umount ./MedicatUSB
-		colEcho $cyanB "Unmounted."
-	elif [[ $unmountcheck == [Nn]* ]]; then
-		colEcho $cyanB "MedicatUSB will not be unmounted."
-	else
-		colEcho $redB "Invalid input. Please enter 'Y' or 'N'."
-	fi
-done
+if $(YesNo "Would you like to unmount ./MedicatUSB? (Y/N) "); then
+	colEcho $cyanB "Unmounting MedicatUSB..."
+	sudo umount ./MedicatUSB
+	colEcho $cyanB "Unmounted."
+else
+	colEcho $cyanB "MedicatUSB will not be unmounted."
+fi
