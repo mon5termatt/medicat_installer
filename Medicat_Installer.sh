@@ -116,7 +116,7 @@ function dependenciesHandler() {
 		fi
 	done
 	if [ "$toInstall" != "" ]; then
-		if $os == "unknown"; then
+		if [ $os == "unknown" ]; then
 			colEcho $redB "ERROR: Distro is unknown and some dependencies were not found. \n Please install the following dependencies manually: $toInstall"
 			exit 1
 		fi
@@ -186,7 +186,7 @@ elif grep -qs "nixos" /etc/os-release; then
 	os="nixos"
 	sudo=""
 	pkgmgr="nix-env"
-	install_arg="-iA"
+	install_arg="iA"
 	update_arg="--upgrade"
 	ventoyFS=false
 elif grep -qs "alpine" /etc/os-release; then
