@@ -186,7 +186,7 @@ elif grep -qs "nixos" /etc/os-release; then
 	os="nixos"
 	sudo=""
 	pkgmgr="nix-env"
-	install_arg="iA"
+	install_arg="-iA"
 	update_arg="--upgrade"
 	ventoyFS=false
 elif grep -qs "alpine" /etc/os-release; then
