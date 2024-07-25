@@ -1,6 +1,6 @@
 $TargetLanguage = $Args[0]
 
-$text1 = "How is it already june. Happy pride month."
+$text1 = "New update coming soon!"
 
 $Uri1 = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$text1"
 $Response = Invoke-RestMethod -Uri $Uri1 -Method Get
