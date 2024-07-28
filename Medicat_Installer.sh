@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Script Version 0008
+# Script Version 0009
 
 #--------------------------------Variables------------------------------------#
 
@@ -12,13 +12,17 @@ Medicat7zFull=''MediCat\ USB\ $MedicatVersion/MediCat.USB.$MedicatVersion.7z''
 
 # Dependencies
 declare -A depCommands
-depCommands["wget"]="wget"
+depCommands["curl"]="curl"
+depCommands["jq"]="jq"
 depCommands["7z"]="zip"
 depCommands["mkfs.vfat"]="mkfs"
 depCommands["mkntfs"]="ntfs"
-declare -A wget
-wget["nixos"]="nixos.wget"
-wget["default"]="wget"
+declare -A curl
+curl["nixos"]="nixos.curl"
+curl["default"]="curl"
+declare -A jq
+curl["nixos"]="nixos.jq"
+curl["default"]="jq"
 declare -A zip
 zip["arch"]="p7zip"
 zip["nixos"]="nixos.p7zip"
@@ -131,13 +135,13 @@ function dependenciesHandler() {
 # Function to download ventoy
 function downloadVentoy() {
 	local os="$1"
-  	local ventoyPackage=$2
-  	# Identify latest Ventoy release.
-  	venver=$(wget -q -O - https://api.github.com/repos/ventoy/Ventoy/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
+	local ventoyPackage=$2
+	# Identify latest Ventoy release.
+	venver="$(curl -L https://api.github.com/repos/ventoy/Ventoy/releases/latest | jq -r '.tag_name')"
 
 	# Download latest verion of Ventoy.
-	colEcho $cyanB "\nDownloading Ventoy Version:$whiteB ${venver: -6}"
-	wget -q --show-progress https://github.com/ventoy/Ventoy/releases/download/v${venver: -6}/ventoy-${venver: -6}-linux.tar.gz -O ventoy.tar.gz
+	colEcho $cyanB "\nDownloading Ventoy Version:$whiteB ${venver}"
+	curl -L "https://github.com/ventoy/Ventoy/releases/download/${venver}/ventoy-${venver:1}-linux.tar.gz" --output ventoy.tar.gz
 
 	colEcho $cyanB "\nExtracting Ventoy..."
 	tar -xf ventoy.tar.gz
@@ -228,7 +232,7 @@ fi
 
 colEcho $cyanB "Operating System Identified as:$whiteB $os"
 
-# Ensure dependencies are installed: wget, 7z, mkntfs, and aria2c only if Medicat 7z file is not present
+# Ensure dependencies are installed: curl, jq, 7z, mkntfs, and aria2c only if Medicat 7z file is not present
 colEcho $cyanB "\nLocating the Medicat 7z file..."
 
 if [[ -f "$Medicat7zFile" ]]; then
@@ -261,7 +265,7 @@ fi
 # Download the missing Medicat 7z file
 if [ -z "$location" ] ; then
 	colEcho $cyanB "Starting to download Medicat via bittorrent"
-	wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_$MedicatVersion.torrent -O medicat.torrent
+	curl -L https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_$MedicatVersion.torrent --output medicat.torrent
 	aria2c --file-allocation=none --seed-time=0 medicat.torrent
 	location="$Medicat7zFull"
 	colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"
