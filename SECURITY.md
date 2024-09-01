@@ -21,4 +21,4 @@ Additionally all EXE versions (Including the one in the original file) are no lo
 
 ## Reporting a Vulnerability
 
-Please Report all issues in the Issues tab or directly in the discord.
+Please report all issues in the issues tab or directly in the Discord.
