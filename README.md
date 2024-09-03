@@ -33,7 +33,8 @@ Contains the code required to download and install Medicat files
 
 ### Medicat_Installer.sh
 Main file for installing via Linux command-line
-Coded by: [@SkeletonMan03](https://github.com/SkeletonMan03)
+
+*Coded by: [@SkeletonMan03](https://github.com/SkeletonMan03)*
 
 # Programs Included / Downloaded during install
 
