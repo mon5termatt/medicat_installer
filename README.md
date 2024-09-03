@@ -29,7 +29,7 @@ OR:
 
 # Main Files
 ### Medicat_Installer.bat
-Contains the script required to download and install Medicat files (Medicat zipped file is quite large, be careful with internet that has a data cap limit)
+Contains the code required to download and install Medicat files
 
 ### Medicat_Installer.sh
 Main file for installing via Linux command-line
