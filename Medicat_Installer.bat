@@ -15,19 +15,19 @@ if not exist bin md bin
 
 
 :initialchecks
-echo.Running Initial Checks
+echo.Running initial checks...
 ping 1.1.1.1 -n 1 -w 1000 > nul
-if errorlevel 1 (Echo.Could not Ping 1.1.1.1, Attempting backup pings.) else (goto foundinternet)
+if errorlevel 1 (Echo.Could not ping 1.1.1.1, attempting backup pings.) else (goto foundinternet)
 ping 8.8.8.8 -n 1 -w 2000 > nul
-if errorlevel 1 (Echo.Could not Ping 8.8.8.8, Attempting backup pings.) else (goto foundinternet)
+if errorlevel 1 (Echo.Could not ping 8.8.8.8, attempting backup pings.) else (goto foundinternet)
 ping github.com -n 1 -w 2000 > nul
 if errorlevel 1 (Echo.Could not Ping github.com, Exiting Script && timeout 5 > nul && exit) else (goto foundinternet)
 :foundinternet
 echo.Found Internet
 curl.exe -V > nul
-if errorlevel 1 (echo Failed to find curl. && pause && exit)
+if errorlevel 1 (echo Failed to find cURL, please install it! && pause && exit)
 echo.Found cURL
-for %%# in (powershell.exe) do @if "%%~$PATH:#"=="" (echo.Could not find Powershell. && pause && exit) 
+for %%# in (powershell.exe) do @if "%%~$PATH:#"=="" (echo.Could not find PowerShell, please install it! && pause && exit) 
 echo.Found Powershell
 echo.Prompting for admin permissions if not run as admin.
 timeout 1 >nul
@@ -50,13 +50,16 @@ if "%os2%" == "10.0" goto oscheckpass
 mode con:cols=64 lines=18
 title Medicat Installer [UNSUPPORTED]
 ver
-echo.Your version of windows might not be supported.
-echo.If you believe this is an error you can
-Set /P warn=bypass this warning by typing "I AGREE": || Set warn=no
+echo WARNING!!!
+
+echo Your Windows version is NOT supported, most likely you're using a insider build.
+echo Things might break if you continue.
+echo If you believe this is an error, you can
+set /P warn=bypass this warning by typing exactly "I AGREE": || set warn=no
 If "%warn%"=="no" exit
 If /i "%warn%"=="I AGREE" goto oscheckpass
 :oscheckpass
-echo.Using Supported version of windows. (10/11)
+echo.Using supported version of Windows 10/11.
 timeout 1 > nul
 
 :curver
@@ -80,17 +83,17 @@ exit
 echo.[41m
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
-echo.IIII                                                       IIII
+echo.IIII                      WARNING!!!                       IIII
 echo.IIII           MEDICAT CONTAINS TOOLS THAT MAY             IIII
 echo.IIII          TRIGGER YOUR ANTIVIRUS DUE TO HOW            IIII
 echo.IIII               SOME OF THE TOOLS WORK.                 IIII
 echo.IIII                                                       IIII
 echo.IIII         WE CANT DO ANYTHING TO CHANGE THAT.           IIII
-echo.IIII       IF YOU DONT TRUST THE TOOL DONT USE IT.         IIII
+echo.IIII       IF YOU DON'T TRUST THE TOOL, DON'T USE IT.      IIII
 echo.IIII         GIANT THANKS, MON5TERMATT AND JAYRO           IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II[0m
-echo.Please wait for 5 seconds, Read the above.  
+echo.Please wait for 5 seconds, and read the above.  
 PING localhost -n 6 >NUL
 echo.                          Press any key to accept this warning.&& pause >nul
 
@@ -98,7 +101,7 @@ echo.                          Press any key to accept this warning.&& pause >nu
 :startbinfiles
 title Medicat Installer [FILECHECK]
 cls
-echo.Downloading Initial Files, Please wait.
+echo.Downloading initial files, please wait...
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -o ./bin/QuickSFV.exe -s -L
 call :filesize bin/QuickSFV.exe
 if "%size%" == "103424" (echo [GOOD] QuickSFV.exe) else (echo [BAD]  QuickSFV.exe && set flag=1)
@@ -144,7 +147,7 @@ if "%size%" == "" (echo GOOD) else (echo BAD && set flag=1)
 goto checkdone
 
 :checkdone
-rem dont hash these they change
+rem don't hash these, they change!
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/motd.ps1" -o ./bin/motd.ps1 -s -L
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/licence.ps1" -o ./bin/licence.ps1 -s -L
 echo.Setting Powershell Settings for Scripts.
@@ -154,6 +157,7 @@ if "%flag%" == "1" goto hasherror
 goto start
 
 :hasherror
+echo WARNING!!!
 echo.ERROR DOWNLOADING BIN FILES. ONE OF THE HASHES DOES NOT MATCH.
 echo.PLEASE CHECK YOUR FIREWALL AND CURL AND TRY AGAIN. 
 echo.IF YOU CHOOSE TO CONTINUE YOU MAY ENCOUNTER ERRORS
