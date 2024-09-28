@@ -1,3 +1,5 @@
+# Work on this script is currently on pause. im working full time being a IT manager and Trainer. Sorry.
+
 # Medicat Installer
 ![Logo](icon.png)
 
