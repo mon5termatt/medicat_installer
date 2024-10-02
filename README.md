@@ -38,6 +38,12 @@ Main file for installing via Linux command-line
 
 *Coded by: [@SkeletonMan03](https://github.com/SkeletonMan03)*
 
+or
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/heads/main/Medicat_Installer.sh | bash
+```
+
 # Programs Included / Downloaded during install
 
   ### Files Downloaded
