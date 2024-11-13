@@ -17,7 +17,7 @@
 * cURL
 * Az biraz beyin
 
-#### Requirements for Linux
+#### Linux için Gereksinimler
 * Terminal
 * Fazlası ile beyin %75 gibi
 * Genel Linux Bilgisi
@@ -63,4 +63,5 @@ Linux komut satırı ile kurulum için ana dosya.[@SkeletonMan03](https://github
 * [@SkeletonMan03](https://github.com/SkeletonMan03)
 * [@Teknoist](https://github.com/Teknoist)
 * [@Samega7Cattac](https://github.com/Samega7Cattac)
+* [@Ben-Hampson](https://github.com/Ben-Hampson)
 * Ve Discord'daki diğer tüm yardımcılarla birlikte.
