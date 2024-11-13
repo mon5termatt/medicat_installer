@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Script Version 0009
+# Script Version 0010
 
 #--------------------------------Variables------------------------------------#
 
