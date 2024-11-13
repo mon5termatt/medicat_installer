@@ -57,7 +57,7 @@ if test -n "$NumColours" && test $NumColours -ge 8; then
 
     clear="$(tput sgr0)"
     blackN="$(tput setaf 0)";		blackB="$(tput bold setaf 0)"
-    redN="$(tput setaf 1)";		    redB="$(tput bold setaf 1)"
+    redN="$(tput setaf 1)";		redB="$(tput bold setaf 1)"
     greenN="$(tput setaf 2)";		greenB="$(tput bold setaf 2)"
     yellowN="$(tput setaf 3)";		yellowB="$(tput bold setaf 3)"
     blueN="$(tput setaf 4)";		blueB="$(tput bold setaf 4)"
@@ -120,7 +120,7 @@ function dependenciesHandler() {
 		fi
 	done
 	if [ "$toInstall" != "" ]; then
-		if $os == "unknown"; then
+		if [ $os == "unknown" ]; then
 			colEcho $redB "ERROR: Distro is unknown and some dependencies were not found. \n Please install the following dependencies manually: $toInstall"
 			exit 1
 		fi
@@ -222,6 +222,7 @@ elif [[ -e /etc/nobara ]]; then
 	update_arg="update"
 elif [[ -e /etc/arch-release ]]; then
 	os="arch"
+	colEcho $blueB "I use Arch btw"
 	pkgmgr="pacman"
 	install_arg="-S --needed --noconfirm"
 	update_arg="-Syy"
@@ -344,7 +345,7 @@ if ! [[ -d MedicatUSB/ ]] ; then
 fi
 
 colEcho $cyanB "Mounting Medicat NTFS volume..."
-sudo mount $drive2 ./MedicatUSB -t ntfs3
+sudo mount $drive2 ./MedicatUSB
 
 colEcho $cyanB "Extracting Medicat to NTFS volume..."
 7z x -O./MedicatUSB "$location"
