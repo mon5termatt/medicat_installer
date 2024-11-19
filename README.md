@@ -1,4 +1,4 @@
-# Work on this script is currently on pause. im working full time being a IT manager and Trainer. Sorry.
+# Work on this script is currently on pause. im working full time being a IT tech and Trainer. Sorry.
 
 # Medicat Installer
 ![Logo](icon.png)
@@ -72,3 +72,13 @@ curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/
 * [@Samega7Cattac](https://github.com/Samega7Cattac)
 * [@Ben-Hampson](https://github.com/Ben-Hampson)
 * Along with all the others helping in the Discord server!
+
+  ## Star History
+
+<a href="https://star-history.com/#mon5termatt/medicat_installer&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=mon5termatt/medicat_installer&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=mon5termatt/medicat_installer&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=mon5termatt/medicat_installer&type=Date" />
+ </picture>
+</a>
