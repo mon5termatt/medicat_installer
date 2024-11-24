@@ -160,7 +160,7 @@ goto start
 echo WARNING!!!
 echo.ERROR DOWNLOADING BIN FILES. ONE OF THE HASHES DOES NOT MATCH.
 echo.PLEASE CHECK YOUR FIREWALL AND CURL AND TRY AGAIN. 
-echo.IF YOU CHOOSE TO CONTINUE YOU MAY ENCOUNTER ERRORS
+echo.IF YOU CHOOSE TO CONTINUE, YOU MAY ENCOUNTER ERRORS.
 pause
 pause > nul
 pause > nul
@@ -269,7 +269,7 @@ goto menu2
 
 
 :check5
-echo.Getting Current Ventoy Version
+echo.Getting current Ventoy version...
 timeout 0 >nul
 powershell -c "$data = curl https://api.github.com/repos/ventoy/ventoy/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './ventoyversion.txt'"
 
@@ -277,10 +277,10 @@ powershell -c "$data = curl https://api.github.com/repos/ventoy/ventoy/git/refs/
 set /p VENVER= <./ventoyversion.txt
 ::set VENVER=v1.0.91
 set vencurver=%VENVER:~-6%
-echo.Current Online Version - %VENVER:~-6%
+echo.Current online version - %VENVER:~-6%
 
 :checkventoyver
-echo.Checking if current version found on system.
+echo.Checking if current version found on system...
 timeout 1 >nul
 if exist "%CD%\Ventoy2Disk\" (goto checkver) else (goto ventoyget)
 :checkver
@@ -288,7 +288,7 @@ set /p localver= <.\Ventoy2Disk\ventoy\version
 echo.Current Local Version - %VENVER:~-6%
 if "%localver%" == "%vencurver%" (goto uptodate) else (goto ventoyget)
 :ventoyget
-echo.Update Found. Downloading Latest Ventoy.
+echo.Update found, downloading latest Ventoy...
 timeout 1 >nul
 curl https://github.com/ventoy/Ventoy/releases/download/v%vencurver%/ventoy-%vencurver%-windows.zip -o ./ventoy.zip -s -L
 7z x ventoy.zip -r -aoa
@@ -322,7 +322,7 @@ echo.Installing to (%drivepath%). If this is correct just hit enter.
 echo.[41m
 echo.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 echo.PLEASE CONFIRM NOW THAT THIS IS YOUR USB DRIVE.
-echo.MEDICAT IS NOT RESPOSIBLE FOR WIPED HARD DRIVES.
+echo.MEDICAT IS NOT RESPOSIBLE FOR WIPED USB DRIVES.
 echo.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 echo.[0m waiting for 5 seconds...
 PING localhost -n 6 >NUL
@@ -340,10 +340,10 @@ echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
-echo.IIII               WOULD YOU LIKE TO USE GPT               IIII
+echo.IIII              WOULD YOU LIKE TO USE GPT?               IIII
 echo.IIII                                                       IIII
-echo.IIII              Most computers should be ok              IIII
-echo.IIII              with GPT. However some very              IIII
+echo.IIII              Most computers should be OK              IIII
+echo.IIII             with GPT. However, some very              IIII
 echo.IIII             old machines may have issues.             IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
@@ -392,7 +392,7 @@ goto sbask
 echo.[41mII-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
-echo.IIII                   IMPORTANT WARNING                   IIII
+echo.IIII                 !IMPORTANT WARNING!                   IIII
 echo.IIII                                                       IIII
 echo.IIII           SOMETIMES VENTOY MESSES UP A DRIVE          IIII
 echo.IIII   IF THE DRIVE DISAPPEARS PLEASE CHECK DISK MANAGER   IIII
@@ -415,7 +415,7 @@ echo.IIII                                                       IIII
 echo.IIII                   IMPORTANT WARNING                   IIII
 echo.IIII                                                       IIII
 echo.IIII    PLEASE VERIFY THE DRIVE LETTER HAS NOT CHANGED     IIII
-echo.IIII               CURRENTLY INSTALLING TO: %drivepath%              IIII
+echo.IIII         CURRENTLY INSTALLING TO: %drivepath%          IIII
 echo.IIII  IF THIS IS INCORRECT PLEASE TYPE THE CORRECT LETTER  IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
@@ -559,11 +559,11 @@ exit
 
 :finisherror
 echo.[41m
-echo.Error has occured. Please look above.
-echo.If you come to the discord for support we will need this error. 
+echo.An error has occurred. Please look above.
+echo.If you come to the Discord for support, we will need this error. 
 echo.COMMON ERRORS: 
-echo.Error: Unexpected end of archive		FIX: Redownload Main File.  (download issue)
-echo.Error: Cannot find the path specified	FIX: Check Disk is Mounted. (ventoy issue)
+echo.Error: Unexpected end of archive		FIX: Redownload main file.  (download issue)
+echo.Error: Cannot find the path specified	FIX: Check disk is mounted. (ventoy issue)
 echo.[0m
 pause
 exit
@@ -596,7 +596,7 @@ start https://url.medicatusb.com/discord
 goto menu2
 
 :recheck
-for /f "delims=" %%A in ('folderbrowse.exe "Please select the drive you want to install medicat on"') do set "folder=%%A"
+for /f "delims=" %%A in ('folderbrowse.exe "Please select the drive you want to install Medicat on"') do set "folder=%%A"
 set drivepath=%folder:~0,1%
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -o %drivepath%:/CheckFiles.bat -s -L
 cd /d %drivepath%:
