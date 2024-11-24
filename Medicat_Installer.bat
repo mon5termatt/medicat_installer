@@ -150,7 +150,7 @@ goto checkdone
 rem don't hash these, they change!
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/motd.ps1" -o ./bin/motd.ps1 -s -L
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/licence.ps1" -o ./bin/licence.ps1 -s -L
-echo.Setting Powershell Settings for Scripts.
+echo.Setting PowerShell settings for scripts.
 Powershell -c "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine"
 Powershell -c "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"
 if "%flag%" == "1" goto hasherror
@@ -314,7 +314,7 @@ title Medicat Installer [CHOOSEINSTALL]
 mode con:cols=100 lines=15
 echo.We now need to find out what drive you will be installing to.
 REM - FOLDER PROMPT STARTS
-for /f "delims=" %%A in ('folderbrowse.exe "Please select the drive you want to install medicat on"') do set "folder=%%A"
+for /f "delims=" %%A in ('folderbrowse.exe "Please select the drive you want to install Medicat on"') do set "folder=%%A"
 REM - AND ENDS
 set drivepath=%folder:~0,1%
 IF "%drivepath%" == "~0,1" GOTO install2
@@ -366,7 +366,7 @@ echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
-echo.IIII           WOULD YOU LIKE TO USE SECUREBOOT?           IIII
+echo.IIII           WOULD YOU LIKE TO USE SECURE BOOT?          IIII
 echo.IIII                                                       IIII
 echo.IIII            Recommended for most computers             IIII
 echo.IIII                                                       IIII
@@ -403,7 +403,7 @@ echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II[0m
 echo.Please Wait, Installing Ventoy. 
 echo.Please close the file explorer when done.
-echo.IF FROZEN FOR MORE THEN 60 SECONDS INSTALL VENTOY MANUALLY.
+echo.IF FROZEN FOR MORE THEN 60 SECONDS, INSTALL VENTOY MANUALLY.
 cd .\Ventoy2Disk\
 Ventoy2Disk.exe VTOYCLI /I /Drive:%drivepath%: /NOUSBCheck %arg1% %arg2% 
 cd %maindir% 
@@ -427,7 +427,7 @@ format %drivepath%: /FS:NTFS /X /Q /V:Medicat /Y
 goto installver
 
 :error
-echo.nothing was chosen, try again
+echo.Nothing was chosen, try again.
 timeout 5
 goto install2
 :importantdrive
@@ -437,10 +437,10 @@ echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII                   IMPORTANT WARNING                   IIII
 echo.IIII                                                       IIII
-echo.IIII       IT LOOKS LIKE YOU SELECTED THE C DRIVE          IIII
+echo.IIII       IT LOOKS LIKE YOU SELECTED THE C DRIVE!         IIII
 echo.IIII        THIS MAY CAUSE IRREPARABLE DAMAGE TO           IIII
-echo.IIII               YOUR COMPUTER SYSTEM..                  IIII
-echo.IIII           THE PROGRAM WILL NOW ASK AGAIN              IIII
+echo.IIII               YOUR COMPUTER SYSTEM.                   IIII
+echo.IIII           THE PROGRAM WILL NOW ASK AGAIN.             IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II[0m
@@ -455,14 +455,14 @@ REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
 
 
 :updateventoy
-echo.Please Wait, Updating Ventoy but not formatting
+echo.Please wait, updating Ventoy without formatting the USB drive.
 cd .\Ventoy2Disk\
 Ventoy2Disk.exe VTOYCLI /U /Drive:%drivepath%:
 cd %maindir%
 goto installver
 
 :installver
-title Medicat Installer [INSTALL!]
+title Medicat Installer [INSTALLING]
 if exist "%CD%\MediCat.USB.v%medicatver%.7z" (goto install4) else (goto installversion2)
 :installversion2
 if exist "%CD%\MediCat.USB.v%medicatver%.zip.001" (goto hasher)
@@ -473,11 +473,11 @@ echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII         COULD NOT FIND THE MEDICAT FILE(S).           IIII
 echo.IIII            (EITHER *.001 or the main .7z)             IIII
-echo.IIII             are they in The same folder?              IIII
+echo.IIII             Are they in the same folder?              IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
-echo.IIII           WOULD YOU LIKE TO DOWNLOAD THEM?            IIII
-echo.IIII       SELECTING NO WILL LET YOU FIND THE FILE.        IIII
+echo.IIII           Would you like to download them?            IIII
+echo.IIII       Selecting no will let you find the file.        IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 call Button 10 12 F2 "YES" 46 12 F4 "NO" X _Var_Box _Var_Hover
@@ -500,7 +500,7 @@ echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
-echo.IIII        THE INSTALLER COULD NOT FIND MEDICAT           IIII
+echo.IIII        THE INSTALLER COULD NOT FIND MEDICAT!          IIII
 echo.IIII                                                       IIII
 echo.IIII          PLEASE MANUALLY SELECT THE FILE!             IIII
 echo.IIII                                                       IIII
