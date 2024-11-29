@@ -1,3 +1,5 @@
+# Bu komut dosyası üzerindeki çalışma şu anda duraklatılmış durumdadır. Tam zamanlı olarak BT teknisyeni ve eğitmen olarak çalışıyorum. Üzgünüm.
+
 # Medicat Kurulum Aracı
 
 ![Logo](icon.png)
@@ -7,6 +9,11 @@
 # [Medicat Sitesine Gidin](https://medicatusb.com/)
 
 ### [Bu kodu ve Medicat'ı iyileştirmeye yardımcı olmak isteyen insanlar arıyoruz, Discord'da uğrayın. :D](https://url.medicatusb.com/discord)
+
+VEYA:
+
+* Bu projeyi forklayın ve değiştirilmiş dosyalarla bir pull request oluşturun.
+
 
 # Uyumluluk
 * Windows 10/11 (Insider her zaman desteklenmez)
@@ -27,37 +34,39 @@
 Medicat USB'yi indirme ve kurma için rehberli istekler içeren ana dosya
 
 ### Medicat_Installer.sh
-Linux komut satırı ile kurulum için ana dosya.[@SkeletonMan03](https://github.com/SkeletonMan03) tarafından kodlanmıştır
+Linux komut satırı ile kurulum için ana dosya.
+*[@SkeletonMan03](https://github.com/SkeletonMan03) tarafından kodlanmıştır.*
+
+Veya 
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/heads/main/Medicat_Installer.sh | bash
+```
 
 # Kurulum İçinde Bulunan ve Kurulum sırasında İndirilen Programlar
 
   ### İndirilen Dosyalar
   
-  1. [Gdrive](https://github.com/prasmussen/gdrive)
-      * Google Drive'dan indirmek için.
-      * Eski Yöntem
-  2. [aria2](https://github.com/aria2/aria2)
+  1. [aria2](https://github.com/aria2/aria2)
       * Torrent dosyasından indirmek için.
-  3. [7Zip](https://www.7-zip.org/)
-      * Sıkıştırılmış Dosyaları Çıkartmak için
-  4. [Wget](https://eternallybored.org/misc/wget/)
-      * İnternetten dosyaları indirmek için. Çünkü curl'i sevmiyorum...
-  5. [gdown](https://github.com/wkentaro/gdown)
-      * Yeni Google Drive Yöntemi
-  6. [WinPython](https://winpython.github.io/)
-      * Taşınabilir Python
-  7. [IPget](https://github.com/ipfs/ipget)
+  2. [7Zip](https://www.7-zip.org/)
+      * Sıkıştırılmış Dosyaları Çıkartmak için.
+  3. [FolderBrowse](https://github.com/TheBATeam/FolderBrowse-by-Fatih-Kodak)
+      * Bir şeyler yazmadan hangi sürücüye yükleme yapmak istediğinizi bulmak için.
+  4. [IPget](https://github.com/ipfs/ipget)
       * IPFS wget benzeri
+  5. [QuickSFV](http://www.quicksfv.org/)
+      * Büyük dosyaları *biraz* hızlı bir şekilde hashlemek için ...
       
       
-  ### Bin.bat içinde Bulunan Dosyalar
-  1. [batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
+ #### Aşağıdakiler menü sistemi içindir:
+  1. [Batbox](https://github.com/TheBATeam/BATBOX-An-Awesome-Batch-Plugin)
   2. [Box](https://github.com/TheBATeam/Box-Function-2.0)
   3. [Button](https://github.com/TheBATeam/Button-Function-2.0-by-Kvc)
   4. [Getinput](https://github.com/TheBATeam/GetInput-By-Aacini)
   5. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
-  6. [QuickSFV](http://www.quicksfv.org/)
-      * Dosyaları biraz hızlı doğrulamak için...
+
+# Credits
 
 # Credits
 * [@SkeletonMan03](https://github.com/SkeletonMan03)
@@ -65,3 +74,15 @@ Linux komut satırı ile kurulum için ana dosya.[@SkeletonMan03](https://github
 * [@Samega7Cattac](https://github.com/Samega7Cattac)
 * [@Ben-Hampson](https://github.com/Ben-Hampson)
 * Ve Discord'daki diğer tüm yardımcılarla birlikte.
+
+  ## Star History
+
+<a href="https://star-history.com/#mon5termatt/medicat_installer&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=mon5termatt/medicat_installer&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=mon5termatt/medicat_installer&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=mon5termatt/medicat_installer&type=Date" />
+ </picture>
+</a>
+
+
