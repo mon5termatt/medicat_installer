@@ -30,6 +30,7 @@ zip["fedora"]="p7zip-full p7zip-plugins"
 zip["nobara"]="p7zip-full p7zip-plugins"
 zip["centos"]="p7zip p7zip-plugins"
 zip["alpine"]="7zip"
+zip["opensuse"]="7zip"
 zip["default"]="p7zip-full"
 declare -A mkfs
 mkfs["nixos"]="nixos.dosfstools"
@@ -89,7 +90,7 @@ function YesNo() {
 		read -e -p "$1" setCheck
 		if [[ $setCheck == [Yy]* ]]; then
 			echo true
-		elif [[ $setCheck == [Nn]* ]]; then	
+		elif [[ $setCheck == [Nn]* ]]; then
 			echo false
 		else
 			colEcho $redB "Invalid input. Please enter 'Y' or 'N'." > /dev/stderr
@@ -226,6 +227,11 @@ elif [[ -e /etc/arch-release ]]; then
 	pkgmgr="pacman"
 	install_arg="-S --needed --noconfirm"
 	update_arg="-Syy"
+elif grep -qs "opensuse-tumbleweed" /etc/os-release; then
+	os="opensuse"
+	pkgmgr="zypper"
+	install_arg="install"
+	update_arg="update"
 else
 	os="unknown"
 	colEcho "WARNING: Distro not recognised - trying to continue...\n"
