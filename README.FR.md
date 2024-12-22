@@ -53,8 +53,6 @@ Codé par [@SkeletonMan03](https://github.com/SkeletonMan03)
   5. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
 
 # Crédits
-* [@SkeletonMan03](https://github.com/SkeletonMan03)
-* [@Teknoist](https://github.com/Teknoist)
-* [@Samega7Cattac](https://github.com/Samega7Cattac)
-* [@Ben-Hampson](https://github.com/Ben-Hampson)
+<!-- readme: contributors -start -->
+<!-- readme: contributors -end -->
 * Ainsi que tous les autres qui ont aidé dans le Discord

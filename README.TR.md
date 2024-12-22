@@ -60,8 +60,6 @@ Linux komut satırı ile kurulum için ana dosya.[@SkeletonMan03](https://github
       * Dosyaları biraz hızlı doğrulamak için...
 
 # Credits
-* [@SkeletonMan03](https://github.com/SkeletonMan03)
-* [@Teknoist](https://github.com/Teknoist)
-* [@Samega7Cattac](https://github.com/Samega7Cattac)
-* [@Ben-Hampson](https://github.com/Ben-Hampson)
+<!-- readme: contributors -start -->
+<!-- readme: contributors -end -->
 * Ve Discord'daki diğer tüm yardımcılarla birlikte.
