@@ -322,7 +322,7 @@ echo.Installing to (%drivepath%). If this is correct just hit enter.
 echo.[41m
 echo.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 echo.PLEASE CONFIRM NOW THAT THIS IS YOUR USB DRIVE.
-echo.MEDICAT IS NOT RESPOSIBLE FOR WIPED USB DRIVES.
+echo.MEDICAT IS NOT RESPOSIBLE FOR WIPED HARD DRIVES.
 echo.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 echo.[0m waiting for 5 seconds...
 PING localhost -n 6 >NUL
