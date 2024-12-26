@@ -141,13 +141,13 @@ function downloadVentoy() {
 	venver="$(curl -L https://api.github.com/repos/ventoy/Ventoy/releases/latest | jq -r '.tag_name')"
 
 	# Download latest verion of Ventoy.
-	colEcho $cyanB "\nDownloading Ventoy Version:$whiteB ${venver}"
+	colEcho $cyanB "\nDownloading Ventoy version:$whiteB ${venver}"
 	curl -L "https://github.com/ventoy/Ventoy/releases/download/${venver}/ventoy-${venver:1}-linux.tar.gz" --output ventoy.tar.gz
 
 	colEcho $cyanB "\nExtracting Ventoy..."
 	tar -xf ventoy.tar.gz
 
-	colEcho $cyanB "Removing the extracted Ventory tar.gz file..."
+	colEcho $cyanB "Removing the extracted Ventoy tar.gz file..."
 	rm -rf ventoy.tar.gz
 
 	# Remove the ./ventoy folder if it exists before renaming ventoy folder.
@@ -156,7 +156,7 @@ function downloadVentoy() {
 		rm -rf ./ventoy/
 	fi
 
-	colEcho $cyanB "Renaming ventoy folder to remove the version number..."
+	colEcho $cyanB "Renaming Ventoy folder to remove the version number..."
 	mv ventoy-${venver: -6} ventoy
 }
 #-----------------------------------------------------------------------------#
@@ -168,7 +168,7 @@ colEcho $yellowB "WELCOME TO THE MEDICAT INSTALLER.\n"
 
 CheckNotElevated
 
-colEcho $cyanB "This Installer will install Ventoy and Medicat.\n"
+colEcho $cyanB "This installer will install Ventoy and Medicat.\n"
 colEcho $yellowB "THIS IS IN BETA. PLEASE CONTACT MATT IN THE DISCORD FOR ALL ISSUES.\n"
 colEcho $cyanB "Updated for efficiency and cross-distro use by SkeletonMan.\n"
 colEcho $cyanB "Enhancements by Manganar.\n"
@@ -263,7 +263,7 @@ if $ventoyFS ; then
     dependenciesHandler
 	downloadVentoy
 else
-	colEcho $cyanB "INFO: Handling ventoy as a package."
+	colEcho $cyanB "INFO: Handling Ventoy as a package."
 	depCommands["ventoy"]="ventoy"
 	dependenciesHandler
 	ventoyLauncher="ventoy"
@@ -296,15 +296,15 @@ else
 fi
 
 # Advise user to connect and select the required USB device.
-colEcho $yellowB "\nPlease Plug your USB in now if it is not already connected..."
+colEcho $yellowB "\nPlease plug your USB in now if it is not already connected..."
 colEcho $yellowB "\nPress any key once it has been detected by your system..."
 UserWait
 
-colEcho $yellowB "Please Find the ID of your USB below:"
+colEcho $yellowB "Please find the ID of your USB below:"
 
 lsblk --nodeps --output "NAME,SIZE,VENDOR,MODEL,SERIAL" | grep -v loop
 
-colEcho $yellowB "Enter the device for the USB drive NOT INCLUDING /dev/ OR the Number After."
+colEcho $yellowB "Enter the device for the USB drive NOT INCLUDING /dev/ OR the number after."
 colEcho $yellowB "for example enter sda or sdb"
 read letter
 
@@ -315,7 +315,7 @@ if $(YesNo "You want to install Ventoy and Medicat to $drive / $drive2? (Y/N) ")
 	colEcho $cyanB "Installation confirmed and will commence in 5 seconds..."
 	sleep 5
 else
-	colEcho $yellowB "Installation Cancelled."
+	colEcho $yellowB "Installation cancelled."
 	exit 0
 fi
 
