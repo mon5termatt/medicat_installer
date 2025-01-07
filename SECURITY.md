@@ -8,15 +8,8 @@ Additionally all EXE versions (Including the one in the original file) are no lo
 
 | Version  | Supported          |
 | -------- | ------------------ |
-| v 3514   | :white_check_mark: |
-| < 3513   | :x:                |
-
-
-#### Linux
-| Version  | Supported          |
-| -------- | ------------------ |
-| v 0005   | :white_check_mark: |
-| < 0004   | :x:                |
+| Latest Release   | :white_check_mark: |
+| Anything not latest release.   | :x:                |
 
 
 ## Reporting a Vulnerability
