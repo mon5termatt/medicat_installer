@@ -2,9 +2,7 @@
 
 ## Supported Versions
 
-#### Windows
-
-Additionally all EXE versions (Including the one in the original file) are no longer supported.
+Additionally all PACKED EXE versions (Including the one in the original file) are no longer supported.
 
 | Version  | Supported          |
 | -------- | ------------------ |
