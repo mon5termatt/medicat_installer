@@ -150,7 +150,7 @@ goto checkdone
 rem don't hash these, they change!
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/motd.ps1" -o ./bin/motd.ps1 -s -L
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/licence.ps1" -o ./bin/licence.ps1 -s -L
-echo.Setting Powershell Settings for Scripts.
+echo.Setting PowerShell settings for scripts.
 Powershell -c "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine"
 Powershell -c "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"
 if "%flag%" == "1" goto hasherror
@@ -160,7 +160,7 @@ goto start
 echo WARNING!!!
 echo.ERROR DOWNLOADING BIN FILES. ONE OF THE HASHES DOES NOT MATCH.
 echo.PLEASE CHECK YOUR FIREWALL AND CURL AND TRY AGAIN. 
-echo.IF YOU CHOOSE TO CONTINUE YOU MAY ENCOUNTER ERRORS
+echo.IF YOU CHOOSE TO CONTINUE, YOU MAY ENCOUNTER ERRORS.
 pause
 pause > nul
 pause > nul
@@ -269,7 +269,7 @@ goto menu2
 
 
 :check5
-echo.Getting Current Ventoy Version
+echo.Getting current Ventoy version...
 timeout 0 >nul
 powershell -c "$data = curl https://api.github.com/repos/ventoy/ventoy/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './ventoyversion.txt'"
 
@@ -277,10 +277,10 @@ powershell -c "$data = curl https://api.github.com/repos/ventoy/ventoy/git/refs/
 set /p VENVER= <./ventoyversion.txt
 ::set VENVER=v1.0.91
 set vencurver=%VENVER:~-6%
-echo.Current Online Version - %VENVER:~-6%
+echo.Current online version - %VENVER:~-6%
 
 :checkventoyver
-echo.Checking if current version found on system.
+echo.Checking if current version found on system...
 timeout 1 >nul
 if exist "%CD%\Ventoy2Disk\" (goto checkver) else (goto ventoyget)
 :checkver
@@ -288,7 +288,7 @@ set /p localver= <.\Ventoy2Disk\ventoy\version
 echo.Current Local Version - %VENVER:~-6%
 if "%localver%" == "%vencurver%" (goto uptodate) else (goto ventoyget)
 :ventoyget
-echo.Update Found. Downloading Latest Ventoy.
+echo.Update found, downloading latest Ventoy...
 timeout 1 >nul
 curl https://github.com/ventoy/Ventoy/releases/download/v%vencurver%/ventoy-%vencurver%-windows.zip -o ./ventoy.zip -s -L
 7z x ventoy.zip -r -aoa
@@ -314,7 +314,7 @@ title Medicat Installer [CHOOSEINSTALL]
 mode con:cols=100 lines=15
 echo.We now need to find out what drive you will be installing to.
 REM - FOLDER PROMPT STARTS
-for /f "delims=" %%A in ('folderbrowse.exe "Please select the drive you want to install medicat on"') do set "folder=%%A"
+for /f "delims=" %%A in ('folderbrowse.exe "Please select the drive you want to install Medicat on"') do set "folder=%%A"
 REM - AND ENDS
 set drivepath=%folder:~0,1%
 IF "%drivepath%" == "~0,1" GOTO install2
@@ -340,10 +340,10 @@ echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
-echo.IIII               WOULD YOU LIKE TO USE GPT               IIII
+echo.IIII              WOULD YOU LIKE TO USE GPT?               IIII
 echo.IIII                                                       IIII
-echo.IIII              Most computers should be ok              IIII
-echo.IIII              with GPT. However some very              IIII
+echo.IIII              Most computers should be OK              IIII
+echo.IIII             with GPT. However, some very              IIII
 echo.IIII             old machines may have issues.             IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
@@ -366,7 +366,7 @@ echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
-echo.IIII           WOULD YOU LIKE TO USE SECUREBOOT?           IIII
+echo.IIII           WOULD YOU LIKE TO USE SECURE BOOT?          IIII
 echo.IIII                                                       IIII
 echo.IIII            Recommended for most computers             IIII
 echo.IIII                                                       IIII
@@ -392,7 +392,7 @@ goto sbask
 echo.[41mII-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
-echo.IIII                   IMPORTANT WARNING                   IIII
+echo.IIII                 !IMPORTANT WARNING!                   IIII
 echo.IIII                                                       IIII
 echo.IIII           SOMETIMES VENTOY MESSES UP A DRIVE          IIII
 echo.IIII   IF THE DRIVE DISAPPEARS PLEASE CHECK DISK MANAGER   IIII
@@ -403,7 +403,7 @@ echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II[0m
 echo.Please Wait, Installing Ventoy. 
 echo.Please close the file explorer when done.
-echo.IF FROZEN FOR MORE THEN 60 SECONDS INSTALL VENTOY MANUALLY.
+echo.IF FROZEN FOR MORE THEN 60 SECONDS, INSTALL VENTOY MANUALLY.
 cd .\Ventoy2Disk\
 Ventoy2Disk.exe VTOYCLI /I /Drive:%drivepath%: /NOUSBCheck %arg1% %arg2% 
 cd %maindir% 
@@ -415,7 +415,7 @@ echo.IIII                                                       IIII
 echo.IIII                   IMPORTANT WARNING                   IIII
 echo.IIII                                                       IIII
 echo.IIII    PLEASE VERIFY THE DRIVE LETTER HAS NOT CHANGED     IIII
-echo.IIII               CURRENTLY INSTALLING TO: %drivepath%              IIII
+echo.IIII         CURRENTLY INSTALLING TO: %drivepath%          IIII
 echo.IIII  IF THIS IS INCORRECT PLEASE TYPE THE CORRECT LETTER  IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
@@ -427,7 +427,7 @@ format %drivepath%: /FS:NTFS /X /Q /V:Medicat /Y
 goto installver
 
 :error
-echo.nothing was chosen, try again
+echo.Nothing was chosen, try again.
 timeout 5
 goto install2
 :importantdrive
@@ -437,10 +437,10 @@ echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII                   IMPORTANT WARNING                   IIII
 echo.IIII                                                       IIII
-echo.IIII       IT LOOKS LIKE YOU SELECTED THE C DRIVE          IIII
+echo.IIII       IT LOOKS LIKE YOU SELECTED THE C DRIVE!         IIII
 echo.IIII        THIS MAY CAUSE IRREPARABLE DAMAGE TO           IIII
-echo.IIII               YOUR COMPUTER SYSTEM..                  IIII
-echo.IIII           THE PROGRAM WILL NOW ASK AGAIN              IIII
+echo.IIII               YOUR COMPUTER SYSTEM.                   IIII
+echo.IIII           THE PROGRAM WILL NOW ASK AGAIN.             IIII
 echo.IIII                                                       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II[0m
@@ -455,14 +455,14 @@ REM -- WHEN DONE EXTRACTING VENTOY, TYPE LICENCE AND CONTINUE
 
 
 :updateventoy
-echo.Please Wait, Updating Ventoy but not formatting
+echo.Please wait, updating Ventoy without formatting the USB drive.
 cd .\Ventoy2Disk\
 Ventoy2Disk.exe VTOYCLI /U /Drive:%drivepath%:
 cd %maindir%
 goto installver
 
 :installver
-title Medicat Installer [INSTALL!]
+title Medicat Installer [INSTALLING]
 if exist "%CD%\MediCat.USB.v%medicatver%.7z" (goto install4) else (goto installversion2)
 :installversion2
 if exist "%CD%\MediCat.USB.v%medicatver%.zip.001" (goto hasher)
@@ -473,11 +473,11 @@ echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII         COULD NOT FIND THE MEDICAT FILE(S).           IIII
 echo.IIII            (EITHER *.001 or the main .7z)             IIII
-echo.IIII             are they in The same folder?              IIII
+echo.IIII             Are they in the same folder?              IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
-echo.IIII           WOULD YOU LIKE TO DOWNLOAD THEM?            IIII
-echo.IIII       SELECTING NO WILL LET YOU FIND THE FILE.        IIII
+echo.IIII           Would you like to download them?            IIII
+echo.IIII       Selecting no will let you find the file.        IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 call Button 10 12 F2 "YES" 46 12 F4 "NO" X _Var_Box _Var_Hover
@@ -500,7 +500,7 @@ echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
 echo.IIII                                                       IIII
-echo.IIII        THE INSTALLER COULD NOT FIND MEDICAT           IIII
+echo.IIII        THE INSTALLER COULD NOT FIND MEDICAT!          IIII
 echo.IIII                                                       IIII
 echo.IIII          PLEASE MANUALLY SELECT THE FILE!             IIII
 echo.IIII                                                       IIII
@@ -559,11 +559,11 @@ exit
 
 :finisherror
 echo.[41m
-echo.Error has occured. Please look above.
-echo.If you come to the discord for support we will need this error. 
+echo.An error has occurred. Please look above.
+echo.If you come to the Discord for support, we will need this error. 
 echo.COMMON ERRORS: 
-echo.Error: Unexpected end of archive		FIX: Redownload Main File.  (download issue)
-echo.Error: Cannot find the path specified	FIX: Check Disk is Mounted. (ventoy issue)
+echo.Error: Unexpected end of archive		FIX: Redownload main file.  (download issue)
+echo.Error: Cannot find the path specified	FIX: Check disk is mounted. (ventoy issue)
 echo.[0m
 pause
 exit
@@ -596,7 +596,7 @@ start https://url.medicatusb.com/discord
 goto menu2
 
 :recheck
-for /f "delims=" %%A in ('folderbrowse.exe "Please select the drive you want to install medicat on"') do set "folder=%%A"
+for /f "delims=" %%A in ('folderbrowse.exe "Please select the drive you want to install Medicat on"') do set "folder=%%A"
 set drivepath=%folder:~0,1%
 curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -o %drivepath%:/CheckFiles.bat -s -L
 cd /d %drivepath%:
