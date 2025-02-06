@@ -9,6 +9,10 @@ MedicatVersion="v21.12"
 Medicat256Hash='a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4'
 Medicat7zFile="MediCat.USB.$MedicatVersion.7z"
 Medicat7zFull=''MediCat\ USB\ $MedicatVersion/MediCat.USB.$MedicatVersion.7z''
+#Google Drive Files.
+Medicat7zGD1=""
+Medicat7zGD1Hash=""
+
 
 # Dependencies
 declare -A depCommands
