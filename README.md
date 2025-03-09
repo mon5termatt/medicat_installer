@@ -84,6 +84,7 @@ curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/
     </tr>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/SuperRedPanda1"><img src="https://avatars.githubusercontent.com/u/120546867?v=4?s=100" width="100px;" alt="SuperRedPanda1"/><br /><sub><b>SuperRedPanda1</b></sub></a><br /><a href="#code-SuperRedPanda1" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Teknoist"><img src="https://avatars.githubusercontent.com/u/37031361?v=4?s=100" width="100px;" alt="Mahmut Sözen"/><br /><sub><b>Mahmut Sözen</b></sub></a><br /><a href="#code-Teknoist" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
