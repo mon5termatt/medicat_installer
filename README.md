@@ -76,6 +76,7 @@ curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/SkeletonMan03"><img src="https://avatars.githubusercontent.com/u/96273359?v=4?s=100" width="100px;" alt="Lord SkeletonMan"/><br /><sub><b>Lord SkeletonMan</b></sub></a><br /><a href="#code-SkeletonMan03" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="http://edm115.dev"><img src="https://avatars.githubusercontent.com/u/82015596?v=4?s=100" width="100px;" alt="EDM115"/><br /><sub><b>EDM115</b></sub></a><br /><a href="#code-EDM115" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Ludo-code"><img src="https://avatars.githubusercontent.com/u/56892223?v=4?s=100" width="100px;" alt="Ludovic"/><br /><sub><b>Ludovic</b></sub></a><br /><a href="#code-Ludo-code" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
