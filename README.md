@@ -1,4 +1,4 @@
-# Work on this script is currently on pause. im working full time being a IT tech and Trainer. Sorry.
+### Work on this script is currently on pause. Im working full time being a IT tech and Trainer, along with going back to college, Sorry.
 
 # Medicat Installer
 ![Logo](icon.png)
