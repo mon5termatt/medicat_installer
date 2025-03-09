@@ -89,6 +89,7 @@ curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/
       <td align="center" valign="top" width="14.28%"><a href="http://benhampson.co.uk"><img src="https://avatars.githubusercontent.com/u/77866043?v=4?s=100" width="100px;" alt="Ben Hampson"/><br /><sub><b>Ben Hampson</b></sub></a><br /><a href="#code-ben-hampson" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://fedoraproject.org/wiki/User:Eclipseo"><img src="https://avatars.githubusercontent.com/u/30413512?v=4?s=100" width="100px;" alt="Robert-André Mauchin"/><br /><sub><b>Robert-André Mauchin</b></sub></a><br /><a href="#code-eclipseo" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/id3v1669"><img src="https://avatars.githubusercontent.com/u/57532211?v=4?s=100" width="100px;" alt="id3v1669"/><br /><sub><b>id3v1669</b></sub></a><br /><a href="#code-id3v1669" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="http://link.itrio.pet"><img src="https://avatars.githubusercontent.com/u/15737258?v=4?s=100" width="100px;" alt="Itrio"/><br /><sub><b>Itrio</b></sub></a><br /><a href="#code-itsitrio" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
