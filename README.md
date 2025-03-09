@@ -78,6 +78,7 @@ curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/
       <td align="center" valign="top" width="14.28%"><a href="http://edm115.dev"><img src="https://avatars.githubusercontent.com/u/82015596?v=4?s=100" width="100px;" alt="EDM115"/><br /><sub><b>EDM115</b></sub></a><br /><a href="#code-EDM115" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Ludo-code"><img src="https://avatars.githubusercontent.com/u/56892223?v=4?s=100" width="100px;" alt="Ludovic"/><br /><sub><b>Ludovic</b></sub></a><br /><a href="#code-Ludo-code" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Manganar"><img src="https://avatars.githubusercontent.com/u/22703860?v=4?s=100" width="100px;" alt="David Thomson"/><br /><sub><b>David Thomson</b></sub></a><br /><a href="#code-Manganar" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://dablog.pages.dev"><img src="https://avatars.githubusercontent.com/u/42101257?v=4?s=100" width="100px;" alt="Ronald Cantillo"/><br /><sub><b>Ronald Cantillo</b></sub></a><br /><a href="#code-Rooyca" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
