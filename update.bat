@@ -25,9 +25,18 @@ set ver=%ver:~-4%
 del ver.ini /Q
 echo.Version %ver% found
 curl https://github.com/mon5termatt/medicat_installer/releases/download/%ver%/Medicat_Installer.bat -o Medicat_Installer.bat -q -L
-REM Check if the download was successful
+REM Check if the download was successful and file is not empty
 IF NOT EXIST "Medicat_Installer.bat" (
     echo ERROR: Failed to download the new file.
+    REM Restore the backup if it exists
+    IF EXIST "Medicat Installer.bat.bak" (
+        copy "Medicat Installer.bat.bak" "Medicat Installer.bat"
+    )
+    pause
+    exit /b 1
+)
+FOR %%I IN ("Medicat_Installer.bat") DO IF %%~zI==0 (
+    echo ERROR: Downloaded file is empty.
     REM Restore the backup if it exists
     IF EXIST "Medicat Installer.bat.bak" (
         copy "Medicat Installer.bat.bak" "Medicat Installer.bat"

@@ -7,5 +7,4 @@ $Response = Invoke-RestMethod -Uri $Uri1 -Method Get
 $Translation1 = $Response[0].SyncRoot | foreach { $_[0] }
 
 write-host $Translation1
-write-host "~ Matt"
-### write-host "https://discord.gg/medicat"
+write-host "https://discord.gg/medicat"

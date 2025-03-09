@@ -1,7 +1,14 @@
 @echo off
-wget https://dist.ipfs.tech/ipget/v0.9.1/ipget_v0.9.1_windows-amd64.zip -q
-7z x ipget_v0.9.1_windows-amd64.zip
-DEL ipget_v0.9.1_windows-amd64.zip /Q
+
+echo Disclaimer: This script is not affiliated with IPFS or the developers of ipget.
+echo Also, I think that the file is down. It doesnt appear to be downloading.
+
+set /p CONFIRM="Would you like to proceed anyway? (Y/N): "
+if /i "%CONFIRM%" NEQ "Y" exit /b
+
+curl -L -o ipget_v0.9.2_windows-amd64.zip https://dist.ipfs.tech/ipget/v0.9.2/ipget_v0.9.2_windows-amd64.zip -s
+7z x ipget_v0.9.2_windows-amd64.zip
+DEL ipget_v0.9.2_windows-amd64.zip /Q
 MOVE ".\ipget\ipget.exe" ".\ipget.exe"
 RD /S /Q "ipget"
 :check
