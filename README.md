@@ -80,6 +80,7 @@ curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Manganar"><img src="https://avatars.githubusercontent.com/u/22703860?v=4?s=100" width="100px;" alt="David Thomson"/><br /><sub><b>David Thomson</b></sub></a><br /><a href="#code-Manganar" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://dablog.pages.dev"><img src="https://avatars.githubusercontent.com/u/42101257?v=4?s=100" width="100px;" alt="Ronald Cantillo"/><br /><sub><b>Ronald Cantillo</b></sub></a><br /><a href="#code-Rooyca" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Samega7Cattac"><img src="https://avatars.githubusercontent.com/u/25128554?v=4?s=100" width="100px;" alt="Samega7Cattac"/><br /><sub><b>Samega7Cattac</b></sub></a><br /><a href="#code-Samega7Cattac" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Sipper1236"><img src="https://avatars.githubusercontent.com/u/82241081?v=4?s=100" width="100px;" alt="Sipping "/><br /><sub><b>Sipping </b></sub></a><br /><a href="#code-Sipper1236" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
