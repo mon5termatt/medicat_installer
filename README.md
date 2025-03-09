@@ -67,8 +67,16 @@ curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/
   5. [Getlen](https://github.com/TheBATeam/Getlen-Function-2.0-by-Kvc)
 
 # Credits
-<!-- readme: contributors -start -->
-<!-- readme: contributors -end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
 * Along with all the others helping in the Discord server!
 
   ## Star History
