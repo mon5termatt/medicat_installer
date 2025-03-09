@@ -16,8 +16,8 @@ set file11=1SJxlEyIGwbOZBr4OV4fdS23xnl0NTgH4
 set file12=1jSYbrQFqg5rhOMWy_kWW_nuGCcZ-VfuK
 
 if exist "%CD%\WPy%bit%-31080\" (goto download)
-wget https://github.com/winpython/winpython/releases/download/13.1.202502222final/Winpython64-3.12.9.0dot.exe
-Winpython%bit%-3.10.8.0dot.exe -y
+wget https://github.com/winpython/winpython/releases/download/13.1.202502222final/Winpython%bit%-3.12.9.0dot.exe
+Winpython%bit%-3.12.9.0dot.exe -y
 :download
 cd WPy%bit%-31080\scripts
 call env_for_icons.bat
