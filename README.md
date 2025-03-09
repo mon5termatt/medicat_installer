@@ -75,6 +75,7 @@ curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/
   <tbody>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/SkeletonMan03"><img src="https://avatars.githubusercontent.com/u/96273359?v=4?s=100" width="100px;" alt="Lord SkeletonMan"/><br /><sub><b>Lord SkeletonMan</b></sub></a><br /><a href="#code-SkeletonMan03" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/FabienRCT"><img src="https://avatars.githubusercontent.com/u/56532663?v=4?s=100" width="100px;" alt="FabienRCT"/><br /><sub><b>FabienRCT</b></sub></a><br /><a href="#code-FabienRCT" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
