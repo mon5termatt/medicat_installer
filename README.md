@@ -95,6 +95,7 @@ curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/keelnar"><img src="https://avatars.githubusercontent.com/u/198622?v=4?s=100" width="100px;" alt="Neelnavo Kar"/><br /><sub><b>Neelnavo Kar</b></sub></a><br /><a href="#code-keelnar" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/randompersononinternet69"><img src="https://avatars.githubusercontent.com/u/107446530?v=4?s=100" width="100px;" alt="a random person on the internet"/><br /><sub><b>a random person on the internet</b></sub></a><br /><a href="#code-randompersononinternet69" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/shenqingyi9"><img src="https://avatars.githubusercontent.com/u/37582641?v=4?s=100" width="100px;" alt="La vaguelette"/><br /><sub><b>La vaguelette</b></sub></a><br /><a href="#code-shenqingyi9" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/tolgabalper"><img src="https://avatars.githubusercontent.com/u/60055681?v=4?s=100" width="100px;" alt="Tolga Boran Alper"/><br /><sub><b>Tolga Boran Alper</b></sub></a><br /><a href="#code-tolgabalper" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
