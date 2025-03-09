@@ -106,6 +106,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "eclipseo",
+      "name": "Robert-André Mauchin",
+      "avatar_url": "https://avatars.githubusercontent.com/u/30413512?v=4",
+      "profile": "https://fedoraproject.org/wiki/User:Eclipseo",
+      "contributions": [
+        "code"
+      ]
     }
   ]
 }
