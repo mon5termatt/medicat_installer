@@ -17,7 +17,7 @@ OR:
 
 # Compatibility
 * Windows 10/11 (Insider builds might break the installer)
-* Ubuntu / Arch / Debian / CentOS / FreeBSD / Fedora
+* Ubuntu / Arch / Debian / CentOS / FreeBSD / Fedora / Nobara
 
 #### Requirements for Windows
 * Windows 1703+ (releases after 2017)
