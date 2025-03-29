@@ -90,7 +90,7 @@ echo.IIII               SOME OF THE TOOLS WORK.                 IIII
 echo.IIII                                                       IIII
 echo.IIII         WE CANT DO ANYTHING TO CHANGE THAT.           IIII
 echo.IIII       IF YOU DON'T TRUST THE TOOL, DON'T USE IT.      IIII
-echo.IIII         GIANT THANKS, MON5TERMATT AND JAYRO           IIII
+echo.IIII        GIANT THANKS, MON5TERMATT , JAYRO, AAA3A       IIII
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II[0m
 echo.Please wait for 5 seconds, and read the above.  
