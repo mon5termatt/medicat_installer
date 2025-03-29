@@ -19,4 +19,4 @@ $Translation1 = $Response[0].SyncRoot | foreach { $_[0] }
 } 
 
 write-host $Translation1
-write-host "https://discord.gg/medicat"    
+#write-host "https://discord.gg/medicat"    
