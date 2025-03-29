@@ -1,6 +1,6 @@
 $TargetLanguage = $Args[0]
 
-$text1 = "Rest in peace Novaspirit Tech. Thanks for the vids."
+$text1 = "Welcome Flipper nerds!"
 
 $Uri1 = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$text1"
 $Response = Invoke-RestMethod -Uri $Uri1 -Method Get
