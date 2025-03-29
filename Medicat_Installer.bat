@@ -83,7 +83,7 @@ exit
 echo.[41m
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
-echo.IIII                      WARNING!!!                       IIII
+echo.IIII                       WARNING                         IIII
 echo.IIII           MEDICAT CONTAINS TOOLS THAT MAY             IIII
 echo.IIII          TRIGGER YOUR ANTIVIRUS DUE TO HOW            IIII
 echo.IIII               SOME OF THE TOOLS WORK.                 IIII
@@ -320,9 +320,12 @@ set drivepath=%folder:~0,1%
 IF "%drivepath%" == "~0,1" GOTO install2
 echo.Installing to (%drivepath%). If this is correct just hit enter.
 echo.[41m
+
+:: FIX THE !!!. ITS BROKEN
+
 echo.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 echo.PLEASE CONFIRM NOW THAT THIS IS YOUR USB DRIVE.
-echo.MEDICAT IS NOT RESPOSIBLE FOR WIPED HARD DRIVES.
+echo.MEDICAT IS NOT RESPONSIBLE FOR WIPED HARD DRIVES.
 echo.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 echo.[0m waiting for 5 seconds...
 PING localhost -n 6 >NUL
