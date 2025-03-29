@@ -342,7 +342,7 @@ mode con:cols=64 lines=18
 echo.II-----------------------------------------------------------II
 echo.II-----------------------------------------------------------II
 echo.IIII                                                       IIII
-echo.IIII                                                       IIII
+echo.IIII                    (NOT CHATGPT)                      IIII
 echo.IIII              WOULD YOU LIKE TO USE GPT?               IIII
 echo.IIII                                                       IIII
 echo.IIII              Most computers should be OK              IIII
