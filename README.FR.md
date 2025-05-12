@@ -10,7 +10,7 @@
 
 # Compatibilité
 * Windows 10/11 (les versions Insider ne sont pas toujours supportées)
-* Ubuntu / Arch / Debian / CentOS / FreeBSD / Fedora
+* Ubuntu / Arch / Debian / CentOS / FreeBSD / Fedora / OpenSUSE Tumbleweed
 
 #### Prérequis pour Windows
 * Windows 1703+ (les versions sorties après 2017)
