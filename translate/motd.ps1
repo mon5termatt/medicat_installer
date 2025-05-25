@@ -11,7 +11,7 @@ $text1 = "Happy April Fools Day"
 Start-Process "https://coin.medicatusb.com/"
 } else {
 # Normal Text (Updated every once in a while.)
-$text1 = "Welcome Flipper nerds!"
+$text1 = "If you or a loved one has been diagnosed with a broken computer, you are in the right place."
 } 
 
 $Uri1 = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$text1"
