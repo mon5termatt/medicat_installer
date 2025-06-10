@@ -527,17 +527,20 @@ mode con:cols=100 lines=20
 set file="MediCat.USB.v21.12.7z"
 set sha256=a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4
 set sha1=2cbf5f337849a11084124a79a1b8d7e77eaca7d5
+echo.Below is the 7z output. If an error occurs. we will need the logs starting from THIS LINE.
 7z x -O%drivepath%: %file% -r -aoa
 goto finishup
 
 :install5
 mode con:cols=100 lines=20
 set file="MediCat.USB.v%medicatver%.zip.001"
+echo.Below is the 7z output. If an error occurs. we will need the logs starting from THIS LINE.
 7z x -O%drivepath%: %file% -r -aoa
 goto finishup
 
 :install6
 mode con:cols=100 lines=20
+echo.Below is the 7z output. If an error occurs. we will need the logs starting from THIS LINE.
 7z x -O%drivepath%: "%file%" -r -aoa
 goto finishup
 
@@ -564,6 +567,7 @@ exit
 echo.[41m
 echo.An error has occurred. Please look above.
 echo.If you come to the Discord for support, we will need this error. 
+echo.If you do not include what is above. we cannot help you.
 echo.COMMON ERRORS: 
 echo.Error: Unexpected end of archive		FIX: Redownload main file.  (download issue)
 echo.Error: Cannot find the path specified	FIX: Check disk is mounted. (ventoy issue)
