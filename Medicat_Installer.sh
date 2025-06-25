@@ -22,7 +22,7 @@ wget["default"]="wget"
 declare -A zip
 zip["arch"]="p7zip"
 zip["nixos"]="nixos.p7zip"
-zip["fedora"]="p7zip-full p7zip-plugins"
+zip["fedora"]="p7zip p7zip-plugins"
 zip["nobara"]="p7zip-full p7zip-plugins"
 zip["centos"]="p7zip p7zip-plugins"
 zip["alpine"]="7zip"
