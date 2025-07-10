@@ -10,7 +10,7 @@ $text1 = "Happy April Fools Day"
 Start-Process "https://coin.medicatusb.com/"
 } else {
 # Normal Text (Updated every once in a while.)
-$text1 = "Happy Pride Month."
+$text1 = "If you or a loved one has been diagnosed with a broken computer, you may be asked to help now..."
 } 
 # This one is gold, save it. 
 # If you or a loved one has been diagnosed with a broken computer, you may be asked to help now...
