@@ -1,0 +1,132 @@
+---
+alwaysApply: true
+---
+
+# MediCat Installer - PowerShell GUI Application
+
+## Project Overview
+This is a PowerShell-based GUI installer for MediCat USB bootable media. The script provides a modern Windows Forms interface for downloading, installing Ventoy, and extracting MediCat archives to USB drives.
+
+## Architecture & Design Patterns
+
+### Core Components
+- **Windows Forms GUI**: Uses System.Windows.Forms for the user interface
+- **Administrator Elevation**: Automatic UAC elevation with working directory preservation
+- **Comprehensive Logging**: Dual logging to file and UI with debug levels
+- **Background Jobs**: Long-running operations (downloads, extractions) run in background jobs
+- **Thread-Safe UI Updates**: Uses `form.Invoke()` with delegates for cross-thread UI updates
+
+### Key Design Principles
+1. **Fail-Safe Operations**: All operations include error handling and logging
+2. **User Experience**: Real-time progress updates and status messages
+3. **Flexibility**: Support for both fresh installs and Ventoy upgrades
+4. **Debugging**: Extensive debug logging with configurable verbosity
+
+## Code Structure & Conventions
+
+### Global Variables (script: scope)
+- `$script:LogFile` - Log file path
+- `$script:LastLoggedProgress` - Progress throttling
+- `$script:DownloadPath` - Download directory
+- `$script:MediCatVersion` - MediCat version string
+- `$script:LocalVersion` - Installer version
+- `$script:DebugMode` - Debug logging toggle
+
+### Function Naming Conventions
+- `Write-Log` - General logging with UI and file output
+- `Write-DebugLog` - Debug-only logging (respects DebugMode)
+- `Update-Status` - UI status label updates
+- `Update-Progress` - Progress bar updates with throttling
+- `Show-MessageBox` - Centralized message box with logging
+- `Get-DriveList` - Drive enumeration and filtering
+- `Test-VentoyInstalled` - Ventoy installation detection
+- `Install-Ventoy` - Ventoy installation/upgrade
+- `Start-MediatInstallation` - Main installation workflow
+
+### Error Handling Patterns
+```powershell
+try {
+    # Operation
+} catch {
+    Write-Log "ERROR: $($_.Exception.Message)"
+    Write-DebugLog "Exception type: $($_.Exception.GetType().Name)"
+    # Continue or return based on severity
+}
+```
+
+### UI Update Patterns
+```powershell
+# Thread-safe UI updates from background jobs
+$form.Invoke([System.Action[string]]{
+    param($msg)
+    $logTextBox.AppendText("$msg`r`n")
+    $logTextBox.ScrollToCaret()
+}, $message)
+```
+
+## Key Features & Functionality
+
+### Drive Management
+- **Dynamic Drive Detection**: USB drives, VHD/VHDX files, optional HDD inclusion
+- **Drive Filtering**: Excludes C: drive, configurable HDD visibility
+- **VHD/VHDX Support**: Automatic detection of virtual hard drives
+- **Ventoy Detection**: Checks for existing VTOYEFI partitions
+
+### Ventoy Integration
+- **Automatic Download**: Fetches latest Ventoy version from GitHub API
+- **Installation Modes**: Fresh install vs. non-destructive upgrade
+- **Drive Formatting**: Optional NTFS formatting (user-controlled)
+- **Error Handling**: Comprehensive Ventoy CLI error capture
+
+### Archive Extraction
+- **PowerShell Module Priority**: Prefers 7Zip4PowerShell over 7z.exe
+- **Progress Monitoring**: Real-time progress via file system monitoring
+- **Background Processing**: Extraction runs in background jobs
+- **Fallback Support**: Multiple extraction methods available
+
+### Logging System
+- **Dual Output**: Simultaneous file and UI logging
+- **Message Classification**: Status, Progress, Debug, MessageBox logging
+- **Throttling**: Progress updates throttled to prevent log spam
+- **Persistence**: All operations logged to `medicat_download.log`
+
+## Development Guidelines
+
+### When Adding New Features
+1. **Follow Existing Patterns**: Use established error handling and logging patterns
+2. **Thread Safety**: Use `form.Invoke()` for UI updates from background operations
+3. **Comprehensive Logging**: Log all user interactions and system operations
+4. **Error Recovery**: Provide meaningful error messages and recovery options
+5. **User Experience**: Update status and progress for long-running operations
+
+### Code Style Requirements
+- **Consistent Indentation**: 4 spaces for PowerShell blocks
+- **Function Documentation**: Include parameter descriptions and purpose
+- **Variable Naming**: Use descriptive names, prefix script variables with `$script:`
+- **Error Messages**: Use `Write-Log` for errors, `Write-DebugLog` for debugging
+- **UI Updates**: Always use `Update-Status` and `Update-Progress` for UI feedback
+
+### Testing Considerations
+- **Admin Privileges**: Script requires elevation for disk operations
+- **Drive Selection**: Test with various drive types (USB, VHD, HDD)
+- **Network Operations**: Handle offline scenarios gracefully
+- **Large Files**: Test with 24GB MediCat archive extraction
+- **Error Scenarios**: Test Ventoy installation failures and recovery
+
+## File Dependencies
+- **MediCat.USB.v21.12.7z**: Main MediCat archive (24GB)
+- **Ventoy2Disk/**: Ventoy installation directory (auto-downloaded)
+- **7Zip4PowerShell**: PowerShell module for archive extraction
+- **medicat_download.log**: Comprehensive operation log
+
+## Security Considerations
+- **Administrator Rights**: Required for disk operations and Ventoy installation
+- **File Integrity**: MD5 verification for downloaded files
+- **Safe Operations**: Confirmation dialogs for destructive operations
+- **Logging**: All operations logged for audit trail
+
+## Performance Considerations
+- **Background Jobs**: Long operations don't block UI
+- **Progress Throttling**: Prevents excessive logging
+- **Memory Management**: Proper cleanup of background jobs
+- **File System Monitoring**: Efficient progress tracking for extractions
