@@ -1,0 +1,33 @@
+# MediCat Main Archive
+MediCat.USB.v*.7z
+*.7z
+
+# Ventoy2Disk Directory
+Ventoy2Disk/
+
+# Log Files
+*.log
+medicat_download.log
+test_*.log
+*_7zipwrapper_*.log
+
+# Temporary extraction/test directories
+test_extract/
+extracted_medicat/
+TestOutput_*/
+
+# 7-Zip temporary files
+7z_output.tmp
+7z_error.tmp
+medicat_extract_list_*.txt
+ventoy_stdout_*.txt
+ventoy_stderr_*.txt
+
+# PowerShell temporary files
+failed_files.txt
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
