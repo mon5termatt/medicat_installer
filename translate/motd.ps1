@@ -11,7 +11,7 @@ $text1 = "Happy April Fools Day"
 } else {
 
 # Normal Text (Updated every once in a while.)
-$text1 = "If you or a loved one has been diagnosed with a broken computer, you may be asked to help now..."
+$text1 = "Happy Holidays on behalf of the Medicat USB team!"
 } # Close Loop
 
 ### Saved messages
