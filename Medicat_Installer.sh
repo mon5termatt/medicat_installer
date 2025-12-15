@@ -177,6 +177,11 @@ if grep -qs "ubuntu" /etc/os-release; then
 	pkgmgr="apt"
 	install_arg="install"
 	update_arg="update"
+elif grep -qs "opensuse-tumbleweed" /etc/os-release; then
+        os="opensuse-tumbleweed"
+        pkgmgr="zypper"
+        install_arg="install"
+        update_arg="dist-upgrade"
 elif grep -qs "freebsd" /etc/os-release; then
 	os="freebsd"
 	pkgmgr="pkg"

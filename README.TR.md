@@ -17,7 +17,7 @@ VEYA:
 
 # Uyumluluk
 * Windows 10/11 (Insider her zaman desteklenmez)
-* Ubuntu / Arch / Debian / CentOS / FreeBSD / Fedora
+* Ubuntu / Arch / Debian / CentOS / FreeBSD / Fedora / OpenSUSE Tumbleweed
 
 #### Windows için Gereksinimler
 * Windows 1703+ (2017'den sonra yayımlananlar)
