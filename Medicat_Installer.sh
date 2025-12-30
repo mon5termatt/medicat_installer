@@ -239,50 +239,123 @@ elif  [[ -f "$Medicat7zFull" ]]; then
 	location="$Medicat7zFull"
 	colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFull\n"
 else
-	colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to download it via bittorrent."
+	colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to choose between download through MedicatUSB cdn or bittorrent."
 	read location
 fi
+if $(YesNo "Are you wanting to download medicat from bittorrent? If no the fallback is the Medicat cdn. (Y/N) "); then
+	colEcho $cyanB "Acquiring any dependencies for bittorent download..."
 
-colEcho $cyanB "Acquiring any dependencies..."
+	if [ -z "$location" ] ; then
+		depCommands["aria2c"]="aria"
+	fi
 
-if [ -z "$location" ] ; then
-	depCommands["aria2c"]="aria"
-fi
-
-if $ventoyFS ; then
-    dependenciesHandler
-	downloadVentoy
-else
-	colEcho $cyanB "INFO: Handling ventoy as a package."
-	depCommands["ventoy"]="ventoy"
-	dependenciesHandler
-	ventoyLauncher="ventoy"
-fi
+	if $ventoyFS ; then
+		dependenciesHandler
+		downloadVentoy
+	else
+		colEcho $cyanB "INFO: Handling ventoy as a package."
+		depCommands["ventoy"]="ventoy"
+		dependenciesHandler
+		ventoyLauncher="ventoy"
+	fi
 
 # Download the missing Medicat 7z file
-if [ -z "$location" ] ; then
-	colEcho $cyanB "Starting to download Medicat via bittorrent"
-	wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_$MedicatVersion.torrent -O medicat.torrent
-	aria2c --file-allocation=none --seed-time=0 medicat.torrent
-	location="$Medicat7zFull"
-	colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"
-fi
+	if [ -z "$location" ] ; then
+		colEcho $cyanB "Starting to download Medicat via bittorrent"
+		wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_$MedicatVersion.torrent -O medicat.torrent
+		aria2c --file-allocation=none --seed-time=0 medicat.torrent
+		location="$Medicat7zFull"
+		colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"
+	fi
 
 # Check the SHA256 hash of the Medicat zip file.
-colEcho $cyanB "Checking SHA256 hash of$whiteB $Medicat7zFile$cyanB..."
+	colEcho $cyanB "Checking SHA256 hash of$whiteB $Medicat7zFile$cyanB..."
 
-checksha256=$(sha256sum "$location" | awk '{print $1}')
+	checksha256=$(sha256sum "$location" | awk '{print $1}')
 
-if [[ "$checksha256" != "$Medicat256Hash" ]]; then
-	colEcho $redB "$Medicat7zFile SHA256 hash does not match."
-	colEcho $redB "File may be corrupted or compromised."
-	colEcho $cyanB "Hash is$whiteB $checksha256"
-	colEcho $cyanB "Exiting..."
-	exit 1
+	if [[ "$checksha256" != "$Medicat256Hash" ]]; then
+		colEcho $redB "$Medicat7zFile SHA256 hash does not match."
+		colEcho $redB "File may be corrupted or compromised."
+		colEcho $cyanB "Hash is$whiteB $checksha256"
+		colEcho $cyanB "Exiting..."
+		exit 1
+	else
+		colEcho $greenB "$Medicat7zFile SHA256 hash matches."
+		colEcho $cyanB "Hash is$whiteB $checksha256"
+		colEcho $cyanB "Safe to proceed..."
+	fi
 else
-	colEcho $greenB "$Medicat7zFile SHA256 hash matches."
-	colEcho $cyanB "Hash is$whiteB $checksha256"
-	colEcho $cyanB "Safe to proceed..."
+	if $ventoyFS ; then
+		dependenciesHandler
+		downloadVentoy
+	else
+		colEcho $cyanB "INFO: Handling ventoy as a package."
+		depCommands["ventoy"]="ventoy"
+		dependenciesHandler
+		ventoyLauncher="ventoy"
+	fi
+
+# Define Download server
+	srv1="https://files.medicatusb.com/files/${MedicatVersion}/${Medicat7zFile}"
+	srv2="https://files.dog/OD%%20Rips/MediCat/${MedicatVersion}/${Medicat7zFile}"
+	srv3="https://cdn.tcbl.dev/medicat/${Medicat7zFile}"
+	referer="https://installer.medicatusb.com"
+
+	echo "Testing download speeds from available servers..."
+
+	best_speed=0
+	best_server=""
+
+# Check download speed loop
+	for i in 1 2 3; do
+		eval server=\$srv$i
+		echo "Testing $server"
+
+	result=$(curl --referer "$referer" --max-time 3 "$server" --output "test${i}.tmp" --silent --write-out "%{speed_download}")
+	speed=$(( result / 1000000 ))
+
+	if (( $(echo "$speed > $best_speed" | bc -l) )); then
+		best_speed=$speed
+		best_server=$server
+	else
+		echo "Speed: connection failed"
+	fi
+	if [ -e test.tmp ]; then
+		rm test${i}.tmp
+	fi
+	done
+
+	if [ -z "$best_server" ]; then
+		colEcho $redB "\nERROR: No valid server found."
+		colEcho $blueN "Please check your internet connection and try again."
+		sleep 5
+		exit 1
+	fi
+
+# Download the missing Medicat 7z file
+	if [ -z "$location" ] ; then
+		colEcho $cyanB "Starting to download Medicat via fastest cdn ($best_server with speed $best_speed)"
+		wget --referer="$referer" --progress=bar "$best_server"
+		location="$Medicat7zFull"
+		colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"
+	fi
+
+# Check the SHA256 hash of the Medicat zip file.
+	colEcho $cyanB "Checking SHA256 hash of$whiteB $Medicat7zFile$cyanB..."
+
+	checksha256=$(sha256sum "$location" | awk '{print $1}')
+
+	if [[ "$checksha256" != "$Medicat256Hash" ]]; then
+		colEcho $redB "$Medicat7zFile SHA256 hash does not match."
+		colEcho $redB "File may be corrupted or compromised."
+		colEcho $cyanB "Hash is$whiteB $checksha256"
+		colEcho $cyanB "Exiting..."
+		exit 1
+	else
+		colEcho $greenB "$Medicat7zFile SHA256 hash matches."
+		colEcho $cyanB "Hash is$whiteB $checksha256"
+		colEcho $cyanB "Safe to proceed..."
+	fi
 fi
 
 # Advise user to connect and select the required USB device.
