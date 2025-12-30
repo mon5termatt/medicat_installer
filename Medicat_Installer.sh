@@ -320,7 +320,7 @@ else
 	else
 		echo "Speed: connection failed"
 	fi
-	if [ -e test.tmp ]; then
+	if [ -e test${i}.tmp ]; then
 		rm test${i}.tmp
 	fi
 	done
