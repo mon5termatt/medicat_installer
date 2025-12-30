@@ -243,7 +243,7 @@ else
 	read location
 	file_name="$(basename "$location")"
  	if [ -f "$location" ] && [ "$file_name" = "$Medicat7zFile" ]; then
- 		colEcho $blueB "7Z file found:$clear $location"
+ 		colEcho $blueB "7Z file found:$whiteB $location"
 	else
 		colEcho $redB "Invalid path or name."
 		colEcho $blueB "Name needed by the file:$whiteB $Medicat7zFile"
@@ -317,7 +317,7 @@ else
 		if [ -z "$location" ] ; then
 			colEcho $cyanB "Starting to download Medicat via fastest cdn ($best_server with speed $best_speed)"
 			wget --referer="$referer" --progress=bar "$best_server"
-			location="$Medicat7zFull"
+			location="$Medicat7zFile"
 			colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"
 		fi
 		fi
