@@ -47,7 +47,7 @@ ventoy["default"]="ventoy"
 # Other Variables
 sudo="sudo" # By default use sudo with package manager
 ventoyFS=true  # By default install ventoy from github(FromSource)
-ventoyLauncher="sh ./ventoy/Ventoy2Disk.sh" # By default use the ventoy script
+ventoyLauncher="sh ./Ventoy2Disk.sh" # By default use the ventoy script
 
 # Check if the terminal supports colour and set up variables if it does.
 NumColours=$(tput colors)
@@ -385,6 +385,15 @@ colEcho $cyanB "Installing Ventoy on$whiteB $drive"
 colEcho $blueB "MBR at max can do up to approximately 2.2 TB and will work with older BIOS systems and UEFI systems that support legacy operating systems. GPT can do up to 18 exabytes and will work with UEFI systems."
 if $(YesNo "Device partition layout defaults to MBR.  Would you like to use GPT instead? (Y/N)"); then
 	colEcho $yellowB "Using GPT"
+# Before launching ventoy install, moving to ventoy dir
+	if [ -d ventoy ]; then
+		colEcho $blueB "Moving to ventoy dir"
+		cd ventoy
+	else
+		colEcho $redB "Ventoy directory not fount exiting..."
+		wait 5
+		exit 1
+	fi
 	sudo $ventoyLauncher -I -g $drive
 	if [ "$?" != "0" ]; then
 		colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
@@ -392,12 +401,25 @@ if $(YesNo "Device partition layout defaults to MBR.  Would you like to use GPT 
 	fi
 else
 	colEcho $yellowB "Using MBR"
+# Before launching ventoy install, moving to ventoy dir
+	if [ -d ventoy ]; then
+		colEcho $blueB "Moving to ventoy dir"
+		cd ventoy
+	else
+		colEcho $redB "Ventoy directory not fount exiting..."
+		wait 5
+		exit 1
+	fi
 	sudo $ventoyLauncher -I $drive
 	if [ "$?" != "0" ]; then
 		colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
 		exit 1
 	fi
 fi
+
+# Back to medicat folder after Ventoy Install
+	colEcho $blueB "Back to the medicat folder"
+	cd ..
 
 colEcho $cyanB "Unmounting drive$whiteB $drive"
 sudo umount $drive
