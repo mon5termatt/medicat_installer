@@ -207,9 +207,9 @@ elif [[ -e /etc/almalinux-release || -e /etc/rocky-release || -e /etc/centos-rel
 	update_arg="update"
 elif [[ -e /etc/fedora-release ]]; then
 	os="fedora"
-	pkgmgr="yum"
+	pkgmgr="dnf"
 	install_arg="install"
-	update_arg="update"
+	update_arg="upgrade"
 elif [[ -e /etc/nobara ]]; then
 	colEcho $redB "gaming moment"
 	os="fedora"
