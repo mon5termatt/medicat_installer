@@ -13,9 +13,12 @@ Medicat7zFull=''MediCat\ USB\ $MedicatVersion/MediCat.USB.$MedicatVersion.7z''
 # Dependencies
 declare -A depCommands
 depCommands["wget"]="wget"
+depCommands["curl"]="curl"
 depCommands["7z"]="zip"
 depCommands["mkfs.vfat"]="mkfs"
 depCommands["mkntfs"]="ntfs"
+declare -A curl
+curl["default"]="curl"
 declare -A wget
 wget["nixos"]="nixos.wget"
 wget["default"]="wget"
@@ -252,6 +255,7 @@ else
 		if $(YesNo "${blueB}Are you wanting to download medicat from bittorrent? If no the fallback is the Medicat cdn. (Y/N) "); then
 		colEcho $cyanB "Acquiring any dependencies for bittorent download..."
 
+# Download dep for bittorent part
 		if [ -z "$location" ] ; then
 			depCommands["aria2c"]="aria"
 		fi
@@ -275,6 +279,17 @@ else
 			colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"
 		fi
 		else
+
+# Download dep for cdn part
+		if $ventoyFS ; then
+			dependenciesHandler
+			downloadVentoy
+		else
+			colEcho $cyanB "INFO: Handling ventoy as a package."
+			depCommands["ventoy"]="ventoy"
+			dependenciesHandler
+			ventoyLauncher="ventoy"
+		fi
 
 # Define Download server
 		srv1="https://files.medicatusb.com/files/${MedicatVersion}/${Medicat7zFile}"
