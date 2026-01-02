@@ -294,7 +294,7 @@ else
 # Define Download server
 		srv1="https://files.medicatusb.com/files/${MedicatVersion}/${Medicat7zFile}"
 		srv2="https://files.dog/OD%%20Rips/MediCat/${MedicatVersion}/${Medicat7zFile}"
-		srv3="https://cdn.tcbl.dev/medicat/${Medicat7zFile}"
+		srv3="https://cat.tcbl.dev/${Medicat7zFile}"
 		referer="https://installer.medicatusb.com"
 
 		colEcho $blueB "Testing download speeds from available servers..."
