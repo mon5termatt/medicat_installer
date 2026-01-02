@@ -10,7 +10,7 @@ set "REFERER=https://installer.medicatusb.com"
 :: Server URLs
 set "SERVER1=https://files.medicatusb.com/files/v21.12/%FILE_NAME%"
 set "SERVER2=https://files.dog/OD%%20Rips/MediCat/v21.12/%FILE_NAME%"
-set "SERVER3=https://cdn.tcbl.dev/medicat/%FILE_NAME%"
+set "SERVER3=https://cat.tcbl.dev/%FILE_NAME%"
 
 :check
 cls
