@@ -252,7 +252,7 @@ else
 		colEcho $blueB "Name needed by the file:$whiteB $Medicat7zFile"
 		colEcho $blueB "Name you provided:$whiteB $file_name\n"
 
-		if $(YesNo "${blueB}Are you wanting to download medicat from bittorrent? If no the fallback is the Medicat cdn. (Y/N) ${whiteB}"); then
+		if $(YesNo "${blueB}Are you wanting to download Medicat from bittorrent? If no the fallback is the Medicat cdn. (Y/N) ${whiteB}"); then
 		colEcho $cyanB "Acquiring any dependencies for bittorent download..."
 
 # Download dep for bittorent part
