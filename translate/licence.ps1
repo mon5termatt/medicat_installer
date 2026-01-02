@@ -51,4 +51,5 @@ write-host $Translation5
 write-host ""
 write-host $Translation6
 write-host ""
-write-host "Copyright (c) 2025 MediCat USB"
+write-host "Copyright (c) 2026 MediCat USB"
+
