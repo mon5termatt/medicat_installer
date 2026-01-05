@@ -56,6 +56,35 @@ if ($scriptPath) {
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# Load translation helper
+$translationHelperPath = Join-Path $PSScriptRoot "TranslationHelper.ps1"
+if (Test-Path $translationHelperPath) {
+    . $translationHelperPath
+    # Detect system language and load translations
+    $culture = [System.Globalization.CultureInfo]::CurrentCulture
+    $langCode = $culture.TwoLetterISOLanguageName
+    $supportedLanguages = @{
+        "en" = "en"
+        "es" = "es"
+        "fr" = "fr"
+    }
+    $language = if ($supportedLanguages.ContainsKey($langCode)) {
+        $supportedLanguages[$langCode]
+    } else {
+        "en"  # Default to English
+    }
+    Load-Translations -Language $language | Out-Null
+} else {
+    Write-Warning "TranslationHelper.ps1 not found. Using English (hardcoded)."
+    # Create stub functions to prevent errors
+    function Get-UITranslation { param($Key, $FormatArgs = @()) return "[$Key]" }
+    function Get-StatusTranslation { param($Key, $FormatArgs = @()) return "[$Key]" }
+    function Get-MessageTranslation { param($Key, $FormatArgs = @()) return "[$Key]" }
+    function Get-TitleTranslation { param($Key, $FormatArgs = @()) return "[$Key]" }
+    function Get-VentoyWarning { param($DriveLetter) return @{Title="Ventoy Installation Warning"; Message="Install Ventoy to $DriveLetter ?"} }
+    function Get-VentoyNotDetected { param($DriveLetter) return @{Title="Ventoy Installation Not Detected"; Message="Warning: Could not detect Ventoy on $DriveLetter"} }
+}
+
 # Global variables
 $script:LogFile = "medicat_download.log"
 $script:LastLoggedProgress = $null
@@ -74,7 +103,7 @@ $script:DebugMode = $true  # Set to $true to enable debug logging
 
 # Create main form
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "MediCat Installer v$script:LocalVersion [Administrator]"
+$form.Text = Get-UITranslation -Key "form_title" -FormatArgs $script:LocalVersion
 $form.Size = New-Object System.Drawing.Size(800, 600)
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedDialog"
@@ -87,7 +116,7 @@ $mainPanel.Padding = New-Object System.Windows.Forms.Padding(20)
 
 # Title label
 $titleLabel = New-Object System.Windows.Forms.Label
-$titleLabel.Text = "MediCat USB Installer"
+$titleLabel.Text = Get-UITranslation -Key "title_label"
 $titleLabel.Font = New-Object System.Drawing.Font("Arial", 16, [System.Drawing.FontStyle]::Bold)
 $titleLabel.ForeColor = [System.Drawing.Color]::DarkBlue
 $titleLabel.AutoSize = $true
@@ -95,7 +124,7 @@ $titleLabel.Location = New-Object System.Drawing.Point(20, 20)
 
 # Status label
 $statusLabel = New-Object System.Windows.Forms.Label
-$statusLabel.Text = "Ready to install MediCat"
+$statusLabel.Text = Get-StatusTranslation -Key "status_ready"
 $statusLabel.Font = New-Object System.Drawing.Font("Arial", 10)
 $statusLabel.AutoSize = $true
 $statusLabel.Location = New-Object System.Drawing.Point(20, 60)
@@ -117,7 +146,7 @@ $logTextBox.Font = New-Object System.Drawing.Font("Consolas", 9)
 
 # Drive selection
 $driveLabel = New-Object System.Windows.Forms.Label
-$driveLabel.Text = "Select USB Drive:"
+$driveLabel.Text = Get-UITranslation -Key "drive_label"
 $driveLabel.Location = New-Object System.Drawing.Point(20, 450)
 $driveLabel.AutoSize = $true
 
@@ -128,37 +157,37 @@ $driveComboBox.DropDownStyle = "DropDownList"
 
 # Show hard drives checkbox
 $showHardDrivesCheckBox = New-Object System.Windows.Forms.CheckBox
-$showHardDrivesCheckBox.Text = "Show hard drives"
+$showHardDrivesCheckBox.Text = Get-UITranslation -Key "show_hard_drives"
 $showHardDrivesCheckBox.Location = New-Object System.Drawing.Point(360, 450)
 $showHardDrivesCheckBox.AutoSize = $true
 $showHardDrivesCheckBox.Checked = $false
 
 # Format checkbox
 $formatCheckBox = New-Object System.Windows.Forms.CheckBox
-$formatCheckBox.Text = "Format drive before installation"
+$formatCheckBox.Text = Get-UITranslation -Key "format_checkbox"
 $formatCheckBox.Location = New-Object System.Drawing.Point(20, 480)
 $formatCheckBox.AutoSize = $true
 $formatCheckBox.Checked = $true
 
 # Buttons
 $installButton = New-Object System.Windows.Forms.Button
-$installButton.Text = "Install MediCat"
+$installButton.Text = Get-UITranslation -Key "install_button"
 $installButton.Location = New-Object System.Drawing.Point(20, 520)
 $installButton.Size = New-Object System.Drawing.Size(120, 30)
 $installButton.BackColor = [System.Drawing.Color]::LightGreen
 
 $cancelButton = New-Object System.Windows.Forms.Button
-$cancelButton.Text = "Cancel"
+$cancelButton.Text = Get-UITranslation -Key "cancel_button"
 $cancelButton.Location = New-Object System.Drawing.Point(150, 520)
 $cancelButton.Size = New-Object System.Drawing.Size(80, 30)
 
 $checkFilesButton = New-Object System.Windows.Forms.Button
-$checkFilesButton.Text = "Check USB Files"
+$checkFilesButton.Text = Get-UITranslation -Key "check_files_button"
 $checkFilesButton.Location = New-Object System.Drawing.Point(240, 520)
 $checkFilesButton.Size = New-Object System.Drawing.Size(120, 30)
 
 $refreshButton = New-Object System.Windows.Forms.Button
-$refreshButton.Text = "Refresh Drives"
+$refreshButton.Text = Get-UITranslation -Key "refresh_button"
 $refreshButton.Location = New-Object System.Drawing.Point(370, 520)
 $refreshButton.Size = New-Object System.Drawing.Size(100, 30)
 
@@ -360,7 +389,7 @@ function Get-DriveList {
     
     $driveComboBox.Items.Clear()
     $defaultDriveIndex = -1
-    $iDriveIndex = -1
+    $vhdDriveIndex = -1
     $itemIndex = 0
     
     foreach ($drive in $drives) {
@@ -369,18 +398,19 @@ function Get-DriveList {
         
         # Determine drive type label
         $driveTypeLabel = if ($drive.DeviceID -in $vhdDrives) {
-            "(VHD)"
+            Get-UITranslation -Key "drive_type_vhd"
         } elseif ($drive.DriveType -eq 2) {
-            "(USB)"
+            Get-UITranslation -Key "drive_type_usb"
         } else {
-            "(HDD)"
+            Get-UITranslation -Key "drive_type_hdd"
         }
         
-        $driveComboBox.Items.Add("$($drive.DeviceID) $driveTypeLabel - ${free}GB free of ${size}GB")
+        $driveText = Get-UITranslation -Key "drive_format" -FormatArgs $drive.DeviceID, $driveTypeLabel, $free, $size
+        $driveComboBox.Items.Add($driveText)
         
-        # DEBUG: Look for I: drive and remember its index
-        if ($drive.DeviceID -eq "I:") {
-            $iDriveIndex = $itemIndex
+        # Remember first VHD drive as preferred default
+        if ($drive.DeviceID -in $vhdDrives -and $vhdDriveIndex -eq -1) {
+            $vhdDriveIndex = $itemIndex
         }
         
         # Remember first drive as default fallback
@@ -391,14 +421,12 @@ function Get-DriveList {
         $itemIndex++
     }
     
-    # DEBUG: Default to I: drive if available, otherwise use first drive
+    # Default to first VHD drive if available, otherwise use first drive
     if ($driveComboBox.Items.Count -gt 0) {
-        if ($iDriveIndex -ge 0) {
-            $driveComboBox.SelectedIndex = $iDriveIndex
-            Write-DebugLog "Selected I: drive as default (DEBUG mode)"
+        if ($vhdDriveIndex -ge 0) {
+            $driveComboBox.SelectedIndex = $vhdDriveIndex
         } else {
             $driveComboBox.SelectedIndex = $defaultDriveIndex
-            Write-DebugLog "I: drive not found, selected first available drive"
         }
     }
 }
@@ -428,7 +456,7 @@ function Download-BinFiles {
     #>
     try {
         Write-Log "Starting bin files download..."
-        Update-Status "Downloading installer files to bin folder..."
+        Update-Status (Get-StatusTranslation -Key "downloading_files")
         
         # Create bin directory if it doesn't exist
         if (-not (Test-Path "./bin")) {
@@ -486,18 +514,18 @@ function Download-BinFiles {
         Write-Log "Bin files download complete: $successCount/$($binFiles.Count) files downloaded successfully"
         
         if ($successCount -eq $binFiles.Count) {
-            Update-Status "All bin files downloaded successfully"
+            Update-Status (Get-StatusTranslation -Key "bin_download_complete")
             return $true
         } else {
-            Update-Status "Bin files download completed with errors"
-            [System.Windows.Forms.MessageBox]::Show("Downloaded $successCount of $($binFiles.Count) bin files. Some files may have failed. Check the log for details.", "Download Incomplete", "OK", "Warning")
+            Update-Status (Get-StatusTranslation -Key "bin_download_errors")
+            Show-MessageBox -Message (Get-MessageTranslation -Key "bin_download_incomplete" -FormatArgs $successCount, $binFiles.Count) -Title (Get-TitleTranslation -Key "download_incomplete") -Icon "Warning"
             return $false
         }
         
     } catch {
         Write-Log "ERROR during bin files download: $($_.Exception.Message)"
-        Update-Status "Bin files download failed"
-        [System.Windows.Forms.MessageBox]::Show("An error occurred while downloading bin files: $($_.Exception.Message)", "Download Error", "OK", "Error")
+        Update-Status (Get-StatusTranslation -Key "bin_download_failed")
+        Show-MessageBox -Message (Get-MessageTranslation -Key "bin_download_error" -FormatArgs $_.Exception.Message) -Title (Get-TitleTranslation -Key "download_error") -Icon "Error"
         return $false
     }
 }
@@ -646,7 +674,7 @@ function Install-Ventoy {
     
     try {
         Write-Log "Checking Ventoy version..."
-        Update-Status "Checking for Ventoy updates..."
+        Update-Status (Get-StatusTranslation -Key "checking_ventoy")
         
         # Get latest Ventoy version from GitHub API
         $ventoyApiUrl = "https://api.github.com/repos/ventoy/ventoy/git/refs/tag"
@@ -683,7 +711,7 @@ function Install-Ventoy {
                 Write-Log "Ventoy not found. Downloading latest Ventoy v$ventoyVersion..."
             }
             
-            Update-Status "Downloading Ventoy v$ventoyVersion..."
+            Update-Status (Get-StatusTranslation -Key "downloading_ventoy" -FormatArgs $ventoyVersion)
             
             $ventoyZipUrl = "https://github.com/ventoy/Ventoy/releases/download/v$ventoyVersion/ventoy-$ventoyVersion-windows.zip"
             $ventoyZip = ".\ventoy.zip"
@@ -695,7 +723,7 @@ function Install-Ventoy {
             }
             
             # Extract Ventoy zip
-            Update-Status "Extracting Ventoy..."
+            Update-Status (Get-StatusTranslation -Key "extracting_ventoy")
             Write-Log "Extracting Ventoy archive..."
             
             # Find 7z.exe
@@ -757,21 +785,11 @@ function Install-Ventoy {
         
         # Install Ventoy to the drive
         Write-Log "Installing Ventoy to $DriveLetter"
-        Update-Status "Installing Ventoy to $DriveLetter (this may take a moment)..."
+        Update-Status (Get-StatusTranslation -Key "installing_ventoy" -FormatArgs $DriveLetter)
         
         # Show warning message
-        $warningResult = [System.Windows.Forms.MessageBox]::Show(
-            "IMPORTANT WARNING:`n`n" +
-            "SOMETIMES VENTOY MESSES UP A DRIVE.`n" +
-            "IF THE DRIVE DISAPPEARS PLEASE CHECK DISK MANAGER`n" +
-            "AND SEE IF THE DRIVE FAILED TO REMOUNT.`n" +
-            "THIS IS A VENTOY BUG AND CANNOT BE FIXED ON OUR END.`n`n" +
-            "Install Ventoy to $DriveLetter ?`n`n" +
-            "IF FROZEN FOR MORE THAN 60 SECONDS, INSTALL VENTOY MANUALLY.",
-            "Ventoy Installation Warning",
-            "YesNo",
-            "Warning"
-        )
+        $ventoyWarning = Get-VentoyWarning -DriveLetter $DriveLetter
+        $warningResult = Show-MessageBox -Message $ventoyWarning.Message -Title $ventoyWarning.Title -Buttons "YesNo" -Icon "Warning"
         
         if ($warningResult -eq "No") {
             Write-Log "User cancelled Ventoy installation"
@@ -879,14 +897,14 @@ function Start-MediatInstallation {
         
         # Check internet
         if (-not (Test-InternetConnection)) {
-            Show-MessageBox -Message "No internet connection detected. Please check your connection and try again." -Title "No Internet" -Icon "Warning"
+            Show-MessageBox -Message (Get-MessageTranslation -Key "no_internet") -Title (Get-TitleTranslation -Key "no_internet") -Icon "Warning"
             return
         }
         
         # Get selected drive
         $selectedDrive = $driveComboBox.SelectedItem
         if (-not $selectedDrive) {
-            Show-MessageBox -Message "Please select a USB drive." -Title "No Drive Selected" -Icon "Warning"
+            Show-MessageBox -Message (Get-MessageTranslation -Key "no_drive_selected") -Title (Get-TitleTranslation -Key "no_drive_selected") -Icon "Warning"
             return
         }
         
@@ -894,7 +912,7 @@ function Start-MediatInstallation {
         Write-Log "Selected drive: $driveLetter"
         
         # Download bin files
-        Update-Status "Downloading installer files..."
+        Update-Status (Get-StatusTranslation -Key "downloading_files")
         Update-Progress -Value 0 -Maximum 8
         
         $binFiles = @(
@@ -930,7 +948,7 @@ function Start-MediatInstallation {
         }
         
         # Download 7z files
-        Update-Status "Downloading 7-Zip files..."
+        Update-Status (Get-StatusTranslation -Key "downloading_7zip")
         $arch = if ([Environment]::Is64BitOperatingSystem) { "64" } else { "32" }
         
         $sevenZipFiles = @(
@@ -947,7 +965,7 @@ function Start-MediatInstallation {
         }
         
         # Download translation files
-        Update-Status "Downloading translation files..."
+        Update-Status (Get-StatusTranslation -Key "downloading_translations")
         $translationFiles = @(
             @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/motd.ps1"; Path="./bin/motd.ps1"},
             @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/licence.ps1"; Path="./bin/licence.ps1"}
@@ -962,12 +980,12 @@ function Start-MediatInstallation {
         }
         
         # Check for MediCat files
-        Update-Status "Checking for MediCat installation files..."
+        Update-Status (Get-StatusTranslation -Key "checking_files")
         $medicatFileName = "MediCat.USB.v$script:MediCatVersion.7z"
         $medicatFile = Join-Path $PWD $medicatFileName
         if (-not (Test-Path $medicatFile)) {
             Write-Log "MediCat file not found: $medicatFile"
-            [System.Windows.Forms.MessageBox]::Show("MediCat installation file not found. Please ensure '$medicatFileName' is in the same directory as this installer.", "File Not Found", "OK", "Warning")
+            Show-MessageBox -Message (Get-MessageTranslation -Key "file_not_found" -FormatArgs $medicatFileName) -Title (Get-TitleTranslation -Key "file_not_found") -Icon "Warning"
             return
         }
         Write-Log "Found MediCat archive: $medicatFile"
@@ -983,12 +1001,12 @@ function Start-MediatInstallation {
             # Install Ventoy (fresh install)
             if (-not (Install-Ventoy -DriveLetter $driveLetter)) {
                 Write-Log "ERROR: Ventoy installation failed"
-                [System.Windows.Forms.MessageBox]::Show("Ventoy installation failed. Please check the log for details.", "Ventoy Installation Failed", "OK", "Error")
+                Show-MessageBox -Message (Get-MessageTranslation -Key "ventoy_install_failed") -Title (Get-TitleTranslation -Key "ventoy_install_failed") -Icon "Error"
                 return
             }
             
             # Format drive to NTFS after Ventoy installation
-            Update-Status "Formatting drive to NTFS..."
+            Update-Status (Get-StatusTranslation -Key "formatting_drive")
             Write-Log "Formatting $driveLetter to NTFS with label 'Medicat'..."
             
             try {
@@ -1018,7 +1036,7 @@ function Start-MediatInstallation {
         } else {
             # Format is unchecked - check if Ventoy is installed and do upgrade
             Write-Log "Formatting is disabled - checking if Ventoy is already installed..."
-            Update-Status "Checking for existing Ventoy installation..."
+            Update-Status (Get-StatusTranslation -Key "checking_existing")
             
             $ventoyInstalled = Test-VentoyInstalled -DriveLetter $driveLetter
             
@@ -1026,16 +1044,8 @@ function Start-MediatInstallation {
                 # Ventoy not found - warn user
                 Write-Log "WARNING: VTOYEFI partition not found - Ventoy may not be installed"
                 
-                $confirmResult = [System.Windows.Forms.MessageBox]::Show(
-                    "Warning: Could not detect an existing Ventoy installation on this drive.`n`n" +
-                    "The VTOYEFI partition was not found.`n`n" +
-                    "Are you SURE Ventoy is already installed on $driveLetter ?`n`n" +
-                    "If Ventoy is not installed, installation will fail.`n`n" +
-                    "Click 'Yes' to continue with upgrade anyway, or 'No' to cancel.",
-                    "Ventoy Installation Not Detected",
-                    "YesNo",
-                    "Warning"
-                )
+                $ventoyWarning = Get-VentoyNotDetected -DriveLetter $driveLetter
+                $confirmResult = Show-MessageBox -Message $ventoyWarning.Message -Title $ventoyWarning.Title -Buttons "YesNo" -Icon "Warning"
                 
                 if ($confirmResult -eq "No") {
                     Write-Log "User cancelled installation"
@@ -1050,7 +1060,7 @@ function Start-MediatInstallation {
             # Do non-destructive upgrade
             if (-not (Install-Ventoy -DriveLetter $driveLetter -Upgrade)) {
                 Write-Log "ERROR: Ventoy upgrade failed"
-                [System.Windows.Forms.MessageBox]::Show("Ventoy upgrade failed. Please check the log for details.", "Ventoy Upgrade Failed", "OK", "Error")
+                Show-MessageBox -Message (Get-MessageTranslation -Key "ventoy_upgrade_failed") -Title (Get-TitleTranslation -Key "ventoy_upgrade_failed") -Icon "Error"
                 return
             }
             
@@ -1058,7 +1068,7 @@ function Start-MediatInstallation {
         }
         
         # Extract MediCat files
-        Update-Status "Extracting MediCat archive (this will take a while)..."
+        Update-Status (Get-StatusTranslation -Key "extracting_archive")
         Write-Log "Extracting MediCat files from $medicatFile to $driveLetter"
         
         $outputDir = $driveLetter.TrimEnd('\')
@@ -1085,7 +1095,7 @@ function Start-MediatInstallation {
                 
                 # Attempt to install the module locally
                 try {
-                    Update-Status "Installing 7Zip4PowerShell module (required for extraction)..."
+                    Update-Status (Get-StatusTranslation -Key "installing_module")
                     Write-Log "Installing 7Zip4PowerShell module..."
                     
                     # Check for NuGet provider
@@ -1156,19 +1166,9 @@ function Start-MediatInstallation {
                     Write-DebugLog "Install exception details: $($_.Exception | Format-List | Out-String)"
                     
                     if ($_.Exception.Message -like "*admin*" -or $_.Exception.Message -like "*permission*" -or $_.Exception.Message -like "*access*") {
-                        [System.Windows.Forms.MessageBox]::Show(
-                            "Failed to install 7Zip4PowerShell module. Administrator privileges may be required.`n`nError: $installError`n`nPlease try running PowerShell as Administrator and installing manually:`nInstall-Module 7Zip4PowerShell -Scope CurrentUser",
-                            "Module Installation Failed",
-                            "OK",
-                            "Error"
-                        )
+                        Show-MessageBox -Message (Get-MessageTranslation -Key "module_install_failed_admin" -FormatArgs $installError) -Title (Get-TitleTranslation -Key "module_install_failed") -Icon "Error"
                     } else {
-                        [System.Windows.Forms.MessageBox]::Show(
-                            "Failed to install 7Zip4PowerShell module.`n`nError: $installError`n`nPlease try installing manually:`nInstall-Module 7Zip4PowerShell -Scope CurrentUser",
-                            "Module Installation Failed",
-                            "OK",
-                            "Error"
-                        )
+                        Show-MessageBox -Message (Get-MessageTranslation -Key "module_install_failed" -FormatArgs $installError) -Title (Get-TitleTranslation -Key "module_install_failed") -Icon "Error"
                     }
                     $moduleName = $null
                     $module = $null
@@ -1223,12 +1223,7 @@ function Start-MediatInstallation {
         if (-not $usePowerShellModule) {
             # TEMP: 7z.exe fallback removed - only using 7Zip4PowerShell module
             Write-Log "ERROR: 7Zip4PowerShell module not available"
-            [System.Windows.Forms.MessageBox]::Show(
-                "7Zip4PowerShell module is required for extraction.`n`nPlease install it:`nInstall-Module 7Zip4PowerShell`n`nAfter installation, run this installer again.",
-                "7Zip4PowerShell Module Required",
-                "OK",
-                "Error"
-            )
+            Show-MessageBox -Message (Get-MessageTranslation -Key "module_required") -Title (Get-TitleTranslation -Key "module_required") -Icon "Error"
             return
             
             # TEMP: Commented out 7z.exe fallback
@@ -1291,7 +1286,7 @@ function Start-MediatInstallation {
                 Write-Log "Using PowerShell cmdlet: $cmdletName"
                 
                 # Monitor extraction progress by tracking destination directory changes
-                Update-Status "Extracting archive using PowerShell (this may take a while)..."
+                Update-Status (Get-StatusTranslation -Key "extracting_powershell")
                 Update-Progress -Value 0 -Maximum 100
                 
                 try {
@@ -1401,7 +1396,8 @@ function Start-MediatInstallation {
                                         if ($progressPercent -ne $lastProgress) {
                                             $lastProgress = $progressPercent
                                             Update-Progress -Value $progressPercent -Maximum 100
-                                            Update-Status "Extracting... $progressPercent% ($([math]::Round(($currentSize - $initialSize) / 1MB, 1)) MB extracted)"
+                                            $extractedMB = [math]::Round(($currentSize - $initialSize) / 1MB, 1)
+                                            Update-Status (Get-StatusTranslation -Key "extracting_progress" -FormatArgs $progressPercent, $extractedMB)
                                             Write-DebugLog "Progress: $progressPercent%, Files: $currentFileCount, Size: $([math]::Round($currentSize / 1MB, 1)) MB"
                                         }
                                     } catch {
@@ -1443,7 +1439,7 @@ function Start-MediatInstallation {
                             }
                             $extractionSuccess = $true
                             Update-Progress -Value 100 -Maximum 100
-                            Update-Status "Extraction completed"
+                            Update-Status (Get-StatusTranslation -Key "extraction_complete")
                             Write-Log "Extraction completed using 7Zip4PowerShell module ($cmdletName from $script:Expand7ZipModuleName)"
                         } elseif ($jobState -eq "Failed") {
                             $errorMsg = if ($jobErrors -and $jobErrors.Count -gt 0) { 
@@ -1584,7 +1580,7 @@ function Start-MediatInstallation {
                 Write-Log "Extraction completed in $([math]::Round($duration, 2)) minutes"
                 Write-Log "MediCat archive extracted successfully"
                 Update-Progress -Value 100 -Maximum 100
-                Update-Status "Extraction completed successfully"
+                Update-Status (Get-StatusTranslation -Key "extraction_success")
             }
             
         } catch {
@@ -1592,12 +1588,12 @@ function Start-MediatInstallation {
             if ($extractionError) {
                 Write-Log "Additional error details: $extractionError"
             }
-            Show-MessageBox -Message "Failed to extract MediCat archive.`n`nError: $($_.Exception.Message)`n`nCheck the log for details." -Title "Extraction Failed" -Icon "Error"
+            Show-MessageBox -Message (Get-MessageTranslation -Key "extraction_failed" -FormatArgs $_.Exception.Message) -Title (Get-TitleTranslation -Key "extraction_failed") -Icon "Error"
             return
         }
         
         # Copy final files
-        Update-Status "Copying installer files..."
+        Update-Status (Get-StatusTranslation -Key "copying_files")
         $finalFiles = @(
             @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/icon.ico"; Path="$driveLetter/autorun.ico"},
             @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat"; Path="$driveLetter/CheckFiles.bat"}
@@ -1611,13 +1607,13 @@ function Start-MediatInstallation {
             }
         }
         
-        Update-Status "Installation completed successfully!"
+        Update-Status (Get-StatusTranslation -Key "installation_complete")
         Write-Log "MediCat installation completed successfully"
-        Show-MessageBox -Message "MediCat has been installed successfully to $driveLetter" -Title "Installation Complete" -Icon "Information"
+        Show-MessageBox -Message (Get-MessageTranslation -Key "installation_complete" -FormatArgs $driveLetter) -Title (Get-TitleTranslation -Key "installation_complete") -Icon "Information"
         
     } catch {
         Write-Log "ERROR: $($_.Exception.Message)"
-        Show-MessageBox -Message "An error occurred during installation: $($_.Exception.Message)" -Title "Installation Error" -Icon "Error"
+        Show-MessageBox -Message (Get-MessageTranslation -Key "installation_error" -FormatArgs $_.Exception.Message) -Title (Get-TitleTranslation -Key "installation_error") -Icon "Error"
     } finally {
         $installButton.Enabled = $true
         $cancelButton.Enabled = $true
@@ -1641,7 +1637,7 @@ function Start-FileCheck {
         $cancelButton.Enabled = $false
         $checkFilesButton.Enabled = $false
         
-        Update-Status "Checking USB files..."
+        Update-Status (Get-StatusTranslation -Key "checking_usb")
         Write-Log "Starting file check on $DriveLetter"
         
         # Download the MD5 file
@@ -1652,7 +1648,7 @@ function Start-FileCheck {
         if (Invoke-Download -Url $md5Url -OutputPath $md5File) {
             Write-Log "MD5 file downloaded successfully"
             Write-Log "Parsing MD5 file and verifying files..."
-            Update-Status "Verifying files with PowerShell..."
+            Update-Status (Get-StatusTranslation -Key "verifying_files")
             
             # Read and parse MD5 file
             $md5Content = Get-Content $md5File
@@ -1715,8 +1711,8 @@ function Start-FileCheck {
             
             if ($failedFiles.Count -eq 0) {
                 Write-Log "All files verified successfully!"
-                Update-Status "File verification completed - All files OK"
-                [System.Windows.Forms.MessageBox]::Show("File verification completed successfully. All $totalFiles files are intact.", "Verification Complete", "OK", "Information")
+                Update-Status (Get-StatusTranslation -Key "verification_complete")
+                Show-MessageBox -Message (Get-MessageTranslation -Key "verification_complete" -FormatArgs $totalFiles) -Title (Get-TitleTranslation -Key "verification_complete") -Icon "Information"
             } else {
                 Write-Log "WARNING: $($failedFiles.Count) file(s) failed verification:"
                 foreach ($failed in $failedFiles) {
@@ -1732,22 +1728,17 @@ function Start-FileCheck {
                     Write-Log "ERROR: Could not write failed files list: $($_.Exception.Message)"
                 }
                 
-                Update-Status "File verification failed - $($failedFiles.Count) file(s) failed"
+                Update-Status (Get-StatusTranslation -Key "verification_failed" -FormatArgs $failedFiles.Count)
                 
                 # Ask if user wants to re-extract missing files
-                $result = [System.Windows.Forms.MessageBox]::Show(
-                    "File verification found $($failedFiles.Count) file(s) that failed verification.`n`nWould you like to attempt to re-extract the missing files from the archive?",
-                    "Verification Failed - Re-extract Files?",
-                    "YesNo",
-                    "Question"
-                )
+                $result = Show-MessageBox -Message (Get-MessageTranslation -Key "verification_failed" -FormatArgs $failedFiles.Count) -Title (Get-TitleTranslation -Key "verification_failed") -Buttons "YesNo" -Icon "Question"
                 
                 if ($result -eq "Yes") {
                     Write-Log "User requested re-extraction of failed files"
                     $reExtractResult = Start-ReExtractFiles -DriveLetter $DriveLetter -FailedFiles $failedFiles
                     if ($reExtractResult) {
                         Write-Log "Re-extraction completed successfully"
-                        [System.Windows.Forms.MessageBox]::Show("Re-extraction completed. You may want to run file verification again to confirm.", "Re-extraction Complete", "OK", "Information")
+                        Show-MessageBox -Message (Get-MessageTranslation -Key "re_extract_complete") -Title (Get-TitleTranslation -Key "re_extraction_complete") -Icon "Information"
                     } else {
                         Write-Log "Re-extraction failed"
                     }
@@ -1761,19 +1752,19 @@ function Start-FileCheck {
             }
         } else {
             Write-Log "ERROR: Failed to download MD5 file"
-            Update-Status "Failed to download verification file"
-            [System.Windows.Forms.MessageBox]::Show("Failed to download the verification file. Please check your internet connection.", "Download Failed", "OK", "Error")
+            Update-Status (Get-StatusTranslation -Key "verification_failed")
+            Show-MessageBox -Message (Get-MessageTranslation -Key "download_failed") -Title (Get-TitleTranslation -Key "download_failed") -Icon "Error"
         }
         
     } catch {
         Write-Log "ERROR during file check: $($_.Exception.Message)"
-        Update-Status "File check failed"
-        [System.Windows.Forms.MessageBox]::Show("An error occurred during file verification: $($_.Exception.Message)", "Verification Error", "OK", "Error")
+        Update-Status (Get-StatusTranslation -Key "verification_failed")
+        Show-MessageBox -Message (Get-MessageTranslation -Key "verification_error" -FormatArgs $_.Exception.Message) -Title (Get-TitleTranslation -Key "verification_error") -Icon "Error"
     } finally {
         $installButton.Enabled = $true
         $cancelButton.Enabled = $true
         $checkFilesButton.Enabled = $true
-        Update-Status "Ready to install MediCat"
+        Update-Status (Get-StatusTranslation -Key "status_ready")
     }
 }
 
@@ -1781,7 +1772,7 @@ function Start-ReExtractFiles {
     param($DriveLetter, $FailedFiles)
     
     try {
-        Update-Status "Re-extracting missing files..."
+        Update-Status (Get-StatusTranslation -Key "re_extracting")
         Write-Log "Starting re-extraction of $($FailedFiles.Count) files"
         
         # Check if 7z exists - check PATH first, then bin folder
@@ -1810,7 +1801,7 @@ function Start-ReExtractFiles {
         # If still not found, error out
         if (-not $sevenZipPath -or -not (Test-Path $sevenZipPath)) {
             Write-Log "ERROR: 7z.exe not found in PATH or bin folder"
-            [System.Windows.Forms.MessageBox]::Show("7z.exe not found in system PATH or bin folder.`n`nPlease ensure 7-Zip is installed or the installer files are downloaded.", "7-Zip Not Found", "OK", "Error")
+            Show-MessageBox -Message (Get-MessageTranslation -Key "7zip_not_found") -Title (Get-TitleTranslation -Key "7zip_not_found") -Icon "Error"
             return $false
         }
         
@@ -1820,11 +1811,11 @@ function Start-ReExtractFiles {
         # If not found in current directory, prompt user to select the file
         if (-not (Test-Path $archiveFile)) {
             Write-Log "Archive not found in current directory, prompting user to select file..."
-            Update-Status "Please select the MediCat archive file..."
+            Update-Status (Get-StatusTranslation -Key "select_archive")
             
             $fileDialog = New-Object System.Windows.Forms.OpenFileDialog
             $fileDialog.Filter = "7z Archive|*.7z|All Files|*.*"
-            $fileDialog.Title = "Select MediCat Archive File (MediCat.USB.v$script:MediCatVersion.7z)"
+            $fileDialog.Title = Get-TitleTranslation -Key "file_dialog_title" -FormatArgs $script:MediCatVersion
             $fileDialog.CheckFileExists = $true
             $fileDialog.Multiselect = $false
             
@@ -1833,14 +1824,14 @@ function Start-ReExtractFiles {
                 Write-Log "User selected archive: $archiveFile"
             } else {
                 Write-Log "User cancelled archive selection"
-                [System.Windows.Forms.MessageBox]::Show("Archive file selection was cancelled. Re-extraction cannot proceed.", "Selection Cancelled", "OK", "Warning")
+                Show-MessageBox -Message (Get-MessageTranslation -Key "selection_cancelled") -Title (Get-TitleTranslation -Key "selection_cancelled") -Icon "Warning"
                 return $false
             }
         }
         
         if (-not (Test-Path $archiveFile)) {
             Write-Log "ERROR: Source archive not found: $archiveFile"
-            [System.Windows.Forms.MessageBox]::Show("Source archive not found: $archiveFile`nPlease ensure the archive exists.", "Archive Not Found", "OK", "Error")
+            Show-MessageBox -Message (Get-MessageTranslation -Key "archive_not_found" -FormatArgs $archiveFile) -Title (Get-TitleTranslation -Key "archive_not_found") -Icon "Error"
             return $false
         }
         
@@ -1943,17 +1934,17 @@ function Start-ReExtractFiles {
             foreach ($failed in $failedExtract) {
                 Write-Log "  - $failed"
             }
-            [System.Windows.Forms.MessageBox]::Show("Re-extraction completed with errors.`n`nExtracted: $extractedCount/$($FailedFiles.Count)`nFailed: $($failedExtract.Count)`n`nCheck the log for details.", "Re-extraction Complete with Errors", "OK", "Warning")
+            Show-MessageBox -Message (Get-MessageTranslation -Key "re_extract_failed" -FormatArgs $extractedCount, $FailedFiles.Count, $failedExtract.Count) -Title (Get-TitleTranslation -Key "re_extraction_failed") -Icon "Warning"
             return $false
         } else {
-            Update-Status "Re-extraction completed successfully"
+            Update-Status (Get-StatusTranslation -Key "re_extracting")
             return $true
         }
         
     } catch {
         Write-Log "ERROR during re-extraction: $($_.Exception.Message)"
-        Update-Status "Re-extraction failed"
-        [System.Windows.Forms.MessageBox]::Show("An error occurred during re-extraction: $($_.Exception.Message)", "Re-extraction Error", "OK", "Error")
+        Update-Status (Get-StatusTranslation -Key "re_extracting")
+        Show-MessageBox -Message (Get-MessageTranslation -Key "re_extraction_error" -FormatArgs $_.Exception.Message) -Title (Get-TitleTranslation -Key "re_extraction_error") -Icon "Error"
         return $false
     }
 }
@@ -1964,7 +1955,7 @@ $checkFilesButton.Add_Click({
         $driveLetter = $selectedDrive.Substring(0, 2)
         Start-FileCheck -DriveLetter $driveLetter
     } else {
-        Show-MessageBox -Message "Please select a USB drive first." -Title "No Drive Selected" -Icon "Warning"
+        Show-MessageBox -Message (Get-MessageTranslation -Key "no_drive_for_check") -Title (Get-TitleTranslation -Key "no_drive_for_check") -Icon "Warning"
     }
 })
 

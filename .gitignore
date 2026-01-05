@@ -31,3 +31,6 @@ failed_files.txt
 Thumbs.db
 desktop.ini
 
+# Cursor rules
+.cursorrules
+.cursor/

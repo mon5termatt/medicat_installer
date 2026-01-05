@@ -8,7 +8,6 @@ set medicatver=21.12
 set installertext=[31mM[32mE[33mD[34mI[35mC[36mA[31mT[32m I[33mN[34mS[35mT[36mA[31mL[32mL[33mE[34mR[0m
 set format=Yes
 set formatcolor=2F
-set logfile=%CD%\medicat_download.log
 FOR /F "skip=2 tokens=2*" %%a IN ('REG QUERY "HKEY_CURRENT_USER\Control Panel\International" /v "LocaleName"') DO SET "OSLanguage=%%b"
 set lang=%OSLanguage:~0,2%
 if defined ProgramFiles(x86) (set bit=64) else (set bit=32)
@@ -32,10 +31,6 @@ for %%# in (powershell.exe) do @if "%%~$PATH:#"=="" (echo.Could not find PowerSh
 echo.Found Powershell
 echo.Prompting for admin permissions if not run as admin.
 timeout 1 >nul
-
-REM Initialize download log file
-echo MediCat Download Log - Started %date% %time% > "%logfile%"
-echo ========================================== >> "%logfile%"
 set _elev=
 if /i "%~1"=="-el" set _elev=1
 set _PSarg="""%~f0""" -el %_args% && set "nul=>nul 2>&1" && setlocal EnableDelayedExpansion
@@ -79,13 +74,8 @@ if "%localver%" GEQ "%remver%" (goto startup)
 :updateprogram
 cls
 echo.A new version of the program has been released. The program will now restart.
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.bat" "./update.bat" ""
-if "%download_success%" == "0" (
-    start cmd /k update.bat
-) else (
-    echo.Failed to download update.bat. Please try again later.
-    pause
-)
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.bat" -o ./update.bat -s -L
+start cmd /k update.bat
 exit
 
 
@@ -112,51 +102,63 @@ echo.                          Press any key to accept this warning.&& pause >nu
 title Medicat Installer [FILECHECK]
 cls
 echo.Downloading initial files, please wait...
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" "./bin/QuickSFV.exe" "103424"
-if "%download_success%" == "0" (echo [GOOD] QuickSFV.exe) else (echo [BAD]  QuickSFV.exe && set flag=1)
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini" "./bin/QuickSFV.ini" "158"
-if "%download_success%" == "0" (echo [GOOD] QuickSFV.ini) else (echo [BAD]  QuickSFV.ini && set flag=1)
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat" "./bin/Box.bat" "5874"
-if "%download_success%" == "0" (echo [GOOD] Box.bat) else (echo [BAD]  Box.bat && set flag=1)
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat" "./bin/Button.bat" "5254"
-if "%download_success%" == "0" (echo [GOOD] Button.bat) else (echo [BAD]  Button.bat && set flag=1)
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe" "./bin/GetInput.exe" "3584"
-if "%download_success%" == "0" (echo [GOOD] GetInput.exe) else (echo [BAD]  GetInput.exe && set flag=1)
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat" "./bin/Getlen.bat" "1897"
-echo DEBUG: After Getlen.bat download
-if "%download_success%" == "0" (echo [GOOD] Getlen.bat) else (echo [BAD]  Getlen.bat && set flag=1)
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe" "./bin/batbox.exe" "1536"
-echo DEBUG: After batbox.exe download
-if "%download_success%" == "0" (echo [GOOD] batbox.exe) else (echo [BAD]  batbox.exe && set flag=1)
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe" "./bin/folderbrowse.exe" "8192"
-echo DEBUG: After folderbrowse.exe download
-if "%download_success%" == "0" (echo [GOOD] folderbrowse.exe) else (echo [BAD]  folderbrowse.exe && set flag=1)
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.exe" "./bin/7z.exe" ""
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.dll" "./bin/7z.dll" ""
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE" -o ./bin/QuickSFV.exe -s -L
+call :filesize bin/QuickSFV.exe
+if "%size%" == "103424" (echo [GOOD] QuickSFV.exe) else (echo [BAD]  QuickSFV.exe && set flag=1)
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini" -o ./bin/QuickSFV.ini -s -L
+call :filesize bin/QuickSFV.ini
+if "%size%" == "158" (echo [GOOD] QuickSFV.ini) else (echo [BAD]  QuickSFV.ini && set flag=1)
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat" -o ./bin/Box.bat -s -L
+call :filesize bin/Box.bat
+if "%size%" == "5874" (echo [GOOD] Box.bat) else (echo [BAD]  Box.bat && set flag=1)
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat" -o ./bin/Button.bat -s -L
+call :filesize bin/Button.bat
+if "%size%" == "5254" (echo [GOOD] Button.bat) else (echo [BAD]  Button.bat && set flag=1)
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe" -o ./bin/GetInput.exe -s -L
+call :filesize bin/GetInput.exe
+if "%size%" == "3584" (echo [GOOD] GetInput.exe) else (echo [BAD]  GetInput.exe && set flag=1)
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat" -o ./bin/Getlen.bat -s -L
+call :filesize bin/Getlen.bat
+if "%size%" == "1897" (echo [GOOD] Getlen.bat) else (echo [BAD]  Getlen.bat && set flag=1)
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe" -o ./bin/batbox.exe -s -L
+call :filesize bin/batbox.exe
+if "%size%" == "1536" (echo [GOOD] batbox.exe) else (echo [BAD]  batbox.exe && set flag=1)
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe" -o ./bin/folderbrowse.exe -s -L
+call :filesize bin/folderbrowse.exe
+if "%size%" == "8192" (echo [GOOD] folderbrowse.exe) else (echo [BAD]  folderbrowse.exe && set flag=1)
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.exe" -o ./bin/7z.exe -s -L
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/%bit%.dll" -o ./bin/7z.dll -s -L
 
+goto checkdone
+::if defined ProgramFiles(x86) (goto check64) else (goto check32)
+
+:check64
+call :filesize bin/7z.exe
+if "%size%" == "1269760" (echo [GOOD] 7z.exe) else (echo [BAD]  7z.exe && set flag=1)
+call :filesize bin/7z.dll
+if "%size%" == "389120" (echo [GOOD] 7z.dll) else (echo [BAD]  7z.dll && set flag=1)
+goto checkdone
+
+:check32
+call :filesize bin/7z.exe
+if "%size%" == "" (echo GOOD) else (echo BAD && set flag=1)
+call :filesize bin/7z.dll
+if "%size%" == "" (echo GOOD) else (echo BAD && set flag=1)
 goto checkdone
 
 :checkdone
 rem don't hash these, they change!
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/motd.ps1" "./bin/motd.ps1" ""
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/licence.ps1" "./bin/licence.ps1" ""
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/motd.ps1" -o ./bin/motd.ps1 -s -L
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/licence.ps1" -o ./bin/licence.ps1 -s -L
 echo.Setting Powershell Settings for Scripts.
 Powershell -c "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine"
 Powershell -c "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"
 if "%flag%" == "1" goto hasherror
-pause
 goto start
 
 :hasherror
 echo WARNING!!!
 echo.ERROR DOWNLOADING BIN FILES. ONE OF THE HASHES DOES NOT MATCH.
-echo.
-echo.COMMON CAUSES:
-echo.- GitHub rate limiting (429 error) - Wait 1 hour and try again
-echo.- Network connectivity issues - Check your internet connection
-echo.- Firewall blocking downloads - Check your firewall settings
-echo.- Corrupted download - Try running the installer again
-echo.
 echo.PLEASE CHECK YOUR FIREWALL AND CURL AND TRY AGAIN. 
 echo.IF YOU CHOOSE TO CONTINUE YOU MAY ENCOUNTER ERRORS
 pause
@@ -547,14 +549,11 @@ if errorlevel 1 goto finisherror
 if errorlevel 0 goto finishup2
 
 :finishup2
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/icon.ico" "%drivepath%:/autorun.ico" ""
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" "%drivepath%:/CheckFiles.bat" ""
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/icon.ico" -o %drivepath%:/autorun.ico -s -L
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -o %drivepath%:/CheckFiles.bat -s -L
 cd /d %drivepath%:
 start cmd /k CheckFiles.bat
 echo.The Installer Has Completed.
-echo.Logging completion to download log...
-echo MediCat Installation Completed Successfully - %date% %time% >> "%logfile%"
-echo ========================================== >> "%logfile%"
 pause
 exit
 
@@ -583,7 +582,7 @@ exit
 
 
 :hasher
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/drivefiles.md5" "./drivefiles.md5" ""
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/drivefiles.md5" -o ./drivefiles.md5 -s -L
 start QuickSFV.EXE drivefiles.md5
 DEL drivefiles.md5 /Q
 goto install5
@@ -599,7 +598,7 @@ goto menu2
 :recheck
 for /f "delims=" %%A in ('folderbrowse.exe "Please select the drive you want to install medicat on"') do set "folder=%%A"
 set drivepath=%folder:~0,1%
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" "%drivepath%:/CheckFiles.bat" ""
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat" -o %drivepath%:/CheckFiles.bat -s -L
 cd /d %drivepath%:
 start cmd /k CheckFiles.bat
 cd /d %maindir%
@@ -635,180 +634,22 @@ goto bigboi
 
 :tordown
 cls
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" "./tor.bat" ""
-if "%download_success%" == "0" (
-    call tor.bat
-    del tor.bat /Q
-) else (
-    echo.Failed to download torrent script. Please try again later.
-    pause
-)
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/tor.bat" -o ./tor.bat -s -L
+call tor.bat
+del tor.bat /Q
 goto installver
 
 :cdndown
 cls
-call :downloadfile "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/cdn.bat" "./cdn.bat" ""
-if "%download_success%" == "0" (
-    call cdn.bat
-    del cdn.bat /Q
-) else (
-    echo.Failed to download CDN script. Please try again later.
-    pause
-)
+curl "https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/download/cdn.bat" -o ./cdn.bat -s -L
+call cdn.bat
+del cdn.bat /Q
 goto installver
 
 :exit
 exit
 
-:logdownload
-REM Parameters: %1=URL, %2=output file, %3=status, %4=size, %5=error message
-set log_url=%~1
-set log_output=%~2
-set log_status=%~3
-set log_size=%~4
-set log_error=%~5
-
-REM Get current timestamp
-set "timestamp=%date% %time%"
-
-REM Log to file
-echo [%timestamp%] URL: %log_url% >> "%logfile%"
-echo [%timestamp%] Output: %log_output% >> "%logfile%"
-echo [%timestamp%] Status: %log_status% >> "%logfile%"
-echo [%timestamp%] Size: %log_size% bytes >> "%logfile%"
-if not "%log_error%" == "" echo [%timestamp%] Error: %log_error% >> "%logfile%"
-echo [%timestamp%] --- >> "%logfile%"
-exit /b 0
-
-:downloadfile
-REM Parameters: %1=URL, %2=output file, %3=expected size (empty for no size check)
-set download_url=%~1
-set download_output=%~2
-set download_expected_size=%~3
-set download_success=1
-set retry_count=0
-set max_retries=3
-
-:download_retry
-set /a retry_count+=1
-echo.Attempting download (attempt %retry_count%/%max_retries%): %download_output%
-
-REM Download the file first
-curl "%download_url%" -o "%download_output%" -s -L
-
-REM Check if download was successful by examining the file
-if exist "%download_output%" (
-    REM Get file size to determine if download was successful
-    call :filesize "%download_output%"
-    if "%size%" == "0" (
-        REM File exists but is empty, likely an error
-        set http_status=404
-    ) else (
-        REM Check if file contains GitHub rate limit message
-        findstr /C:"API rate limit exceeded" "%download_output%" >nul 2>&1
-        if not errorlevel 1 (
-            set http_status=429
-        ) else (
-            findstr /C:"rate limit" "%download_output%" >nul 2>&1
-            if not errorlevel 1 (
-                set http_status=429
-            ) else (
-                REM File has content and no rate limit message, assume success
-                set http_status=200
-            )
-        )
-    )
-) else (
-    REM File doesn't exist, download failed
-    set http_status=404
-)
-
-REM Debug: Show what we got
-echo.HTTP Status: %http_status%
-if exist "%download_output%" (
-    echo.File exists: %download_output% (Size: %size% bytes)
-) else (
-    echo.File does not exist: %download_output%
-)
-
-REM Check for 429 (rate limiting) or other HTTP errors
-if "%http_status%" == "429" (
-    echo.[429 ERROR] GitHub rate limit exceeded!
-    call :logdownload "%download_url%" "%download_output%" "RATE_LIMIT" "%size%" "GitHub rate limit exceeded"
-    if %retry_count% LSS %max_retries% (
-        echo.Waiting 30 seconds before retry...
-        timeout /t 30 /nobreak >nul
-        goto download_retry
-    ) else (
-        echo.[FAILED] Max retries reached for rate limiting. Please wait and try again later.
-        goto download_end
-    )
-)
-
-REM Check for other HTTP errors
-if "%http_status%" GEQ "400" (
-    echo.[HTTP ERROR %http_status%] Failed to download file
-    call :logdownload "%download_url%" "%download_output%" "HTTP_ERROR" "%size%" "HTTP %http_status%"
-    if %retry_count% LSS %max_retries% (
-        echo.Waiting 5 seconds before retry...
-        timeout /t 5 /nobreak >nul
-        goto download_retry
-    ) else (
-        echo.[FAILED] Max retries reached for HTTP error %http_status%
-        goto download_end
-    )
-)
-
-REM Check file size if expected size provided
-if not "%download_expected_size%" == "" (
-    REM Check if file exists first
-    if exist "%download_output%" (
-        call :filesize "%download_output%"
-        if "%size%" == "%download_expected_size%" (
-            set download_success=0
-        ) else (
-            echo.[SIZE ERROR] Expected %download_expected_size% bytes, got %size% bytes
-            call :logdownload "%download_url%" "%download_output%" "SIZE_ERROR" "%size%" "Expected %download_expected_size% bytes"
-            if %retry_count% LSS %max_retries% (
-                echo.Waiting 5 seconds before retry...
-                timeout /t 5 /nobreak >nul
-                goto download_retry
-            ) else (
-                echo.[FAILED] Max retries reached for size mismatch
-            )
-        )
-    ) else (
-        echo.[FILE ERROR] Downloaded file does not exist: %download_output%
-        call :logdownload "%download_url%" "%download_output%" "FILE_ERROR" "0" "File does not exist"
-        if %retry_count% LSS %max_retries% (
-            echo.Waiting 5 seconds before retry...
-            timeout /t 5 /nobreak >nul
-            goto download_retry
-        ) else (
-            echo.[FAILED] Max retries reached - file not created
-        )
-    )
-) else (
-    REM No size check, assume success if HTTP status was OK
-    if "%http_status%" LSS "400" (
-        set download_success=0
-    )
-)
-
-:download_end
-REM Log the download attempt
-if "%download_success%" == "0" (
-    call :logdownload "%download_url%" "%download_output%" "SUCCESS" "%size%" ""
-) else (
-    call :logdownload "%download_url%" "%download_output%" "FAILED" "%size%" "HTTP %http_status%"
-)
-exit /b 0
-
 :checkfile
 :filesize
-  if exist "%~1" (
-    set size=%~z1
-  ) else (
-    set size=0
-  )
+  set size=%~z1
   exit /b 0
