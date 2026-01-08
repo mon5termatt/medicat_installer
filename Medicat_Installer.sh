@@ -134,10 +134,12 @@ function downloadVentoy() {
   	local ventoyPackage=$2
   	# Identify latest Ventoy release.
   	venver=$(wget -q -O - https://api.github.com/repos/ventoy/Ventoy/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
+	# Clean the venver var that contain the version of ventoy
+	venver="${venver//[^0-9.]/}"
 
 	# Download latest verion of Ventoy.
-	colEcho $cyanB "\nDownloading Ventoy Version:$whiteB ${venver: -6}"
-	wget -q --show-progress https://github.com/ventoy/Ventoy/releases/download/v${venver: -6}/ventoy-${venver: -6}-linux.tar.gz -O ventoy.tar.gz
+	colEcho $cyanB "\nDownloading Ventoy Version:$whiteB $venver"
+	wget -q --show-progress https://github.com/ventoy/Ventoy/releases/download/v$venver/ventoy-$venver-linux.tar.gz -O ventoy.tar.gz
 
 	colEcho $cyanB "\nExtracting Ventoy..."
 	tar -xf ventoy.tar.gz
@@ -152,7 +154,7 @@ function downloadVentoy() {
 	fi
 
 	colEcho $cyanB "Renaming ventoy folder to remove the version number..."
-	mv ventoy-${venver: -6} ventoy
+	mv ventoy-$venver ventoy
 }
 #-----------------------------------------------------------------------------#
 
