@@ -13,9 +13,12 @@ Medicat7zFull=''MediCat\ USB\ $MedicatVersion/MediCat.USB.$MedicatVersion.7z''
 # Dependencies
 declare -A depCommands
 depCommands["wget"]="wget"
+depCommands["curl"]="curl"
 depCommands["7z"]="zip"
 depCommands["mkfs.vfat"]="mkfs"
 depCommands["mkntfs"]="ntfs"
+declare -A curl
+curl["default"]="curl"
 declare -A wget
 wget["nixos"]="nixos.wget"
 wget["default"]="wget"
@@ -44,7 +47,7 @@ ventoy["default"]="ventoy"
 # Other Variables
 sudo="sudo" # By default use sudo with package manager
 ventoyFS=true  # By default install ventoy from github(FromSource)
-ventoyLauncher="sh ./ventoy/Ventoy2Disk.sh" # By default use the ventoy script
+ventoyLauncher="sh ./Ventoy2Disk.sh" # By default use the ventoy script
 
 # Check if the terminal supports colour and set up variables if it does.
 NumColours=$(tput colors)
@@ -233,40 +236,118 @@ colEcho $cyanB "Operating System Identified as:$whiteB $os"
 colEcho $cyanB "\nLocating the Medicat 7z file..."
 
 if [[ -f "$Medicat7zFile" ]]; then
-	location="$Medicat7zFile"
-	colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFile\n"
-elif  [[ -f "$Medicat7zFull" ]]; then
-	location="$Medicat7zFull"
-	colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFull\n"
+    location="$Medicat7zFile"
+    colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFile\n"
+
+elif [[ -f "$Medicat7zFull" ]]; then
+    location="$Medicat7zFull"
+    colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFull\n"
+
 else
-	colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to download it via bittorrent."
-	read location
+    colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to choose between download through MedicatUSB cdn or bittorrent."
+    read -e location
 fi
 
-colEcho $cyanB "Acquiring any dependencies..."
+# --- VALIDATION ---
+if [ -z "$location" ]; then
+    colEcho $cyanB "No file provided, switching to download mode..."
+    need_download=true
 
-if [ -z "$location" ] ; then
-	depCommands["aria2c"]="aria"
-fi
+elif [ -f "$location" ] && [[ "$location" == *"$Medicat7zFile" ]]; then
+    colEcho $blueB "7Z file found:$whiteB $location"
 
-if $ventoyFS ; then
-    dependenciesHandler
-	downloadVentoy
 else
-	colEcho $cyanB "INFO: Handling ventoy as a package."
-	depCommands["ventoy"]="ventoy"
-	dependenciesHandler
-	ventoyLauncher="ventoy"
+    colEcho $redB "Invalid path or name."
+    colEcho $blueB "Name needed by the file:$whiteB $Medicat7zFile"
+    colEcho $blueB "Name you provided:$whiteB $location"
+    exit 1
 fi
 
-# Download the missing Medicat 7z file
-if [ -z "$location" ] ; then
-	colEcho $cyanB "Starting to download Medicat via bittorrent"
-	wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_$MedicatVersion.torrent -O medicat.torrent
-	aria2c --file-allocation=none --seed-time=0 medicat.torrent
-	location="$Medicat7zFull"
-	colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"
-fi
+if [ "$need_download" = true ]; then
+    if $(YesNo "${blueB}Are you wanting to download Medicat from bittorrent? If no the fallback is the Medicat cdn. (Y/N) ${whiteB}"); then
+        colEcho $cyanB "Acquiring any dependencies for bittorent download..."
+
+		# Download dep for bittorent part
+		if [ -z "$location" ] ; then
+			depCommands["aria2c"]="aria"
+		fi
+		if $ventoyFS ; then
+			dependenciesHandler
+			downloadVentoy
+		else
+			colEcho $cyanB "INFO: Handling ventoy as a package."
+			depCommands["ventoy"]="ventoy"
+			dependenciesHandler
+			ventoyLauncher="ventoy"
+		fi
+
+		# Download the missing Medicat 7z file
+		if [ -z "$location" ] ; then
+			colEcho $cyanB "Starting to download Medicat via bittorrent"
+			wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_$MedicatVersion.torrent -O medicat.torrent
+			aria2c --file-allocation=none --seed-time=0 medicat.torrent
+			location="$Medicat7zFull"
+			colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"
+		fi
+    else
+
+		# Download dep for cdn part
+		if $ventoyFS ; then
+			dependenciesHandler
+			downloadVentoy
+			else
+			colEcho $cyanB "INFO: Handling ventoy as a package."
+			depCommands["ventoy"]="ventoy"
+			dependenciesHandler
+			ventoyLauncher="ventoy"
+		fi
+
+		# Define Download server
+		srv1="https://files.medicatusb.com/files/${MedicatVersion}/${Medicat7zFile}"
+		srv2="https://files.dog/OD%20Rips/MediCat/${MedicatVersion}/${Medicat7zFile}"
+		srv3="https://cat.tcbl.dev/${Medicat7zFile}"
+		referer="https://installer.medicatusb.com"
+		colEcho $blueB "Testing download speeds from available servers..."
+		best_speed=0
+		best_server=""
+
+		# Check download speed loop
+		for i in 1 2 3; do
+			eval server="\$srv$i"
+			colEcho $greenB "Testing$whiteB $server"
+			result=$(curl --referer "$referer" --max-time 3 "$server" --output "test${i}.tmp" --silent --write-out "%{speed_download} %{http_code}")
+			speed_bytes=$(echo "$result" | awk '{print $1}')
+			code=$(echo "$result" | awk '{print $2}')
+			if [ "$code" -ne 200 ]; then
+				colEcho $redB "Speed: connection failed (HTTP $code)"
+				rm -f "test${i}.tmp"
+				continue
+			fi
+
+			speed_MB=$(awk -v r="$speed_bytes" 'BEGIN { printf "%.2f", r / 1000000 }')
+			colEcho $whiteB "Speed: ${speed_MB} MB/s"
+			if awk -v s="$speed_MB" -v b="$best_speed" 'BEGIN {exit !(s > b)}'; then
+				best_speed="$speed_MB"
+				best_server="$server"
+			fi
+			rm -f "test${i}.tmp"
+		done
+		if [ -z "$best_server" ]; then
+			colEcho $redB "\nERROR: No valid server found."
+			colEcho $blueN "Please check your internet connection and try again."
+			sleep 5
+			exit 1
+		fi
+
+		# Download the missing Medicat 7z file
+		if [ -z "$location" ] ; then
+			colEcho $cyanB "Starting to download Medicat via fastest cdn ($best_server with speed $best_speed)"
+			wget --referer="$referer" --progress=bar "$best_server"
+			location="$Medicat7zFile"
+			colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"
+		fi
+		fi
+	fi
 
 # Check the SHA256 hash of the Medicat zip file.
 colEcho $cyanB "Checking SHA256 hash of$whiteB $Medicat7zFile$cyanB..."
@@ -314,6 +395,15 @@ colEcho $cyanB "Installing Ventoy on$whiteB $drive"
 colEcho $blueB "MBR at max can do up to approximately 2.2 TB and will work with older BIOS systems and UEFI systems that support legacy operating systems. GPT can do up to 18 exabytes and will work with UEFI systems."
 if $(YesNo "Device partition layout defaults to MBR.  Would you like to use GPT instead? (Y/N)"); then
 	colEcho $yellowB "Using GPT"
+# Before launching ventoy install, moving to ventoy dir
+	if [ -d ventoy ]; then
+		colEcho $blueB "Moving to ventoy dir"
+		cd ventoy
+	else
+		colEcho $redB "Ventoy directory not fount exiting..."
+		wait 5
+		exit 1
+	fi
 	sudo $ventoyLauncher -I -g $drive
 	if [ "$?" != "0" ]; then
 		colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
@@ -321,12 +411,25 @@ if $(YesNo "Device partition layout defaults to MBR.  Would you like to use GPT 
 	fi
 else
 	colEcho $yellowB "Using MBR"
+# Before launching ventoy install, moving to ventoy dir
+	if [ -d ventoy ]; then
+		colEcho $blueB "Moving to ventoy dir"
+		cd ventoy
+	else
+		colEcho $redB "Ventoy directory not fount exiting..."
+		wait 5
+		exit 1
+	fi
 	sudo $ventoyLauncher -I $drive
 	if [ "$?" != "0" ]; then
 		colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
 		exit 1
 	fi
 fi
+
+# Back to medicat folder after Ventoy Install
+	colEcho $blueB "Back to the medicat folder"
+	cd ..
 
 colEcho $cyanB "Unmounting drive$whiteB $drive"
 sudo umount $drive
