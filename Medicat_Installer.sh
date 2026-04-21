@@ -236,30 +236,41 @@ colEcho $cyanB "Operating System Identified as:$whiteB $os"
 colEcho $cyanB "\nLocating the Medicat 7z file..."
 
 if [[ -f "$Medicat7zFile" ]]; then
-	location="$Medicat7zFile"
-	colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFile\n"
-elif  [[ -f "$Medicat7zFull" ]]; then
-	location="$Medicat7zFull"
-	colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFull\n"
+    location="$Medicat7zFile"
+    colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFile\n"
+
+elif [[ -f "$Medicat7zFull" ]]; then
+    location="$Medicat7zFull"
+    colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFull\n"
+
 else
-	colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to choose between download through MedicatUSB cdn or bittorrent."
-	read location
-	file_name="$(basename "$location")"
- 	if [ -f "$location" ] && [ "$file_name" = "$Medicat7zFile" ]; then
- 		colEcho $blueB "7Z file found:$whiteB $location"
-	else
-		colEcho $redB "Invalid path or name."
-		colEcho $blueB "Name needed by the file:$whiteB $Medicat7zFile"
-		colEcho $blueB "Name you provided:$whiteB $file_name\n"
+    colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to choose between download through MedicatUSB cdn or bittorrent."
+    read -e location
+fi
 
-		if $(YesNo "${blueB}Are you wanting to download Medicat from bittorrent? If no the fallback is the Medicat cdn. (Y/N) ${whiteB}"); then
-		colEcho $cyanB "Acquiring any dependencies for bittorent download..."
+# --- VALIDATION ---
+if [ -z "$location" ]; then
+    colEcho $cyanB "No file provided, switching to download mode..."
+    need_download=true
 
-# Download dep for bittorent part
+elif [ -f "$location" ] && [[ "$location" == *"$Medicat7zFile" ]]; then
+    colEcho $blueB "7Z file found:$whiteB $location"
+
+else
+    colEcho $redB "Invalid path or name."
+    colEcho $blueB "Name needed by the file:$whiteB $Medicat7zFile"
+    colEcho $blueB "Name you provided:$whiteB $location"
+    exit 1
+fi
+
+if [ "$need_download" = true ]; then
+    if $(YesNo "${blueB}Are you wanting to download Medicat from bittorrent? If no the fallback is the Medicat cdn. (Y/N) ${whiteB}"); then
+        colEcho $cyanB "Acquiring any dependencies for bittorent download..."
+
+		# Download dep for bittorent part
 		if [ -z "$location" ] ; then
 			depCommands["aria2c"]="aria"
 		fi
-
 		if $ventoyFS ; then
 			dependenciesHandler
 			downloadVentoy
@@ -270,7 +281,7 @@ else
 			ventoyLauncher="ventoy"
 		fi
 
-# Download the missing Medicat 7z file
+		# Download the missing Medicat 7z file
 		if [ -z "$location" ] ; then
 			colEcho $cyanB "Starting to download Medicat via bittorrent"
 			wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_$MedicatVersion.torrent -O medicat.torrent
@@ -278,49 +289,49 @@ else
 			location="$Medicat7zFull"
 			colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"
 		fi
-		else
+    else
 
-# Download dep for cdn part
+		# Download dep for cdn part
 		if $ventoyFS ; then
 			dependenciesHandler
 			downloadVentoy
-		else
+			else
 			colEcho $cyanB "INFO: Handling ventoy as a package."
 			depCommands["ventoy"]="ventoy"
 			dependenciesHandler
 			ventoyLauncher="ventoy"
 		fi
 
-# Define Download server
+		# Define Download server
 		srv1="https://files.medicatusb.com/files/${MedicatVersion}/${Medicat7zFile}"
 		srv2="https://files.dog/OD%20Rips/MediCat/${MedicatVersion}/${Medicat7zFile}"
 		srv3="https://cat.tcbl.dev/${Medicat7zFile}"
 		referer="https://installer.medicatusb.com"
-
 		colEcho $blueB "Testing download speeds from available servers..."
-
 		best_speed=0
 		best_server=""
 
-# Check download speed loop
+		# Check download speed loop
 		for i in 1 2 3; do
-			eval server=\$srv$i
+			eval server="\$srv$i"
 			colEcho $greenB "Testing$whiteB $server"
+			result=$(curl --referer "$referer" --max-time 3 "$server" --output "test${i}.tmp" --silent --write-out "%{speed_download} %{http_code}")
+			speed_bytes=$(echo "$result" | awk '{print $1}')
+			code=$(echo "$result" | awk '{print $2}')
+			if [ "$code" -ne 200 ]; then
+				colEcho $redB "Speed: connection failed (HTTP $code)"
+				rm -f "test${i}.tmp"
+				continue
+			fi
 
-		result=$(curl --referer "$referer" --max-time 3 "$server" --output "test${i}.tmp" --silent --write-out "%{speed_download}")
-		speed=$(( result / 1000000 ))
-
-		if [ "$(awk -v s="$speed" -v b="$best_speed" 'BEGIN {print (s > b)}')" -eq 1 ]; then
-			best_speed=$speed
-			best_server=$server
-		else
-			colEcho $redB "Speed: connection failed"
-		fi
-		if [ -e test${i}.tmp ]; then
-			rm test${i}.tmp
-		fi
+			speed_MB=$(awk -v r="$speed_bytes" 'BEGIN { printf "%.2f", r / 1000000 }')
+			colEcho $whiteB "Speed: ${speed_MB} MB/s"
+			if awk -v s="$speed_MB" -v b="$best_speed" 'BEGIN {exit !(s > b)}'; then
+				best_speed="$speed_MB"
+				best_server="$server"
+			fi
+			rm -f "test${i}.tmp"
 		done
-
 		if [ -z "$best_server" ]; then
 			colEcho $redB "\nERROR: No valid server found."
 			colEcho $blueN "Please check your internet connection and try again."
@@ -328,7 +339,7 @@ else
 			exit 1
 		fi
 
-# Download the missing Medicat 7z file
+		# Download the missing Medicat 7z file
 		if [ -z "$location" ] ; then
 			colEcho $cyanB "Starting to download Medicat via fastest cdn ($best_server with speed $best_speed)"
 			wget --referer="$referer" --progress=bar "$best_server"
@@ -337,7 +348,6 @@ else
 		fi
 		fi
 	fi
-fi
 
 # Check the SHA256 hash of the Medicat zip file.
 colEcho $cyanB "Checking SHA256 hash of$whiteB $Medicat7zFile$cyanB..."
