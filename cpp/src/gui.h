@@ -72,12 +72,17 @@ private:
     void EnsureVentoyVersionsLoaded();
     void PopulateVentoyVersionCombo();
     void SetVentoyVersions(std::vector<std::wstring> versions);
+    void ApplyLanguageSelection(const std::wstring& languageCode);
+    void RefreshTranslatedUi();
 
     HINSTANCE instance_ = nullptr;
     HWND hwnd_ = nullptr;
     HWND logoStatic_ = nullptr;
     HWND titleLabel_ = nullptr;
     HWND versionLabel_ = nullptr;
+    HWND driveLabel_ = nullptr;
+    HWND languageLabel_ = nullptr;
+    HWND languageCombo_ = nullptr;
     HWND driveCombo_ = nullptr;
     HWND showAllDrivesCheck_ = nullptr;
     HWND formatCheck_ = nullptr;

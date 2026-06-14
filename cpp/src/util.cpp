@@ -60,7 +60,7 @@ std::wstring FormatBytes(uint64_t bytes) {
     if (gb >= 1.0) {
         std::wostringstream ss;
         ss.setf(std::ios::fixed);
-        ss.precision(2);
+        ss.precision(0);
         ss << gb << L" GB";
         return ss.str();
     }
