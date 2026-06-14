@@ -65,7 +65,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | **Refresh drives** button | ⬜ | PS: `refresh_button` |
 | **Show all drives** checkbox | ✅ | Includes fixed disks (HDD/SSD) ≥ 30 GiB; `C:` still hidden |
 | Default select first VHD | ✅ | |
-| Drive size / free display | ✅ | `ui.drive_format` |
+| Drive size / free display | ✅ | `ui.drive_format`; volume label shown when set |
 | Cancel button | ⬜ | PS had cancel |
 | Internet check before install | ✅ | `TestInternetConnection` when Ventoy enabled |
 | Antivirus / MOTD splash | ⬜ | Batch legacy |

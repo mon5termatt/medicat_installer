@@ -153,7 +153,19 @@ bool TryAddDrive(std::vector<DriveInfo>& drives, wchar_t letter, const std::wstr
     }
 
     info.kind = typeLabel;
-    info.display = i18n::Tr(L"ui.drive_format", info.letter, typeLabel,
+
+    std::wstring driveName = info.letter;
+    if (!info.label.empty()) {
+        std::wstring safeLabel = info.label;
+        for (wchar_t& ch : safeLabel) {
+            if (ch == L'"') {
+                ch = L'\'';
+            }
+        }
+        driveName += L" \"" + safeLabel + L"\"";
+    }
+
+    info.display = i18n::Tr(L"ui.drive_format", driveName, typeLabel,
                             std::to_wstring(freeGb), std::to_wstring(totalGb));
     drives.push_back(std::move(info));
     return true;

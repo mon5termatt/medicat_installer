@@ -2,131 +2,134 @@
 alwaysApply: true
 ---
 
-# MediCat Installer - PowerShell GUI Application
+# MediCat Installer — C++ Win32 Application
 
 ## Project Overview
-This is a PowerShell-based GUI installer for MediCat USB bootable media. The script provides a modern Windows Forms interface for downloading, installing Ventoy, and extracting MediCat archives to USB drives.
 
-## Architecture & Design Patterns
+Native Windows installer for MediCat USB bootable media. **Active development is on the `cpp` branch** (`MedicatInstaller.exe`). Older branches exist for reference:
 
-### Core Components
-- **Windows Forms GUI**: Uses System.Windows.Forms for the user interface
-- **Administrator Elevation**: Automatic UAC elevation with working directory preservation
-- **Comprehensive Logging**: Dual logging to file and UI with debug levels
-- **Background Jobs**: Long-running operations (downloads, extractions) run in background jobs
-- **Thread-Safe UI Updates**: Uses `form.Invoke()` with delegates for cross-thread UI updates
+| Branch | Stack | Status |
+|--------|-------|--------|
+| `cpp` | C++17 / Win32 / CMake | **Active** — experimental prerelease |
+| `pwsh` | PowerShell 7 + WinForms | Legacy alpha |
+| `main` | Batch scripts | Community maintenance |
 
-### Key Design Principles
-1. **Fail-Safe Operations**: All operations include error handling and logging
-2. **User Experience**: Real-time progress updates and status messages
-3. **Flexibility**: Support for both fresh installs and Ventoy upgrades
-4. **Debugging**: Extensive debug logging with configurable verbosity
+The C++ installer handles Ventoy install/upgrade, optional NTFS format, `MediCat.USB.v21.12.7z` extraction, and MD5 verification. Tools (`7za.exe`, `7z.exe`, `MedicatFiles.md5`) are **embedded in the exe** and extracted to `%TEMP%\MedicatInstaller\{pid}\` at runtime.
 
-## Code Structure & Conventions
+## Architecture
 
-### Global Variables (script: scope)
-- `$script:LogFile` - Log file path
-- `$script:LastLoggedProgress` - Progress throttling
-- `$script:DownloadPath` - Download directory
-- `$script:MediCatVersion` - MediCat version string
-- `$script:LocalVersion` - Installer version
-- `$script:DebugMode` - Debug logging toggle
+### Core layout (`cpp/src/`)
 
-### Function Naming Conventions
-- `Write-Log` - General logging with UI and file output
-- `Write-DebugLog` - Debug-only logging (respects DebugMode)
-- `Update-Status` - UI status label updates
-- `Update-Progress` - Progress bar updates with throttling
-- `Show-MessageBox` - Centralized message box with logging
-- `Get-DriveList` - Drive enumeration and filtering
-- `Test-VentoyInstalled` - Ventoy installation detection
-- `Install-Ventoy` - Ventoy installation/upgrade
-- `Start-MediatInstallation` - Main installation workflow
+| Module | Role |
+|--------|------|
+| `main.cpp` | Entry, `App::Run()` |
+| `app.cpp` | Install/verify orchestration, worker threads, `PostDone` |
+| `gui.cpp` | Win32 UI, dark theme, file-log window, progress |
+| `drives.cpp` | USB/VHD/HDD enumeration, drive identity, capacity checks |
+| `ventoy.cpp` | Download, extract, `VTOYCLI /I` or `/U` |
+| `extract.cpp` | `7za` subprocess, stdout pipe, `extract.log` tee |
+| `verify.cpp` | Parallel MD5 verify, `check.log`, manifest load |
+| `debug.cpp` | Auto `debug.log` on errors (system + tool diagnostics) |
+| `bundle.cpp` | Extract embedded resources from exe |
+| `download.cpp` | WinHTTP downloads (Ventoy, manifest fallback) |
+| `i18n.cpp` | `i18n::Tr()` — strings from build-generated header |
+| `theme.cpp` | GDI+ dark controls, flat checkboxes, glow buttons |
+| `log.cpp` | `medicat_installer.log` beside exe |
 
-### Error Handling Patterns
-```powershell
-try {
-    # Operation
-} catch {
-    Write-Log "ERROR: $($_.Exception.Message)"
-    Write-DebugLog "Exception type: $($_.Exception.GetType().Name)"
-    # Continue or return based on severity
-}
+### Threading & UI updates
+
+Long work runs on **detached `std::thread` workers** (`RunInstallThread`, `RunVerifyThread`). Never call GUI APIs from workers directly.
+
+```cpp
+// Worker posts to UI thread:
+PostExtractProgress(percent, fileLine, resetLog);  // WM_MEDICAT_PROGRESS
+PostDone(success, message, title);                 // WM_MEDICAT_DONE
+
+// Gui handles WM_MEDICAT_PROGRESS:
+//   extractUpdate=true → NotifyExtractProgress → timer batches listbox lines
+//   extractUpdate=false → SetProgress only
 ```
 
-### UI Update Patterns
-```powershell
-# Thread-safe UI updates from background jobs
-$form.Invoke([System.Action[string]]{
-    param($msg)
-    $logTextBox.AppendText("$msg`r`n")
-    $logTextBox.ScrollToCaret()
-}, $message)
+`Gui::SetBusy(true, BusyProgressMode::Verify|FileLog)` enables a 250ms timer that flushes pending file-log lines to the listbox.
+
+### Key design principles
+
+1. **Fail-safe** — confirm wipe/Ventoy/drive-letter changes; log everything
+2. **Thread-safe UI** — workers post messages; GUI thread owns HWNDs
+3. **Single-file distribution** — bundle 7za/7z/MD5 into exe; no sidecar copies
+4. **Diagnostics on failure** — `debug.log` auto-written in `PostDone(false, …)`
+
+## Drive management (`drives.cpp`)
+
+- Lists **USB removable** + **VHD/VHDX** (`BusTypeFileBackedVirtual`) by default
+- **Show all drives** checkbox adds fixed HDD/SSD ≥ 30 GiB (`kMinDriveCapacityBytes`)
+- Always hides `C:`
+- Display: `H: "LABEL" (USB) - XGB free of YGB` when volume label exists
+- `GetDriveIdentity` + `ResolveDriveLetterAfterVentoy` track disk numbers across Ventoy remounts
+
+## Logging (beside exe)
+
+| File | When |
+|------|------|
+| `medicat_installer.log` | Every session |
+| `extract.log` | 7za stdout/stderr during extract |
+| `check.log` | Per-file MD5 result during verify |
+| `debug.log` | On operation failure only |
+| `failed_files.txt` | Verification failures |
+
+## i18n
+
+- Source: `i18n/translations.json` (EN, ES, FR, PL)
+- Build codegen: `tools/i18n_codegen.py` → `cpp/src/i18n_generated.h`
+- Usage: `i18n::Tr(L"key")` or `i18n::Tr(L"key", arg1, arg2)`
+- Add keys to **all four languages** in `translations.json`; rebuild regenerates header
+
+## Build
+
+```bat
+cd cpp
+cmake -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
 ```
 
-## Key Features & Functionality
+Output: `cpp/build/Release/MedicatInstaller.exe`
 
-### Drive Management
-- **Dynamic Drive Detection**: USB drives, VHD/VHDX files, optional HDD inclusion
-- **Drive Filtering**: Excludes C: drive, configurable HDD visibility
-- **VHD/VHDX Support**: Automatic detection of virtual hard drives
-- **Ventoy Detection**: Checks for existing VTOYEFI partitions
+**Bundle inputs** (repo root): `7za.exe` (or `7z/x64/7za.exe`), `bin/7z.exe`, `MedicatFiles.md5`
 
-### Ventoy Integration
-- **Automatic Download**: Fetches latest Ventoy version from GitHub API
-- **Installation Modes**: Fresh install vs. non-destructive upgrade
-- **Drive Formatting**: Optional NTFS formatting (user-controlled)
-- **Error Handling**: Comprehensive Ventoy CLI error capture
+Defines: `INSTALLER_VERSION`, `MEDICAT_USB_VERSION` (CMake)
 
-### Archive Extraction
-- **PowerShell Module Priority**: Prefers 7Zip4PowerShell over 7z.exe
-- **Progress Monitoring**: Real-time progress via file system monitoring
-- **Background Processing**: Extraction runs in background jobs
-- **Fallback Support**: Multiple extraction methods available
+## Code conventions (C++)
 
-### Logging System
-- **Dual Output**: Simultaneous file and UI logging
-- **Message Classification**: Status, Progress, Debug, MessageBox logging
-- **Throttling**: Progress updates throttled to prevent log spam
-- **Persistence**: All operations logged to `medicat_download.log`
+- C++17, MSVC `/W4 /utf-8`, namespace `medicat`
+- Minimize scope — match existing file style; no over-abstraction
+- Wide strings (`std::wstring`) for Windows paths/UI; UTF-8 for log files
+- Extended paths: `\\?\` prefix in `verify.cpp` for long manifest paths
+- Listbox strings: persist in `fileLogDisplayLines_` — never pass temporaries to `LB_ADDSTRING`
+- Verification workers: heap buffers for MD5 (`std::vector<BYTE>`), not large stack arrays
 
-## Development Guidelines
+## When adding features
 
-### When Adding New Features
-1. **Follow Existing Patterns**: Use established error handling and logging patterns
-2. **Thread Safety**: Use `form.Invoke()` for UI updates from background operations
-3. **Comprehensive Logging**: Log all user interactions and system operations
-4. **Error Recovery**: Provide meaningful error messages and recovery options
-5. **User Experience**: Update status and progress for long-running operations
+1. Read `cpp/FEATURES.md` for parity checklist vs PowerShell installer
+2. Wire progress through `PostExtractProgress` / `onFileLog` callbacks
+3. Add i18n keys for user-visible strings
+4. Log via `log_->Info/Error/Debug` in `app.cpp`; module `onLog` for verify/ventoy
+5. On new failure paths, ensure `PostDone(false, msg)` runs so `debug.log` is generated
+6. Do not commit `cpp/build/`, logs, `Ventoy2Disk/`, or `.7z` archives
 
-### Code Style Requirements
-- **Consistent Indentation**: 4 spaces for PowerShell blocks
-- **Function Documentation**: Include parameter descriptions and purpose
-- **Variable Naming**: Use descriptive names, prefix script variables with `$script:`
-- **Error Messages**: Use `Write-Log` for errors, `Write-DebugLog` for debugging
-- **UI Updates**: Always use `Update-Status` and `Update-Progress` for UI feedback
+## Testing notes
 
-### Testing Considerations
-- **Admin Privileges**: Script requires elevation for disk operations
-- **Drive Selection**: Test with various drive types (USB, VHD, HDD)
-- **Network Operations**: Handle offline scenarios gracefully
-- **Large Files**: Test with 24GB MediCat archive extraction
-- **Error Scenarios**: Test Ventoy installation failures and recovery
+- Requires **Administrator** (UAC manifest on exe)
+- Test USB, VHD, and **Show all drives** (fixed disk) paths
+- Verify: ~29k files / ~28 GB — throughput log warns if OS read cache makes timing misleading
+- Ventoy may remount drive under a different letter — confirm dialog must pass
+- Release asset uploaded to GitHub tag (e.g. `3520` prerelease) via `gh release upload --clobber`
 
-## File Dependencies
-- **MediCat.USB.v21.12.7z**: Main MediCat archive (24GB)
-- **Ventoy2Disk/**: Ventoy installation directory (auto-downloaded)
-- **7Zip4PowerShell**: PowerShell module for archive extraction
-- **medicat_download.log**: Comprehensive operation log
+## Security
 
-## Security Considerations
-- **Administrator Rights**: Required for disk operations and Ventoy installation
-- **File Integrity**: MD5 verification for downloaded files
-- **Safe Operations**: Confirmation dialogs for destructive operations
-- **Logging**: All operations logged for audit trail
+- Destructive ops require explicit confirmation (`wipe_confirm`, `ventoy_warning`)
+- MD5 verify reads full file bytes; incomplete reads fail hash
+- Internet required only for Ventoy download (not for verify-only with bundled manifest)
 
-## Performance Considerations
-- **Background Jobs**: Long operations don't block UI
-- **Progress Throttling**: Prevents excessive logging
-- **Memory Management**: Proper cleanup of background jobs
-- **File System Monitoring**: Efficient progress tracking for extractions
+## Legacy reference
+
+PowerShell installer patterns (`pwsh` branch): `form.Invoke`, `Write-Log`, `medicat_download.log`, SevenZipSharp/7Zip4PowerShell. **Do not port PS patterns into C++** — use Win32 message posting and `7za` CLI instead.
