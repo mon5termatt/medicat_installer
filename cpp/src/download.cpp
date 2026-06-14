@@ -112,6 +112,19 @@ bool HttpRequest(const std::wstring& url, std::vector<BYTE>& body, std::wstring&
         return false;
     }
 
+    DWORD statusCode = 0;
+    DWORD statusSize = sizeof(statusCode);
+    if (!WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                             WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize,
+                             WINHTTP_NO_HEADER_INDEX) ||
+        statusCode < 200 || statusCode >= 300) {
+        WinHttpCloseHandle(request);
+        WinHttpCloseHandle(connect);
+        WinHttpCloseHandle(session);
+        error = L"HTTP request returned status " + std::to_wstring(statusCode);
+        return false;
+    }
+
     const bool ok = ReadResponse(request, body, error);
     WinHttpCloseHandle(request);
     WinHttpCloseHandle(connect);

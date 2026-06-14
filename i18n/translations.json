@@ -17,6 +17,8 @@
       "drive_format": "{0} {1} - {2}GB free of {3}GB",
       "advanced_options": "Advanced options",
       "pin_ventoy_version": "Pin Ventoy version",
+      "ventoy_secure_boot": "Enable Ventoy Secure Boot support",
+      "ventoy_gpt_partition": "Use GPT partition style (default: MBR)",
       "ventoy_version_hint": "e.g. 1.0.99 (leave blank = latest)",
       "open_file_log_button": "Open File Log",
       "file_log_title": "Extraction File Log"
@@ -43,7 +45,7 @@
       "copying_files": "Copying installer files...",
       "installation_complete": "Installation completed successfully!",
       "checking_usb": "Checking USB files...",
-      "verifying_files": "Verifying files with PowerShell...",
+      "verifying_files": "Verifying installed files...",
       "verification_complete": "File verification completed - All files OK",
       "verification_failed": "File verification failed - {0} file(s) failed",
       "re_extracting": "Re-extracting missing files...",
@@ -65,12 +67,14 @@
       "module_install_failed_admin": "Failed to load extraction libraries.\n\nError: {0}\n\nEnsure the lib/ folder is complete and readable.",
       "installation_complete": "MediCat has been installed successfully to {0}",
       "installation_error": "An error occurred during installation: {0}",
-      "verification_complete": "File verification completed successfully. All {0} files are intact.",
+      "verification_complete": "File verification completed successfully. {0}/{1} files passed MD5 check.",
+      "verify_skipped_files": "{0} known optional file(s) were skipped (e.g. autorun.ico).",
       "verification_failed": "File verification found {0} file(s) that failed verification.\n\nWould you like to attempt to re-extract the missing files from the archive?",
       "re_extract_complete": "Re-extraction completed. You may want to run file verification again to confirm.",
       "re_extract_failed": "Re-extraction completed with errors.\n\nExtracted: {0}/{1}\nFailed: {2}\n\nCheck the log for details.",
       "download_failed": "Failed to download the verification file. Please check your internet connection.",
       "verification_error": "An error occurred during file verification: {0}",
+      "md5_manifest_missing": "The bundled MD5 verification manifest could not be loaded. Reinstall MedicatInstaller.exe or check medicat_installer.log for details.",
       "re_extraction_error": "An error occurred during re-extraction: {0}",
       "bin_download_incomplete": "Downloaded {0} of {1} bin files. Some files may have failed. Check the log for details.",
       "bin_download_error": "An error occurred while downloading bin files: {0}",
@@ -78,11 +82,24 @@
       "archive_not_found": "Source archive not found: {0}\nPlease ensure the archive exists.",
       "selection_cancelled": "Archive file selection was cancelled. Re-extraction cannot proceed.",
       "no_drive_for_check": "Please select a USB drive first.",
-      "usb_too_small": "USB drive is too small for MediCat."
+      "usb_too_small": "USB drive does not have enough free space for MediCat.",
+      "drive_under_minimum": "Drive {0} is too small. MediCat requires at least 30 GB total capacity.",
+      "drive_lost_after_ventoy": "The USB drive could not be found after Ventoy installation. It may have failed to remount — please check Disk Management and try again."
     },
     "ventoy_warning": {
       "title": "Ventoy Installation Warning",
       "message": "IMPORTANT WARNING:\n\nSOMETIMES VENTOY MESSES UP A DRIVE.\nIF THE DRIVE DISAPPEARS PLEASE CHECK DISK MANAGER\nAND SEE IF THE DRIVE FAILED TO REMOUNT.\nTHIS IS A VENTOY BUG AND CANNOT BE FIXED ON OUR END.\n\nInstall Ventoy to {0} ?\n\nIF FROZEN FOR MORE THAN 60 SECONDS, INSTALL VENTOY MANUALLY."
+    },
+    "wipe_confirm": {
+      "title": "DATA LOSS WARNING",
+      "message": "YOU ARE ABOUT TO WIPE DRIVE {0}\n\nThis installer will perform the following operations on the selected drive:\n\n{1}\n\nALL EXISTING DATA ON {0} MAY BE PERMANENTLY LOST.\n\nARE YOU ABSOLUTELY SURE YOU WANT TO WIPE THIS DRIVE AND CONTINUE?\n\nClick \"No\" to cancel. There is no undo.",
+      "detail_ventoy": "- Install or upgrade Ventoy (repartitions the drive)",
+      "detail_format": "- Format the drive to NTFS",
+      "detail_extract": "- Extract MediCat files to the drive (overwrites existing files)"
+    },
+    "drive_letter_changed": {
+      "title": "Drive Letter Changed",
+      "message": "Ventoy finished, but Windows remounted the USB drive under a different letter.\n\nYou selected: {0}\nDrive is now:  {1}\n\nExtract MediCat to {1}?\n\nClick \"No\" to cancel. If no drive appears, check Disk Management."
     },
     "ventoy_not_detected": {
       "title": "Ventoy Installation Not Detected",
@@ -91,6 +108,7 @@
     "titles": {
       "no_internet": "No Internet",
       "no_drive_selected": "No Drive Selected",
+      "drive_under_minimum": "Drive Too Small",
       "file_not_found": "File Not Found",
       "ventoy_install_failed": "Ventoy Installation Failed",
       "ventoy_upgrade_failed": "Ventoy Upgrade Failed",
@@ -173,6 +191,8 @@
       "drive_format": "{0} {1} - {2}GB libres de {3}GB",
       "advanced_options": "Opciones avanzadas",
       "pin_ventoy_version": "Fijar versión de Ventoy",
+      "ventoy_secure_boot": "Habilitar soporte Secure Boot de Ventoy",
+      "ventoy_gpt_partition": "Usar partición GPT (predeterminado: MBR)",
       "ventoy_version_hint": "ej. 1.0.99 (vacío = última)",
       "open_file_log_button": "Abrir registro de archivos",
       "file_log_title": "Registro de extracción"
@@ -233,11 +253,24 @@
       "7zip_not_found": "No se pudieron usar las bibliotecas de extracción.\n\nAsegúrese de que lib/ contenga SevenZipSharp.dll y 7z64.dll, o que 7za.exe esté presente.",
       "archive_not_found": "Archivo fuente no encontrado: {0}\nPor favor asegúrese de que el archivo exista.",
       "selection_cancelled": "La selección del archivo fue cancelada. La re-extracción no puede continuar.",
-      "no_drive_for_check": "Por favor seleccione una unidad USB primero."
+      "no_drive_for_check": "Por favor seleccione una unidad USB primero.",
+      "drive_lost_after_ventoy": "No se pudo encontrar la unidad USB después de la instalación de Ventoy. Puede que no se haya vuelto a montar — verifique el Administrador de discos e intente nuevamente.",
+      "drive_under_minimum": "La unidad {0} es demasiado pequeña. MediCat requiere al menos 30 GB de capacidad total."
     },
     "ventoy_warning": {
       "title": "Advertencia de Instalación Ventoy",
       "message": "ADVERTENCIA IMPORTANTE:\n\nA VECES VENTOY DAÑA UNA UNIDAD.\nSI LA UNIDAD DESAPARECE POR FAVOR VERIFIQUE EL ADMINISTRADOR DE DISCOS\nY VEA SI LA UNIDAD FALLÓ AL REMONTARSE.\nESTE ES UN ERROR DE VENTOY Y NO PUEDE SER CORREGIDO DE NUESTRA PARTE.\n\n¿Instalar Ventoy en {0} ?\n\nSI SE CONGELA POR MÁS DE 60 SEGUNDOS, INSTALE VENTOY MANUALMENTE."
+    },
+    "wipe_confirm": {
+      "title": "ADVERTENCIA DE PÉRDIDA DE DATOS",
+      "message": "ESTÁ A PUNTO DE BORRAR LA UNIDAD {0}\n\nEste instalador realizará las siguientes operaciones en la unidad seleccionada:\n\n{1}\n\nTODOS LOS DATOS EXISTENTES EN {0} PUEDEN PERDERSE PERMANENTEMENTE.\n\n¿ESTÁ ABSOLUTAMENTE SEGURO DE QUE DESEA BORRAR ESTA UNIDAD Y CONTINUAR?\n\nHaga clic en \"No\" para cancelar. No hay deshacer.",
+      "detail_ventoy": "- Instalar o actualizar Ventoy (reparticiona la unidad)",
+      "detail_format": "- Formatear la unidad a NTFS",
+      "detail_extract": "- Extraer archivos MediCat a la unidad (sobrescribe archivos existentes)"
+    },
+    "drive_letter_changed": {
+      "title": "Letra de unidad cambiada",
+      "message": "Ventoy terminó, pero Windows volvió a montar la unidad USB con una letra diferente.\n\nSeleccionó: {0}\nAhora es:    {1}\n\n¿Extraer MediCat en {1}?\n\nHaga clic en \"No\" para cancelar. Si no aparece ninguna unidad, verifique el Administrador de discos."
     },
     "ventoy_not_detected": {
       "title": "Instalación Ventoy No Detectada",
@@ -246,6 +279,7 @@
     "titles": {
       "no_internet": "Sin Internet",
       "no_drive_selected": "No se Seleccionó Unidad",
+      "drive_under_minimum": "Unidad Demasiado Pequeña",
       "file_not_found": "Archivo No Encontrado",
       "ventoy_install_failed": "Instalación Ventoy Falló",
       "ventoy_upgrade_failed": "Actualización Ventoy Falló",
@@ -329,6 +363,8 @@
       "drive_format": "{0} {1} - {2}GB libres sur {3}GB",
       "advanced_options": "Options avancées",
       "pin_ventoy_version": "Épingler la version Ventoy",
+      "ventoy_secure_boot": "Activer le support Secure Boot Ventoy",
+      "ventoy_gpt_partition": "Utiliser le style de partition GPT (par défaut : MBR)",
       "ventoy_version_hint": "ex. 1.0.99 (vide = dernière)",
       "open_file_log_button": "Ouvrir le journal des fichiers",
       "file_log_title": "Journal d'extraction"
@@ -389,11 +425,24 @@
       "7zip_not_found": "Les bibliothèques d'extraction n'ont pas pu être utilisées.\n\nAssurez-vous que lib/ contient SevenZipSharp.dll et 7z64.dll, ou que 7za.exe est présent.",
       "archive_not_found": "Archive source introuvable: {0}\nVeuillez vous assurer que l'archive existe.",
       "selection_cancelled": "La sélection du fichier d'archive a été annulée. La ré-extraction ne peut pas continuer.",
-      "no_drive_for_check": "Veuillez d'abord sélectionner un lecteur USB."
+      "no_drive_for_check": "Veuillez d'abord sélectionner un lecteur USB.",
+      "drive_lost_after_ventoy": "Le lecteur USB est introuvable après l'installation de Ventoy. Il a peut-être échoué à se remonter — vérifiez le Gestionnaire de disques et réessayez.",
+      "drive_under_minimum": "Le lecteur {0} est trop petit. MediCat nécessite au moins 30 Go de capacité totale."
     },
     "ventoy_warning": {
       "title": "Avertissement d'Installation Ventoy",
       "message": "AVERTISSEMENT IMPORTANT:\n\nPARFOIS VENTOY CASSE UN LECTEUR.\nSI LE LECTEUR DISPARAÎT, VEUILLEZ VÉRIFIER LE GESTIONNAIRE DE DISQUES\nET VOIR SI LE LECTEUR A ÉCHOUÉ À REMONTER.\nC'EST UN BUG DE VENTOY ET NE PEUT PAS ÊTRE CORRIGÉ DE NOTRE CÔTÉ.\n\nInstaller Ventoy sur {0} ?\n\nSI GELÉ PENDANT PLUS DE 60 SECONDES, INSTALLEZ VENTOY MANUELLEMENT."
+    },
+    "wipe_confirm": {
+      "title": "AVERTISSEMENT PERTE DE DONNÉES",
+      "message": "VOUS ÊTES SUR LE POINT D'EFFACER LE LECTEUR {0}\n\nCet installateur effectuera les opérations suivantes sur le lecteur sélectionné :\n\n{1}\n\nTOUTES LES DONNÉES EXISTANTES SUR {0} PEUVENT ÊTRE DÉFINITIVEMENT PERDUES.\n\nÊTES-VOUS ABSOLUMENT SÛR DE VOULOIR EFFACER CE LECTEUR ET CONTINUER ?\n\nCliquez sur \"Non\" pour annuler. Il n'y a pas de retour en arrière.",
+      "detail_ventoy": "- Installer ou mettre à jour Ventoy (repartitionne le lecteur)",
+      "detail_format": "- Formater le lecteur en NTFS",
+      "detail_extract": "- Extraire les fichiers MediCat sur le lecteur (écrase les fichiers existants)"
+    },
+    "drive_letter_changed": {
+      "title": "Lettre de lecteur modifiée",
+      "message": "Ventoy a terminé, mais Windows a remonté le lecteur USB sous une autre lettre.\n\nVous avez sélectionné : {0}\nLe lecteur est maintenant : {1}\n\nExtraire MediCat sur {1} ?\n\nCliquez sur \"Non\" pour annuler. Si aucun lecteur n'apparaît, vérifiez le Gestionnaire de disques."
     },
     "ventoy_not_detected": {
       "title": "Installation Ventoy Non Détectée",
@@ -402,6 +451,7 @@
     "titles": {
       "no_internet": "Pas d'Internet",
       "no_drive_selected": "Aucun Lecteur Sélectionné",
+      "drive_under_minimum": "Lecteur Trop Petit",
       "file_not_found": "Fichier Introuvable",
       "ventoy_install_failed": "Échec de l'Installation Ventoy",
       "ventoy_upgrade_failed": "Échec de la Mise à Jour Ventoy",
@@ -485,6 +535,8 @@
       "drive_format": "{0} {1} - {2}GB wolne z {3}GB",
       "advanced_options": "Opcje zaawansowane",
       "pin_ventoy_version": "Przypnij wersję Ventoy",
+      "ventoy_secure_boot": "Włącz obsługę Secure Boot Ventoy",
+      "ventoy_gpt_partition": "Użyj stylu partycji GPT (domyślnie: MBR)",
       "ventoy_version_hint": "np. 1.0.99 (puste = najnowsza)",
       "open_file_log_button": "Otwórz dziennik plików",
       "file_log_title": "Dziennik rozpakowywania"
@@ -545,11 +597,24 @@
       "7zip_not_found": "Nie można było użyć bibliotek ekstrakcji.\n\nUpewnij się, że lib/ zawiera SevenZipSharp.dll i 7z64.dll, lub że 7za.exe jest obecny.",
       "archive_not_found": "Nie znaleziono archiwum źródłowego: {0}\nUpewnij się, że archiwum istnieje.",
       "selection_cancelled": "Wybór pliku archiwum został anulowany. Nie można kontynuować ponownego rozpakowywania.",
-      "no_drive_for_check": "Najpierw wybierz dysk USB."
+      "no_drive_for_check": "Najpierw wybierz dysk USB.",
+      "drive_lost_after_ventoy": "Nie można znaleźć dysku USB po instalacji Ventoy. Możliwe, że nie został ponownie zamontowany — sprawdź Menedżera dysków i spróbuj ponownie.",
+      "drive_under_minimum": "Dysk {0} jest za mały. MediCat wymaga co najmniej 30 GB całkowitej pojemności."
     },
     "ventoy_warning": {
       "title": "Ostrzeżenie dotyczące instalacji Ventoy",
       "message": "WAŻNE OSTRZEŻENIE:\n\nCZASAMI VENTOY PSUJE DYSK.\nJEŚLI DYSK ZNIKNĄŁ, SPRAWDŹ MENEDŻERA DYSKÓW\n I ZOBACZ, CZY DYSK NIE ZOSTAŁ PONOWNIE PODŁĄCZONY.\n JEST TO BŁĄD VENTOY I NIE MOŻEMY GO NAPRAWIĆ.\n\nZainstaluj Ventoy w {0} ?\n\nJEŚLI ZAWIESIŁO SIĘ NA DŁUŻEJ NIŻ 60 SEKUND, ZAINSTALUJ VENTOY RĘCZNIE."
+    },
+    "wipe_confirm": {
+      "title": "OSTRZEŻENIE O UTRACIE DANYCH",
+      "message": "ZAMIERZASZ WYCZYŚCIĆ DYSK {0}\n\nTen instalator wykona następujące operacje na wybranym dysku:\n\n{1}\n\nWSZYSTKIE ISTNIEJĄCE DANE NA {0} MOGĄ ZOSTAĆ TRWALE UTRACONE.\n\nCZY NA PEWNO CHCESZ WYCZYŚCIĆ TEN DYSK I KONTYNUOWAĆ?\n\nKliknij „Nie”, aby anulować. Nie ma cofnięcia.",
+      "detail_ventoy": "- Zainstaluj lub zaktualizuj Ventoy (zmienia partycje dysku)",
+      "detail_format": "- Sformatuj dysk do NTFS",
+      "detail_extract": "- Rozpakuj pliki MediCat na dysk (nadpisuje istniejące pliki)"
+    },
+    "drive_letter_changed": {
+      "title": "Zmieniono literę dysku",
+      "message": "Ventoy zakończył pracę, ale Windows ponownie zamontował dysk USB pod inną literą.\n\nWybrałeś: {0}\nDysk jest teraz: {1}\n\nRozpakować MediCat na {1}?\n\nKliknij „Nie”, aby anulować. Jeśli dysk się nie pojawia, sprawdź Menedżera dysków."
     },
     "ventoy_not_detected": {
       "title": "Nie wykryto instalacji Ventoy",
@@ -558,6 +623,7 @@
     "titles": {
       "no_internet": "Brak internetu",
       "no_drive_selected": "Brak wybranego dysku",
+      "drive_under_minimum": "Dysk za mały",
       "file_not_found": "Nie znaleziono pliku",
       "ventoy_install_failed": "Niepowodzenie instalacji Ventoy",
       "ventoy_upgrade_failed": "Niepowodzenie aktualizacji Ventoy",

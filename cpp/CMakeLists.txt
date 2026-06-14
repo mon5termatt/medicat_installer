@@ -20,6 +20,7 @@ else()
 endif()
 
 set(BUNDLE_7Z "${REPO_ROOT}/bin/7z.exe")
+set(BUNDLE_MD5 "${REPO_ROOT}/MedicatFiles.md5")
 
 if(NOT EXISTS "${BUNDLE_7ZA}")
     message(FATAL_ERROR "7za.exe not found for bundling: ${BUNDLE_7ZA}")
@@ -27,12 +28,17 @@ endif()
 if(NOT EXISTS "${BUNDLE_7Z}")
     message(FATAL_ERROR "7z.exe not found for bundling: ${BUNDLE_7Z}")
 endif()
+if(NOT EXISTS "${BUNDLE_MD5}")
+    message(FATAL_ERROR "MedicatFiles.md5 not found for bundling: ${BUNDLE_MD5}")
+endif()
 
 file(TO_NATIVE_PATH "${BUNDLE_7ZA}" BUNDLE_7ZA_PATH)
 file(TO_NATIVE_PATH "${BUNDLE_7Z}" BUNDLE_7Z_PATH)
+file(TO_NATIVE_PATH "${BUNDLE_MD5}" BUNDLE_MD5_PATH)
 # RC treats \7 as an escape — use forward slashes in the resource script.
 string(REPLACE "\\" "/" BUNDLE_7ZA_PATH "${BUNDLE_7ZA_PATH}")
 string(REPLACE "\\" "/" BUNDLE_7Z_PATH "${BUNDLE_7Z_PATH}")
+string(REPLACE "\\" "/" BUNDLE_MD5_PATH "${BUNDLE_MD5_PATH}")
 
 set(VENTOY_VERSIONS_GEN "${CMAKE_BINARY_DIR}/ventoy_versions.txt")
 set(VENTOY_VERSIONS_SCRIPT "${REPO_ROOT}/tools/fetch_ventoy_versions.py")
@@ -50,7 +56,7 @@ file(TO_NATIVE_PATH "${VENTOY_VERSIONS_GEN}" VENTOY_VERSIONS_PATH)
 string(REPLACE "\\" "/" VENTOY_VERSIONS_PATH "${VENTOY_VERSIONS_PATH}")
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/res/bundle.rc.in" "${CMAKE_BINARY_DIR}/bundle.rc" @ONLY)
 set_source_files_properties("${CMAKE_BINARY_DIR}/bundle.rc" PROPERTIES
-    OBJECT_DEPENDS "${VENTOY_VERSIONS_GEN}"
+    OBJECT_DEPENDS "${VENTOY_VERSIONS_GEN};${BUNDLE_MD5}"
 )
 
 set(I18N_JSON "${REPO_ROOT}/i18n/translations.json")
@@ -78,6 +84,8 @@ add_executable(MedicatInstaller WIN32
     src/bundle.cpp
     src/i18n.cpp
     src/theme.cpp
+    src/verify.cpp
+    src/debug.cpp
     "${CMAKE_BINARY_DIR}/bundle.rc"
     "${CMAKE_BINARY_DIR}/ventoy_versions.txt"
     "${I18N_GEN}"
@@ -94,7 +102,8 @@ target_compile_definitions(MedicatInstaller PRIVATE
     _UNICODE
     WIN32_LEAN_AND_MEAN
     NOMINMAX
-    MEDICAT_VERSION="21.12"
+    INSTALLER_VERSION="${PROJECT_VERSION}"
+    MEDICAT_USB_VERSION="21.12"
 )
 
 target_link_libraries(MedicatInstaller PRIVATE
@@ -110,6 +119,7 @@ target_link_libraries(MedicatInstaller PRIVATE
     dwmapi
     uxtheme
     gdiplus
+    advapi32
 )
 
 if(MSVC)

@@ -150,7 +150,7 @@ const Palette& Colors() { return g_palette; }
 
 const Brushes& GetBrushes() { return g_brushes; }
 
-HBITMAP LoadLogoBitmap(HINSTANCE instance) {
+HBITMAP LoadLogoBitmap(const HINSTANCE instance, const int maxSize) {
     HRSRC resource = FindResourceW(instance, MAKEINTRESOURCEW(IDR_LOGO_PNG), RT_RCDATA);
     if (!resource) {
         return nullptr;
@@ -167,28 +167,57 @@ HBITMAP LoadLogoBitmap(HINSTANCE instance) {
         return nullptr;
     }
 
-    IWICImagingFactory* factory = nullptr;
-    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory)))) {
+    HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, size);
+    if (!mem) {
         return nullptr;
     }
 
-    IWICStream* stream = nullptr;
-    HBITMAP bitmap = nullptr;
-    if (SUCCEEDED(factory->CreateStream(&stream)) &&
-        SUCCEEDED(stream->InitializeFromMemory(reinterpret_cast<BYTE*>(const_cast<void*>(data)), size))) {
-        IWICBitmapDecoder* decoder = nullptr;
-        if (SUCCEEDED(factory->CreateDecoderFromStream(stream, nullptr, WICDecodeMetadataCacheOnLoad, &decoder))) {
-            IWICBitmapFrameDecode* frame = nullptr;
-            if (SUCCEEDED(decoder->GetFrame(0, &frame))) {
-                bitmap = CreateHBitmapFromWicBitmap(frame);
-                frame->Release();
-            }
-            decoder->Release();
-        }
-        stream->Release();
+    void* dest = GlobalLock(mem);
+    if (!dest) {
+        GlobalFree(mem);
+        return nullptr;
+    }
+    memcpy(dest, data, size);
+    GlobalUnlock(mem);
+
+    IStream* stream = nullptr;
+    if (FAILED(CreateStreamOnHGlobal(mem, TRUE, &stream))) {
+        GlobalFree(mem);
+        return nullptr;
     }
 
-    factory->Release();
+    auto* src = Gdiplus::Bitmap::FromStream(stream);
+    stream->Release();
+    if (!src || src->GetLastStatus() != Gdiplus::Ok) {
+        delete src;
+        return nullptr;
+    }
+
+    const INT srcW = src->GetWidth();
+    const INT srcH = src->GetHeight();
+    if (srcW <= 0 || srcH <= 0) {
+        delete src;
+        return nullptr;
+    }
+
+    const int limit = std::max(1, maxSize);
+    const float scale =
+        std::min(static_cast<float>(limit) / static_cast<float>(srcW),
+                 static_cast<float>(limit) / static_cast<float>(srcH));
+    const int dstW = std::max(1, static_cast<int>(static_cast<float>(srcW) * scale + 0.5f));
+    const int dstH = std::max(1, static_cast<int>(static_cast<float>(srcH) * scale + 0.5f));
+
+    Gdiplus::Bitmap dst(dstW, dstH, PixelFormat32bppPARGB);
+    Gdiplus::Graphics graphics(&dst);
+    graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+    graphics.DrawImage(src, 0, 0, dstW, dstH);
+    delete src;
+
+    HBITMAP bitmap = nullptr;
+    if (dst.GetHBITMAP(Gdiplus::Color(0, 0, 0, 0), &bitmap) != Gdiplus::Ok) {
+        return nullptr;
+    }
     return bitmap;
 }
 

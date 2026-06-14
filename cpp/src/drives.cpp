@@ -128,8 +128,8 @@ bool TryAddDrive(std::vector<DriveInfo>& drives, wchar_t letter, const std::wstr
         return false;
     }
 
-    // Skip tiny volumes (matches PS installer: Size > 1GB)
-    if (totalBytes.QuadPart <= 1024ULL * 1024ULL * 1024ULL) {
+    // MediCat requires at least 30 GiB total capacity (leeway below nominal 32 GB drives).
+    if (totalBytes.QuadPart < kMinDriveCapacityBytes) {
         return false;
     }
 
@@ -155,6 +155,75 @@ bool TryAddDrive(std::vector<DriveInfo>& drives, wchar_t letter, const std::wstr
                             std::to_wstring(freeGb), std::to_wstring(totalGb));
     drives.push_back(std::move(info));
     return true;
+}
+
+wchar_t NormalizeDriveLetter(const std::wstring& driveLetter) {
+    if (driveLetter.empty()) {
+        return L'\0';
+    }
+    wchar_t letter = driveLetter[0];
+    if (letter >= L'a' && letter <= L'z') {
+        letter = static_cast<wchar_t>(letter - L'a' + L'A');
+    }
+    return letter;
+}
+
+bool GetVolumeDiskNumbers(const wchar_t letter, std::vector<DWORD>& diskNumbers) {
+    diskNumbers.clear();
+    if (letter < L'A' || letter > L'Z') {
+        return false;
+    }
+
+    wchar_t volumePath[] = L"\\\\.\\?:";
+    volumePath[4] = letter;
+    const HANDLE volume =
+        CreateFileW(volumePath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+    if (volume == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    std::vector<BYTE> extentsBuf(sizeof(VOLUME_DISK_EXTENTS) + sizeof(DISK_EXTENT) * 8);
+    DWORD returned = 0;
+    if (!DeviceIoControl(volume, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, nullptr, 0, extentsBuf.data(),
+                         static_cast<DWORD>(extentsBuf.size()), &returned, nullptr)) {
+        if (GetLastError() != ERROR_MORE_DATA) {
+            CloseHandle(volume);
+            return false;
+        }
+        extentsBuf.resize(sizeof(VOLUME_DISK_EXTENTS) + sizeof(DISK_EXTENT) * 32);
+        returned = 0;
+        if (!DeviceIoControl(volume, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, nullptr, 0, extentsBuf.data(),
+                             static_cast<DWORD>(extentsBuf.size()), &returned, nullptr)) {
+            CloseHandle(volume);
+            return false;
+        }
+    }
+    CloseHandle(volume);
+
+    if (returned < sizeof(VOLUME_DISK_EXTENTS)) {
+        return false;
+    }
+
+    const auto* extents = reinterpret_cast<const VOLUME_DISK_EXTENTS*>(extentsBuf.data());
+    diskNumbers.reserve(extents->NumberOfDiskExtents);
+    for (DWORD i = 0; i < extents->NumberOfDiskExtents; ++i) {
+        diskNumbers.push_back(extents->Extents[i].DiskNumber);
+    }
+    return !diskNumbers.empty();
+}
+
+bool IdentityMatches(const DriveIdentity& a, const DriveIdentity& b) {
+    if (!a.valid || !b.valid) {
+        return false;
+    }
+    for (const DWORD diskA : a.diskNumbers) {
+        for (const DWORD diskB : b.diskNumbers) {
+            if (diskA == diskB) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 }  // namespace
@@ -195,6 +264,107 @@ int DefaultDriveIndex(const std::vector<DriveInfo>& drives) {
         }
     }
     return drives.empty() ? -1 : 0;
+}
+
+DriveIdentity GetDriveIdentity(const std::wstring& driveLetter) {
+    DriveIdentity identity;
+    const wchar_t letter = NormalizeDriveLetter(driveLetter);
+    if (letter == L'\0') {
+        return identity;
+    }
+
+    const std::wstring root = std::wstring(1, letter) + L":\\";
+    DWORD serial = 0;
+    if (GetVolumeInformationW(root.c_str(), nullptr, 0, &serial, nullptr, nullptr, nullptr, 0)) {
+        identity.volumeSerial = serial;
+    }
+
+    identity.valid = GetVolumeDiskNumbers(letter, identity.diskNumbers);
+    return identity;
+}
+
+namespace {
+
+bool DriveLetterMatchesIdentity(const std::wstring& driveLetter, const DriveIdentity& identity) {
+    const wchar_t letter = NormalizeDriveLetter(driveLetter);
+    if (letter == L'\0') {
+        return false;
+    }
+
+    const std::wstring root = std::wstring(1, letter) + L":\\";
+    if (GetDriveTypeW(root.c_str()) == DRIVE_NO_ROOT_DIR) {
+        return false;
+    }
+
+    return IdentityMatches(identity, GetDriveIdentity(driveLetter));
+}
+
+std::wstring FindDriveLetterForIdentity(const DriveIdentity& identity) {
+    const DWORD mask = GetLogicalDrives();
+    for (wchar_t letter = L'A'; letter <= L'Z'; ++letter) {
+        if (letter == L'C') {
+            continue;
+        }
+        const int bit = letter - L'A';
+        if ((mask & (1u << bit)) == 0) {
+            continue;
+        }
+
+        const std::wstring candidate = std::wstring(1, letter) + L":";
+        if (DriveLetterMatchesIdentity(candidate, identity)) {
+            return candidate;
+        }
+    }
+    return L"";
+}
+
+}  // namespace
+
+std::wstring ResolveDriveLetterAfterVentoy(const std::wstring& expectedLetter, const DriveIdentity& before) {
+    if (!before.valid) {
+        return expectedLetter;
+    }
+
+    for (int attempt = 0; attempt < 20; ++attempt) {
+        if (attempt > 0) {
+            Sleep(500);
+        }
+
+        if (DriveLetterMatchesIdentity(expectedLetter, before)) {
+            return expectedLetter;
+        }
+
+        const std::wstring found = FindDriveLetterForIdentity(before);
+        if (!found.empty()) {
+            return found;
+        }
+    }
+
+    return L"";
+}
+
+uint64_t GetDriveTotalBytes(const std::wstring& driveLetter) {
+    const wchar_t letter = NormalizeDriveLetter(driveLetter);
+    if (letter == L'\0') {
+        return 0;
+    }
+
+    const std::wstring root = std::wstring(1, letter) + L":\\";
+    ULARGE_INTEGER freeBytesAvailable{};
+    ULARGE_INTEGER totalBytes{};
+    ULARGE_INTEGER totalFree{};
+    if (!GetDiskFreeSpaceExW(root.c_str(), &freeBytesAvailable, &totalBytes, &totalFree)) {
+        return 0;
+    }
+    return totalBytes.QuadPart;
+}
+
+bool MeetsMinimumDriveCapacity(const uint64_t totalBytes) {
+    return totalBytes >= kMinDriveCapacityBytes;
+}
+
+bool MeetsMinimumDriveCapacity(const std::wstring& driveLetter) {
+    return MeetsMinimumDriveCapacity(GetDriveTotalBytes(driveLetter));
 }
 
 uint64_t GetDriveFreeBytes(const std::wstring& root) {

@@ -11,12 +11,13 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 |---------|--------|-------|
 | Win32 GUI (drive picker, install button) | ✅ | `cpp/src/gui.cpp` |
 | Admin elevation (UAC manifest) | ✅ | `requireAdministrator` |
-| USB drive detection | ✅ | Removable drives |
+| USB drive detection | ✅ | Removable drives; hides drives under 30 GiB |
 | VHD/VHDX drive detection | ✅ | `BusTypeFileBackedVirtual` |
 | Skip `C:` drive | ✅ | |
 | Format checkbox (NTFS) | 🟡 | `format.com` only; no GPT/Ventoy format path |
 | Skip Ventoy checkbox | ✅ | Checkbox + full skip path |
 | MediCat `.7z` extraction | ✅ | Bundled `7za.exe`, byte-based progress |
+| Post-extract MD5 verification | ✅ | `MedicatFiles.md5` manifest; missing + hash mismatch |
 | Progress bar + status text | ✅ | Uses `status.extracting_*` keys |
 | Current filename during extract | ✅ | From 7za stdout parser |
 | Post-install files (icon, CheckFiles.bat) | ⬜ | PS: downloads from GitHub |
@@ -36,7 +37,9 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Non-destructive upgrade `VTOYCLI /U` | ✅ | When format unchecked |
 | Ventoy warning dialog | ✅ | `ventoy_warning.*` |
 | Ventoy-not-detected confirm dialog | ✅ | `ventoy_not_detected.*` when upgrade + no folder |
-| GPT / Secure Boot prompts | ⬜ | Batch legacy had these |
+| GPT / Secure Boot prompts | ✅ | Advanced options: GPT checkbox + Secure Boot (`/GPT` / `/NOSB`) |
+| Wipe confirmation dialog | ✅ | `wipe_confirm.*` before install starts |
+| Drive letter remap after Ventoy | ✅ | Disk-number tracking; confirm after Ventoy + final check before extract |
 | Bundle or download Ventoy2Disk | ✅ | Download to `Ventoy2Disk\` beside exe |
 | Advanced: pin Ventoy version | ✅ | Optional version field under Advanced options |
 
@@ -46,10 +49,10 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| **Check USB Files** button | ⬜ | PS: `check_files_button` in UI |
-| Download `MedicatFiles.md5` | ⬜ | From GitHub |
-| Verify files via MD5/hash | ⬜ | PS: `Start-FileCheck` |
-| Show pass/fail summary | ⬜ | |
+| **Check USB Files** button | ✅ | Standalone MD5 verify on selected drive without re-extract |
+| Download `MedicatFiles.md5` | ✅ | Embedded in exe, extracted to temp at runtime |
+| Verify files via MD5/hash | ✅ | Runs automatically after install extract |
+| Show pass/fail summary | ✅ | Log + `failed_files.txt` on failure |
 | Re-extract missing files | ⬜ | PS: `Start-ReExtractFiles` with file list |
 | Archive picker for re-extract | ⬜ | |
 

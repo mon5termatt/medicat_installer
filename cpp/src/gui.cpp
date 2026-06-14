@@ -19,22 +19,49 @@ namespace medicat {
 
 namespace {
 
+#ifndef INSTALLER_VERSION
+#define INSTALLER_VERSION "dev"
+#endif
+
 constexpr int kHeaderHeight = 88;
+constexpr int kHeaderLogoY = 8;
+constexpr int kHeaderTitleY = 60;
+constexpr int kLogoMaxSize = 48;
+constexpr int kVersionLabelHeight = 18;
+constexpr int kVersionBottomMargin = 10;
 constexpr int kContentTop = 96;
 constexpr int kMargin = 20;
 constexpr int kContentWidth = 520;
 constexpr int kWindowWidth = 560;
-constexpr int kWindowHeightCollapsed = 425;
-constexpr int kWindowHeightExpanded = 460;
 
-constexpr int kInstallYCollapsed = kContentTop + 146;
-constexpr int kInstallYExpanded = kContentTop + 181;
-constexpr int kProgressYCollapsed = kContentTop + 201;
-constexpr int kProgressYExpanded = kContentTop + 236;
-constexpr int kOpenLogYCollapsed = kContentTop + 199;
-constexpr int kOpenLogYExpanded = kContentTop + 234;
-constexpr int kCurrentFileYCollapsed = kContentTop + 237;
-constexpr int kCurrentFileYExpanded = kContentTop + 272;
+constexpr int kCheckboxHeight = 24;
+constexpr int kSectionGap = 12;
+constexpr int kInstallBtnHeight = 44;
+constexpr int kInstallBtnWidth = 252;
+constexpr int kVerifyBtnWidth = kContentWidth - kInstallBtnWidth - 10;
+constexpr int kVerifyBtnX = kMargin + kInstallBtnWidth + 10;
+constexpr int kProgressHeight = 28;
+constexpr int kOpenLogBtnHeight = 32;
+constexpr int kActionRowGap = 12;
+constexpr int kCurrentFileHeight = 20;
+constexpr int kBottomChrome = kVersionBottomMargin + kVersionLabelHeight + 8;
+
+constexpr int kAdvancedY = kContentTop + 116;
+constexpr int kOptionsBottomCollapsed = kAdvancedY + kCheckboxHeight;
+constexpr int kGptY = kContentTop + 202;
+constexpr int kOptionsBottomExpanded = kGptY + kCheckboxHeight;
+
+constexpr int kInstallYCollapsed = kOptionsBottomCollapsed + kSectionGap;
+constexpr int kInstallYExpanded = kOptionsBottomExpanded + kSectionGap;
+constexpr int kProgressYCollapsed = kInstallYCollapsed + kInstallBtnHeight + kActionRowGap;
+constexpr int kProgressYExpanded = kInstallYExpanded + kInstallBtnHeight + kActionRowGap;
+constexpr int kOpenLogYCollapsed = kProgressYCollapsed + (kProgressHeight - kOpenLogBtnHeight) / 2;
+constexpr int kOpenLogYExpanded = kProgressYExpanded + (kProgressHeight - kOpenLogBtnHeight) / 2;
+constexpr int kCurrentFileYCollapsed = kProgressYCollapsed + kOpenLogBtnHeight + 8;
+constexpr int kCurrentFileYExpanded = kProgressYExpanded + kOpenLogBtnHeight + 8;
+
+constexpr int kWindowHeightCollapsed = kCurrentFileYCollapsed + kCurrentFileHeight + kBottomChrome + 16;
+constexpr int kWindowHeightExpanded = kCurrentFileYExpanded + kCurrentFileHeight + kBottomChrome + 16;
 
 constexpr int kDriveComboId = 1001;
 constexpr int kFormatCheckId = 1002;
@@ -48,6 +75,9 @@ constexpr int kVentoyVersionEditId = 1009;
 constexpr int kOpenLogBtnId = 1010;
 constexpr int kFileLogListId = 1011;
 constexpr int kCurrentFileLabelId = 1012;
+constexpr int kVentoySecureBootCheckId = 1013;
+constexpr int kVentoyGptCheckId = 1014;
+constexpr int kVerifyFilesBtnId = 1015;
 constexpr UINT_PTR kUiRefreshTimerId = 1;
 constexpr UINT kUiRefreshIntervalMs = 250;
 constexpr wchar_t kFileLogWindowClass[] = L"MedicatFileLogWindow";
@@ -367,20 +397,29 @@ int Gui::Run() {
 
 void Gui::SetInstallHandler(InstallHandler handler) { onInstall_ = std::move(handler); }
 
-void Gui::SetBusy(const bool busy) {
+void Gui::SetVerifyHandler(InstallHandler handler) { onVerify_ = std::move(handler); }
+
+void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
     EnableWindow(installBtn_, !busy);
+    EnableWindow(verifyFilesBtn_, !busy);
     EnableWindow(driveCombo_, !busy);
     EnableWindow(formatCheck_, !busy);
     EnableWindow(skipVentoyCheck_, !busy);
     EnableWindow(advancedCheck_, !busy);
     UpdateAdvancedControls();
     if (busy) {
+        busyProgressMode_ = progressMode;
         EnableWindow(pinVentoyCheck_, FALSE);
         EnableWindow(ventoyVersionCombo_, FALSE);
-        SetTimer(hwnd_, kUiRefreshTimerId, kUiRefreshIntervalMs, nullptr);
+        if (progressMode == BusyProgressMode::FileLog || progressMode == BusyProgressMode::Verify) {
+            SetTimer(hwnd_, kUiRefreshTimerId, kUiRefreshIntervalMs, nullptr);
+        }
     } else {
-        KillTimer(hwnd_, kUiRefreshTimerId);
-        FlushInstallUi();
+        if (busyProgressMode_ == BusyProgressMode::FileLog || busyProgressMode_ == BusyProgressMode::Verify) {
+            KillTimer(hwnd_, kUiRefreshTimerId);
+            FlushInstallUi();
+        }
+        busyProgressMode_ = BusyProgressMode::None;
     }
 }
 
@@ -389,6 +428,7 @@ void Gui::NotifyExtractProgress(const int percent, const std::wstring& file, con
     if (resetLog) {
         fileLogLines_.clear();
         pendingFileLines_.clear();
+        fileLogDisplayLines_.clear();
         pendingPercent_ = 0;
         pendingResetLog_ = true;
         return;
@@ -405,6 +445,7 @@ void Gui::FlushInstallUi() {
     int percent = 0;
     bool reset = false;
     std::vector<std::wstring> newFiles;
+    size_t startIndex = 0;
 
     {
         std::lock_guard lock(uiMutex_);
@@ -412,6 +453,9 @@ void Gui::FlushInstallUi() {
         reset = pendingResetLog_;
         pendingResetLog_ = false;
         newFiles.swap(pendingFileLines_);
+        if (!newFiles.empty()) {
+            startIndex = fileLogLines_.size() - newFiles.size() + 1;
+        }
     }
 
     if (reset) {
@@ -420,12 +464,11 @@ void Gui::FlushInstallUi() {
 
     progressPercentValue_ = percent;
     progressPercentText_ = std::to_wstring(percent) + L"%";
-    InvalidateRect(progressBar_, nullptr, TRUE);
+    InvalidateRect(progressBar_, nullptr, FALSE);
 
     if (!newFiles.empty()) {
         SetWindowTextW(currentFileLabel_, ShortDisplayPath(newFiles.back()).c_str());
         if (fileLogList_) {
-            const size_t startIndex = fileLogLines_.size() - newFiles.size() + 1;
             BatchAppendDetailLog(newFiles, startIndex);
         }
     }
@@ -437,11 +480,19 @@ void Gui::SetProgress(const int percent, const bool clearLog) {
     }
     progressPercentValue_ = percent;
     progressPercentText_ = std::to_wstring(percent) + L"%";
-    InvalidateRect(progressBar_, nullptr, TRUE);
+    InvalidateRect(progressBar_, nullptr, FALSE);
+}
+
+void Gui::SetCurrentFileLabel(const std::wstring& text) {
+    SetWindowTextW(currentFileLabel_, ShortDisplayPath(text).c_str());
 }
 
 void Gui::ClearFileLog() {
-    fileLogLines_.clear();
+    {
+        std::lock_guard lock(uiMutex_);
+        fileLogLines_.clear();
+        fileLogDisplayLines_.clear();
+    }
     SetWindowTextW(currentFileLabel_, L"");
     if (fileLogList_) {
         SendMessageW(fileLogList_, LB_RESETCONTENT, 0, 0);
@@ -460,8 +511,9 @@ void Gui::BatchAppendDetailLog(const std::vector<std::wstring>& files, const siz
     }
 
     for (size_t i = 0; i < files.size(); ++i) {
-        const std::wstring line = FormatLogLine(startIndex + i, files[i]);
-        SendMessageW(fileLogList_, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(line.c_str()));
+        fileLogDisplayLines_.push_back(FormatLogLine(startIndex + i, files[i]));
+        SendMessageW(fileLogList_, LB_ADDSTRING, 0,
+                     reinterpret_cast<LPARAM>(fileLogDisplayLines_.back().c_str()));
     }
 
     const int count = static_cast<int>(SendMessageW(fileLogList_, LB_GETCOUNT, 0, 0));
@@ -475,10 +527,12 @@ void Gui::SyncDetailLog() {
         return;
     }
 
+    fileLogDisplayLines_.clear();
     SendMessageW(fileLogList_, LB_RESETCONTENT, 0, 0);
     for (size_t i = 0; i < fileLogLines_.size(); ++i) {
-        const std::wstring line = FormatLogLine(i + 1, fileLogLines_[i]);
-        SendMessageW(fileLogList_, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(line.c_str()));
+        fileLogDisplayLines_.push_back(FormatLogLine(i + 1, fileLogLines_[i]));
+        SendMessageW(fileLogList_, LB_ADDSTRING, 0,
+                     reinterpret_cast<LPARAM>(fileLogDisplayLines_.back().c_str()));
     }
 
     const int count = static_cast<int>(SendMessageW(fileLogList_, LB_GETCOUNT, 0, 0));
@@ -577,17 +631,17 @@ LRESULT CALLBACK Gui::FileLogWndProc(const HWND hwnd, const UINT msg, const WPAR
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
-void Gui::ShowDone(const bool success, const std::wstring& message) {
+void Gui::ShowDone(const bool success, const std::wstring& message, const std::wstring& title) {
     SetBusy(false);
     if (!success && message.empty()) {
         SetProgress(0);
         return;
     }
     SetProgress(success ? 100 : 0);
-    MessageBoxW(hwnd_, message.c_str(),
-                success ? i18n::Tr(L"titles.installation_complete").c_str()
-                        : i18n::Tr(L"titles.installation_error").c_str(),
-                success ? MB_ICONINFORMATION : MB_ICONERROR);
+    const std::wstring dialogTitle =
+        title.empty() ? (success ? i18n::Tr(L"titles.installation_complete") : i18n::Tr(L"titles.installation_error"))
+                      : title;
+    MessageBoxW(hwnd_, message.c_str(), dialogTitle.c_str(), success ? MB_ICONINFORMATION : MB_ICONERROR);
 }
 
 std::wstring Gui::SelectedDrive() const {
@@ -617,6 +671,16 @@ bool Gui::AdvancedChecked() const {
 bool Gui::PinVentoyVersionChecked() const {
     return AdvancedChecked() &&
            SendMessageW(pinVentoyCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+}
+
+bool Gui::VentoySecureBootChecked() const {
+    return AdvancedChecked() &&
+           SendMessageW(ventoySecureBootCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+}
+
+bool Gui::VentoyGptChecked() const {
+    return AdvancedChecked() &&
+           SendMessageW(ventoyGptCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
 }
 
 std::wstring Gui::PinnedVentoyVersion() const {
@@ -678,14 +742,30 @@ void Gui::PopulateVentoyVersionCombo() {
     }
 }
 
+void Gui::LayoutVersionLabel() {
+    if (!versionLabel_) {
+        return;
+    }
+
+    RECT rc{};
+    GetClientRect(hwnd_, &rc);
+    const int y = rc.bottom - kVersionBottomMargin - kVersionLabelHeight;
+    SetWindowPos(versionLabel_, nullptr, kMargin, y, rc.right - 2 * kMargin, kVersionLabelHeight,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
 void Gui::UpdateAdvancedControls() {
     const bool expanded = AdvancedChecked();
     const bool pin = expanded && PinVentoyVersionChecked();
     const bool interactive = IsWindowEnabled(advancedCheck_);
 
     ShowWindow(pinVentoyCheck_, expanded ? SW_SHOW : SW_HIDE);
+    ShowWindow(ventoySecureBootCheck_, expanded ? SW_SHOW : SW_HIDE);
+    ShowWindow(ventoyGptCheck_, expanded ? SW_SHOW : SW_HIDE);
     ShowWindow(ventoyVersionCombo_, pin ? SW_SHOW : SW_HIDE);
     EnableWindow(pinVentoyCheck_, expanded && interactive);
+    EnableWindow(ventoySecureBootCheck_, expanded && interactive);
+    EnableWindow(ventoyGptCheck_, expanded && interactive);
     EnableWindow(ventoyVersionCombo_, pin && interactive);
 
     if (expanded) {
@@ -697,7 +777,10 @@ void Gui::UpdateAdvancedControls() {
     const int openLogY = expanded ? kOpenLogYExpanded : kOpenLogYCollapsed;
     const int currentFileY = expanded ? kCurrentFileYExpanded : kCurrentFileYCollapsed;
 
-    SetWindowPos(installBtn_, nullptr, kMargin, installY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(installBtn_, nullptr, kMargin, installY, kInstallBtnWidth, kInstallBtnHeight,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(verifyFilesBtn_, nullptr, kVerifyBtnX, installY, kVerifyBtnWidth, kInstallBtnHeight,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
     SetWindowPos(progressBar_, nullptr, kMargin, progressY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     SetWindowPos(openLogBtn_, nullptr, 390, openLogY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     SetWindowPos(currentFileLabel_, nullptr, kMargin, currentFileY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
@@ -709,6 +792,8 @@ void Gui::UpdateAdvancedControls() {
         SetWindowPos(hwnd_, nullptr, 0, 0, kWindowWidth, targetH, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
         InvalidateRect(hwnd_, nullptr, TRUE);
     }
+
+    LayoutVersionLabel();
 }
 
 LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -735,7 +820,11 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_MEDICAT_PROGRESS: {
             auto* payload = reinterpret_cast<ProgressPayload*>(lp);
             if (payload) {
-                self->SetProgress(payload->percent, payload->clearLog);
+                if (payload->extractUpdate) {
+                    self->NotifyExtractProgress(payload->percent, payload->file, payload->resetLog);
+                } else {
+                    self->SetProgress(payload->percent, payload->clearLog);
+                }
                 delete payload;
             }
             return 0;
@@ -744,6 +833,9 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (wp == kUiRefreshTimerId) {
                 self->FlushInstallUi();
             }
+            return 0;
+        case WM_SIZE:
+            self->LayoutVersionLabel();
             return 0;
         case WM_ERASEBKGND: {
             HDC hdc = reinterpret_cast<HDC>(wp);
@@ -766,7 +858,7 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 SetTextColor(hdc, theme::Colors().text);
                 return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
             }
-            if (ctl == self->subtitleLabel_ || ctl == self->currentFileLabel_) {
+            if (ctl == self->versionLabel_ || ctl == self->currentFileLabel_) {
                 SetTextColor(hdc, theme::Colors().muted);
                 return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
             }
@@ -783,7 +875,7 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_MEDICAT_DONE: {
             auto* payload = reinterpret_cast<DonePayload*>(lp);
             if (payload) {
-                self->ShowDone(payload->success, payload->message);
+                self->ShowDone(payload->success, payload->message, payload->title);
                 delete payload;
             }
             return 0;
@@ -821,24 +913,34 @@ void Gui::OnCreate(HWND hwnd) {
     const HFONT titleFont = theme::MakeTitleFont();
     const HFONT subtitleFont = theme::MakeSubtitleFont();
 
-    logoBitmap_ = theme::LoadLogoBitmap(instance_);
+    logoBitmap_ = theme::LoadLogoBitmap(instance_, kLogoMaxSize);
+    int logoWidth = kLogoMaxSize;
+    int logoHeight = kLogoMaxSize;
+    if (logoBitmap_) {
+        BITMAP bm{};
+        GetObjectW(logoBitmap_, sizeof(bm), &bm);
+        logoWidth = bm.bmWidth;
+        logoHeight = bm.bmHeight;
+    }
+    const int logoX = (kWindowWidth - logoWidth) / 2;
     logoStatic_ = CreateWindowW(
         L"STATIC", nullptr, WS_CHILD | WS_VISIBLE | SS_BITMAP | SS_CENTERIMAGE,
-        kMargin, 12, 64, 64, hwnd, nullptr, instance_, nullptr);
+        logoX, kHeaderLogoY, logoWidth, logoHeight, hwnd, nullptr, instance_, nullptr);
     if (logoBitmap_) {
         SendMessageW(logoStatic_, STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(logoBitmap_));
     }
 
     titleLabel_ = CreateWindowW(
         L"STATIC", i18n::Tr(L"ui.title_label").c_str(),
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        96, 18, 420, 28, hwnd, nullptr, instance_, nullptr);
+        WS_CHILD | WS_VISIBLE | SS_CENTER,
+        kMargin, kHeaderTitleY, kContentWidth, 26, hwnd, nullptr, instance_, nullptr);
+
     wchar_t versionText[32]{};
-    swprintf_s(versionText, L"v%hs", MEDICAT_VERSION);
-    subtitleLabel_ = CreateWindowW(
+    swprintf_s(versionText, L"v%hs", INSTALLER_VERSION);
+    versionLabel_ = CreateWindowW(
         L"STATIC", versionText,
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        96, 48, 420, 22, hwnd, nullptr, instance_, nullptr);
+        WS_CHILD | WS_VISIBLE | SS_RIGHT,
+        kMargin, 0, kContentWidth, kVersionLabelHeight, hwnd, nullptr, instance_, nullptr);
 
     CreateWindowW(L"STATIC", i18n::Tr(L"ui.drive_label").c_str(), WS_CHILD | WS_VISIBLE, kMargin, kContentTop,
                   kContentWidth, 20, hwnd, nullptr, instance_, nullptr);
@@ -864,7 +966,7 @@ void Gui::OnCreate(HWND hwnd) {
     advancedCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.advanced_options").c_str(),
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-        kMargin, kContentTop + 116, 180, 24, hwnd,
+        kMargin, kAdvancedY, 180, kCheckboxHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kAdvancedCheckId)), instance_, nullptr);
 
     pinVentoyCheck_ = CreateWindowW(
@@ -879,16 +981,35 @@ void Gui::OnCreate(HWND hwnd) {
         270, kContentTop + 142, 270, 300, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVentoyVersionEditId)), instance_, nullptr);
 
+    ventoySecureBootCheck_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.ventoy_secure_boot").c_str(),
+        WS_CHILD | BS_AUTOCHECKBOX,
+        kMargin + 20, kContentTop + 172, kContentWidth - 20, 24, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVentoySecureBootCheckId)), instance_, nullptr);
+    SendMessageW(ventoySecureBootCheck_, BM_SETCHECK, BST_CHECKED, 0);
+
+    ventoyGptCheck_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.ventoy_gpt_partition").c_str(),
+        WS_CHILD | BS_AUTOCHECKBOX,
+        kMargin + 20, kGptY, kContentWidth - 20, kCheckboxHeight, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVentoyGptCheckId)), instance_, nullptr);
+
     installBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.install_button").c_str(),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        kMargin, kInstallYCollapsed, kContentWidth, 44, hwnd,
+        kMargin, kInstallYCollapsed, kInstallBtnWidth, kInstallBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kInstallBtnId)), instance_, nullptr);
+
+    verifyFilesBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.check_files_button").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        kVerifyBtnX, kInstallYCollapsed, kVerifyBtnWidth, kInstallBtnHeight, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVerifyFilesBtnId)), instance_, nullptr);
 
     progressBar_ = CreateWindowW(
         PROGRESS_CLASSW, nullptr,
         WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
-        kMargin, kProgressYCollapsed, 360, 28, hwnd,
+        kMargin, kProgressYCollapsed, 360, kProgressHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kProgressId)), instance_, nullptr);
     SendMessageW(progressBar_, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
     SetPropW(progressBar_, L"MedicatGui", this);
@@ -899,35 +1020,39 @@ void Gui::OnCreate(HWND hwnd) {
     openLogBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.open_file_log_button").c_str(),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        390, kOpenLogYCollapsed, 150, 32, hwnd,
+        390, kOpenLogYCollapsed, 150, kOpenLogBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kOpenLogBtnId)), instance_, nullptr);
 
     currentFileLabel_ = CreateWindowW(
         L"STATIC", L"",
         WS_CHILD | WS_VISIBLE | SS_ENDELLIPSIS,
-        kMargin, kCurrentFileYCollapsed, kContentWidth, 20, hwnd,
+        kMargin, kCurrentFileYCollapsed, kContentWidth, kCurrentFileHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCurrentFileLabelId)), instance_, nullptr);
 
     for (HWND child :
-         {logoStatic_, titleLabel_, subtitleLabel_, driveCombo_, formatCheck_, skipVentoyCheck_, advancedCheck_,
-          pinVentoyCheck_, ventoyVersionCombo_, installBtn_, openLogBtn_, progressBar_, currentFileLabel_}) {
+         {logoStatic_, titleLabel_, versionLabel_, driveCombo_, formatCheck_, skipVentoyCheck_, advancedCheck_,
+          pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_, verifyFilesBtn_,
+          openLogBtn_, progressBar_, currentFileLabel_}) {
         SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
     }
     SendMessageW(titleLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(titleFont), TRUE);
-    SendMessageW(subtitleLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(subtitleFont), TRUE);
+    SendMessageW(versionLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(subtitleFont), TRUE);
 
     theme::EnableDarkMode(hwnd);
     theme::EnableDarkModeRecursive(hwnd);
 
     SubclassGlowButton(installBtn_, true);
+    SubclassGlowButton(verifyFilesBtn_, false);
     SubclassGlowButton(openLogBtn_, false);
 
-    for (const HWND checkbox : {formatCheck_, skipVentoyCheck_, advancedCheck_, pinVentoyCheck_}) {
+    for (const HWND checkbox :
+         {formatCheck_, skipVentoyCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_}) {
         SubclassFlatCheckbox(checkbox);
         InvalidateRect(checkbox, nullptr, TRUE);
     }
 
     UpdateAdvancedControls();
+    LayoutVersionLabel();
     RefreshDrives();
 }
 
@@ -939,6 +1064,10 @@ void Gui::OnCommand(WPARAM wp) {
     }
     if (id == kInstallBtnId && onInstall_) {
         onInstall_();
+        return;
+    }
+    if (id == kVerifyFilesBtnId && onVerify_) {
+        onVerify_();
         return;
     }
     if (id == kOpenLogBtnId) {

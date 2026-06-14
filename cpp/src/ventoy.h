@@ -24,6 +24,11 @@ struct VentoyEnsureOptions {
     std::function<void(const std::wstring&)> onLog;
 };
 
+struct VentoyInstallOptions {
+    bool useGpt = false;           // default MBR; append /GPT when true
+    bool enableSecureBoot = true;  // Ventoy default; append /NOSB when false
+};
+
 // Fetch newest tag from GitHub (e.g. "1.0.99").
 VentoyResult FetchLatestVentoyVersion(std::wstring& version);
 
@@ -38,7 +43,8 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options);
 
 bool TestVentoyInstalled(const std::wstring& driveLetter);
 
-VentoyResult RunVentoyInstall(const std::wstring& ventoyExe, const std::wstring& driveLetter, bool upgrade);
+VentoyResult RunVentoyInstall(const std::wstring& ventoyExe, const std::wstring& driveLetter, bool upgrade,
+                              const VentoyInstallOptions& options = {});
 
 bool FormatDriveNtfs(const std::wstring& driveLetter, const std::wstring& label = L"Medicat");
 

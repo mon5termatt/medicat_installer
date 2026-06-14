@@ -355,7 +355,7 @@ bool TestVentoyInstalled(const std::wstring& driveLetter) {
 }
 
 VentoyResult RunVentoyInstall(const std::wstring& ventoyExe, const std::wstring& driveLetter,
-                              const bool upgrade) {
+                              const bool upgrade, const VentoyInstallOptions& options) {
     VentoyResult result;
     if (!FileExists(ventoyExe)) {
         result.error = L"Ventoy2Disk.exe not found";
@@ -369,8 +369,14 @@ VentoyResult RunVentoyInstall(const std::wstring& ventoyExe, const std::wstring&
 
     const std::wstring ventoyWork = GetExeDirectory();
     const std::wstring ventoyDir = JoinPath(ventoyWork, L"Ventoy2Disk");
-    const std::wstring args =
+    std::wstring args =
         upgrade ? (L"VTOYCLI /U /Drive:" + drive) : (L"VTOYCLI /I /Drive:" + drive + L" /NOUSBCheck");
+    if (options.useGpt) {
+        args += L" /GPT";
+    }
+    if (!options.enableSecureBoot) {
+        args += L" /NOSB";
+    }
 
     std::wstring cmd = L"\"" + ventoyExe + L"\" " + args;
     result.exitCode = RunHiddenProcess(cmd, ventoyDir);

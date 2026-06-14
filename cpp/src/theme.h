@@ -31,7 +31,7 @@ bool Initialize();
 void Shutdown();
 const Palette& Colors();
 const Brushes& GetBrushes();
-HBITMAP LoadLogoBitmap(HINSTANCE instance);
+HBITMAP LoadLogoBitmap(HINSTANCE instance, int maxSize = 48);
 HFONT MakeUiFont();
 HFONT MakeTitleFont();
 HFONT MakeSubtitleFont();

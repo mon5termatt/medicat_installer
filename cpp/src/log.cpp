@@ -48,6 +48,7 @@ void Logger::Write(const std::wstring& level, const std::wstring& message) {
     std::ofstream out(WideToUtf8(path_), std::ios::app);
     out << "[" << WideToUtf8(NowStamp()) << "] " << WideToUtf8(level) << ": "
         << WideToUtf8(message) << "\n";
+    out.flush();
 }
 
 void Logger::Info(const std::wstring& message) { Write(L"INFO", message); }
