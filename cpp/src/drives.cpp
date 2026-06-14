@@ -1,5 +1,6 @@
 #include "drives.h"
 
+#include "i18n.h"
 #include "util.h"
 
 #include <windows.h>
@@ -142,12 +143,16 @@ bool TryAddDrive(std::vector<DriveInfo>& drives, wchar_t letter, const std::wstr
     const double freeGb = static_cast<double>(info.freeBytes) / (1024.0 * 1024.0 * 1024.0);
     const double totalGb = static_cast<double>(info.totalBytes) / (1024.0 * 1024.0 * 1024.0);
 
-    std::wostringstream display;
-    display << info.letter << L' ' << kind << L" - " << freeGb << L"GB free of " << totalGb << L"GB";
-    if (!info.label.empty()) {
-        display << L" (" << info.label << L')';
+    std::wstring typeLabel;
+    if (kind == L"VHD") {
+        typeLabel = i18n::Tr(L"ui.drive_type_vhd");
+    } else {
+        typeLabel = i18n::Tr(L"ui.drive_type_usb");
     }
-    info.display = display.str();
+
+    info.kind = typeLabel;
+    info.display = i18n::Tr(L"ui.drive_format", info.letter, typeLabel,
+                            std::to_wstring(freeGb), std::to_wstring(totalGb));
     drives.push_back(std::move(info));
     return true;
 }
@@ -177,7 +182,7 @@ std::vector<DriveInfo> ListTargetDrives() {
             continue;
         }
 
-        TryAddDrive(drives, letter, isVhd ? L"(VHD)" : L"(USB)");
+        TryAddDrive(drives, letter, isVhd ? L"VHD" : L"USB");
     }
 
     return drives;
@@ -185,7 +190,7 @@ std::vector<DriveInfo> ListTargetDrives() {
 
 int DefaultDriveIndex(const std::vector<DriveInfo>& drives) {
     for (size_t i = 0; i < drives.size(); ++i) {
-        if (drives[i].kind == L"(VHD)") {
+        if (drives[i].kind == i18n::Tr(L"ui.drive_type_vhd")) {
             return static_cast<int>(i);
         }
     }

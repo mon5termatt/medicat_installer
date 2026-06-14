@@ -80,8 +80,7 @@ bool EnsureExtracted(HINSTANCE instance, int resourceId, const std::wstring& out
 
 BundledTools EnsureBundledTools(const HINSTANCE instance) {
     BundledTools tools;
-    tools.dir = JoinPath(GetExeDirectory(), L"bundle");
-    CreateDirectoryW(tools.dir.c_str(), nullptr);
+    tools.dir = GetMedicatTempDir();
 
     tools.sevenZa = JoinPath(tools.dir, L"7za.exe");
     tools.sevenZ = JoinPath(tools.dir, L"7z.exe");

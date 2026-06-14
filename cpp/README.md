@@ -62,3 +62,8 @@ Build embeds `7z/x64/7za.exe` (or arch-specific) and `bin/7z.exe` into the `.exe
 - **Extract**: `CreateProcess` + pipe read on `7za` stdout; drive free-space for %
 - **Threading**: worker thread posts `WM_APP` to UI thread for progress updates
 - **Logging**: `medicat_installer.log` beside the exe
+- **i18n**: `i18n/translations.json` → build-time codegen → `i18n::Tr()` (see `i18n/README.md`)
+
+## Feature parity
+
+See **[FEATURES.md](FEATURES.md)** for the restore checklist (Ventoy, file check, etc.).

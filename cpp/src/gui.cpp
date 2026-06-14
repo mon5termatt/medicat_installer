@@ -1,14 +1,40 @@
 #include "gui.h"
 
 #include "drives.h"
+#include "i18n.h"
+#include "resource.h"
+#include "theme.h"
+#include "util.h"
+#include "ventoy.h"
 
 #include <commctrl.h>
+#include <uxtheme.h>
+#include <windowsx.h>
 
+#include <algorithm>
 #include <sstream>
+#include <thread>
 
 namespace medicat {
 
 namespace {
+
+constexpr int kHeaderHeight = 88;
+constexpr int kContentTop = 96;
+constexpr int kMargin = 20;
+constexpr int kContentWidth = 520;
+constexpr int kWindowWidth = 560;
+constexpr int kWindowHeightCollapsed = 425;
+constexpr int kWindowHeightExpanded = 460;
+
+constexpr int kInstallYCollapsed = kContentTop + 146;
+constexpr int kInstallYExpanded = kContentTop + 181;
+constexpr int kProgressYCollapsed = kContentTop + 201;
+constexpr int kProgressYExpanded = kContentTop + 236;
+constexpr int kOpenLogYCollapsed = kContentTop + 199;
+constexpr int kOpenLogYExpanded = kContentTop + 234;
+constexpr int kCurrentFileYCollapsed = kContentTop + 237;
+constexpr int kCurrentFileYExpanded = kContentTop + 272;
 
 constexpr int kDriveComboId = 1001;
 constexpr int kFormatCheckId = 1002;
@@ -16,17 +42,282 @@ constexpr int kSkipVentoyCheckId = 1003;
 constexpr int kInstallBtnId = 1004;
 constexpr int kProgressId = 1005;
 constexpr int kStatusId = 1006;
+constexpr int kAdvancedCheckId = 1007;
+constexpr int kPinVentoyCheckId = 1008;
+constexpr int kVentoyVersionEditId = 1009;
+constexpr int kOpenLogBtnId = 1010;
+constexpr int kFileLogListId = 1011;
+constexpr int kCurrentFileLabelId = 1012;
+constexpr UINT_PTR kUiRefreshTimerId = 1;
+constexpr UINT kUiRefreshIntervalMs = 250;
+constexpr wchar_t kFileLogWindowClass[] = L"MedicatFileLogWindow";
 
-HFONT MakeUiFont() {
-    return CreateFontW(-16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-                       OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-                       DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+struct GlowButtonState {
+    WNDPROC original = nullptr;
+    bool hovered = false;
+    bool pressed = false;
+    bool primary = false;
+};
+
+LRESULT CALLBACK GlowButtonProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp) {
+    auto* state = reinterpret_cast<GlowButtonState*>(GetPropW(hwnd, L"MedicatGlowBtn"));
+    if (!state) {
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    }
+
+    switch (msg) {
+        case WM_MOUSEMOVE:
+            if (!state->hovered) {
+                state->hovered = true;
+                TRACKMOUSEEVENT tme{};
+                tme.cbSize = sizeof(tme);
+                tme.dwFlags = TME_LEAVE;
+                tme.hwndTrack = hwnd;
+                TrackMouseEvent(&tme);
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
+            break;
+        case WM_MOUSELEAVE:
+            state->hovered = false;
+            state->pressed = false;
+            InvalidateRect(hwnd, nullptr, FALSE);
+            break;
+        case WM_LBUTTONDOWN:
+            if (IsWindowEnabled(hwnd)) {
+                state->pressed = true;
+                SetCapture(hwnd);
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
+            return 0;
+        case WM_LBUTTONUP: {
+            const bool wasPressed = state->pressed;
+            state->pressed = false;
+            if (GetCapture() == hwnd) {
+                ReleaseCapture();
+            }
+            InvalidateRect(hwnd, nullptr, FALSE);
+            if (wasPressed && IsWindowEnabled(hwnd)) {
+                POINT pt{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+                RECT rc{};
+                GetClientRect(hwnd, &rc);
+                if (PtInRect(&rc, pt)) {
+                    const int id = GetDlgCtrlID(hwnd);
+                    SendMessageW(GetParent(hwnd), WM_COMMAND, MAKEWPARAM(id, BN_CLICKED),
+                                 reinterpret_cast<LPARAM>(hwnd));
+                }
+            }
+            return 0;
+        }
+        case WM_KEYDOWN:
+            if ((wp == VK_SPACE || wp == VK_RETURN) && IsWindowEnabled(hwnd)) {
+                state->pressed = true;
+                InvalidateRect(hwnd, nullptr, FALSE);
+                return 0;
+            }
+            break;
+        case WM_KEYUP:
+            if ((wp == VK_SPACE || wp == VK_RETURN) && state->pressed) {
+                state->pressed = false;
+                InvalidateRect(hwnd, nullptr, FALSE);
+                if (IsWindowEnabled(hwnd)) {
+                    const int id = GetDlgCtrlID(hwnd);
+                    SendMessageW(GetParent(hwnd), WM_COMMAND, MAKEWPARAM(id, BN_CLICKED),
+                                 reinterpret_cast<LPARAM>(hwnd));
+                }
+                return 0;
+            }
+            break;
+        case WM_ENABLE:
+            state->hovered = false;
+            state->pressed = false;
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        case WM_UPDATEUISTATE:
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        case BM_SETSTATE:
+            return 0;
+        case WM_PRINTCLIENT: {
+            const HDC hdc = reinterpret_cast<HDC>(wp);
+            RECT rc{};
+            GetClientRect(hwnd, &rc);
+            wchar_t text[256]{};
+            GetWindowTextW(hwnd, text, static_cast<int>(std::size(text)));
+            const HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
+
+            theme::ButtonState btnState = theme::ButtonState::Normal;
+            if (!IsWindowEnabled(hwnd)) {
+                btnState = theme::ButtonState::Disabled;
+            } else if (state->pressed) {
+                btnState = theme::ButtonState::Pressed;
+            } else if (state->hovered) {
+                btnState = theme::ButtonState::Hovered;
+            }
+
+            theme::PaintFlatButton(
+                hdc, rc, text, font,
+                state->primary ? theme::ButtonStyle::Primary : theme::ButtonStyle::Secondary, btnState);
+            return 0;
+        }
+        case WM_PAINT: {
+            PAINTSTRUCT ps{};
+            const HDC hdc = BeginPaint(hwnd, &ps);
+            RECT rc{};
+            GetClientRect(hwnd, &rc);
+            wchar_t text[256]{};
+            GetWindowTextW(hwnd, text, static_cast<int>(std::size(text)));
+            const HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
+
+            theme::ButtonState btnState = theme::ButtonState::Normal;
+            if (!IsWindowEnabled(hwnd)) {
+                btnState = theme::ButtonState::Disabled;
+            } else if (state->pressed) {
+                btnState = theme::ButtonState::Pressed;
+            } else if (state->hovered) {
+                btnState = theme::ButtonState::Hovered;
+            }
+
+            theme::PaintFlatButton(
+                hdc, rc, text, font,
+                state->primary ? theme::ButtonStyle::Primary : theme::ButtonStyle::Secondary, btnState);
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+        case WM_ERASEBKGND:
+            return 1;
+        case WM_NCDESTROY:
+            RemovePropW(hwnd, L"MedicatGlowBtn");
+            delete state;
+            break;
+        default:
+            break;
+    }
+
+    return CallWindowProcW(state->original, hwnd, msg, wp, lp);
+}
+
+void SubclassGlowButton(HWND hwnd, const bool primary) {
+    SetWindowTheme(hwnd, L"", L"");
+    SendMessageW(hwnd, BM_SETSTYLE, BS_PUSHBUTTON, TRUE);
+    auto* state = new GlowButtonState{};
+    state->primary = primary;
+    state->original = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
+        hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(GlowButtonProc)));
+    SetPropW(hwnd, L"MedicatGlowBtn", state);
+}
+
+struct FlatCheckboxState {
+    WNDPROC original = nullptr;
+};
+
+void PaintFlatCheckboxControl(const HWND hwnd, const HDC hdc) {
+    RECT rc{};
+    GetClientRect(hwnd, &rc);
+    wchar_t text[256]{};
+    GetWindowTextW(hwnd, text, static_cast<int>(std::size(text)));
+    const HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
+    const bool checked = SendMessageW(hwnd, BM_GETCHECK, 0, 0) == BST_CHECKED;
+    theme::PaintFlatCheckbox(hdc, rc, text, font, checked, IsWindowEnabled(hwnd) != FALSE);
+}
+
+void ToggleFlatCheckbox(const HWND hwnd) {
+    const bool checked = SendMessageW(hwnd, BM_GETCHECK, 0, 0) == BST_CHECKED;
+    SendMessageW(hwnd, BM_SETCHECK, checked ? BST_UNCHECKED : BST_CHECKED, 0);
+    InvalidateRect(hwnd, nullptr, FALSE);
+    const int id = GetDlgCtrlID(hwnd);
+    SendMessageW(GetParent(hwnd), WM_COMMAND, MAKEWPARAM(id, BN_CLICKED), reinterpret_cast<LPARAM>(hwnd));
+}
+
+LRESULT CALLBACK FlatCheckboxProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp) {
+    auto* state = reinterpret_cast<FlatCheckboxState*>(GetPropW(hwnd, L"MedicatFlatCheck"));
+    if (!state) {
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    }
+
+    switch (msg) {
+        case BM_GETCHECK:
+        case BM_SETCHECK: {
+            const LRESULT result = CallWindowProcW(state->original, hwnd, msg, wp, lp);
+            if (msg == BM_SETCHECK) {
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
+            return result;
+        }
+        case WM_LBUTTONDOWN:
+            if (IsWindowEnabled(hwnd)) {
+                ToggleFlatCheckbox(hwnd);
+            }
+            return 0;
+        case WM_KEYUP:
+            if (wp == VK_SPACE && IsWindowEnabled(hwnd)) {
+                ToggleFlatCheckbox(hwnd);
+                return 0;
+            }
+            break;
+        case WM_ENABLE:
+        case WM_UPDATEUISTATE:
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        case BM_SETSTATE:
+            return 0;
+        case WM_PRINTCLIENT: {
+            PaintFlatCheckboxControl(hwnd, reinterpret_cast<HDC>(wp));
+            return 0;
+        }
+        case WM_PAINT: {
+            PAINTSTRUCT ps{};
+            const HDC hdc = BeginPaint(hwnd, &ps);
+            PaintFlatCheckboxControl(hwnd, hdc);
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+        case WM_ERASEBKGND:
+            return 1;
+        case WM_NCDESTROY:
+            RemovePropW(hwnd, L"MedicatFlatCheck");
+            delete state;
+            break;
+        default:
+            break;
+    }
+
+    return CallWindowProcW(state->original, hwnd, msg, wp, lp);
+}
+
+void SubclassFlatCheckbox(const HWND hwnd) {
+    SetWindowTheme(hwnd, L"", L"");
+    auto* state = new FlatCheckboxState{};
+    state->original = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
+        hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(FlatCheckboxProc)));
+    SetPropW(hwnd, L"MedicatFlatCheck", state);
 }
 
 }  // namespace
 
+LRESULT CALLBACK Gui::ProgressBarProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp) {
+    const auto original = reinterpret_cast<WNDPROC>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    if (msg == WM_PAINT) {
+        PAINTSTRUCT ps{};
+        const HDC hdc = BeginPaint(hwnd, &ps);
+        const auto* gui = reinterpret_cast<Gui*>(GetPropW(hwnd, L"MedicatGui"));
+        if (gui) {
+            RECT rc{};
+            GetClientRect(hwnd, &rc);
+            const HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
+            theme::PaintProgressBar(hdc, rc, gui->progressPercentValue_, gui->progressPercentText_, font);
+        }
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+    if (msg == WM_ERASEBKGND) {
+        return 1;
+    }
+    return CallWindowProcW(original, hwnd, msg, wp, lp);
+}
+
 bool Gui::Create(HINSTANCE instance) {
     instance_ = instance;
+    theme::Initialize();
 
     INITCOMMONCONTROLSEX icc{};
     icc.dwSize = sizeof(icc);
@@ -39,14 +330,25 @@ bool Gui::Create(HINSTANCE instance) {
     wc.lpfnWndProc = Gui::WndProc;
     wc.hInstance = instance;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+    wc.hbrBackground = theme::GetBrushes().window;
+    wc.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(IDI_APP_ICON));
+    wc.hIconSm = wc.hIcon;
     wc.lpszClassName = cls;
     RegisterClassExW(&wc);
 
+    WNDCLASSEXW logWc{};
+    logWc.cbSize = sizeof(logWc);
+    logWc.lpfnWndProc = Gui::FileLogWndProc;
+    logWc.hInstance = instance;
+    logWc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    logWc.hbrBackground = theme::GetBrushes().window;
+    logWc.lpszClassName = kFileLogWindowClass;
+    RegisterClassExW(&logWc);
+
     hwnd_ = CreateWindowExW(
-        0, cls, L"MediCat USB Installer",
+        0, cls, i18n::Tr(L"ui.title_label").c_str(),
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        CW_USEDEFAULT, CW_USEDEFAULT, 560, 320,
+        CW_USEDEFAULT, CW_USEDEFAULT, kWindowWidth, kWindowHeightCollapsed,
         nullptr, nullptr, instance, this);
 
     return hwnd_ != nullptr;
@@ -70,17 +372,221 @@ void Gui::SetBusy(const bool busy) {
     EnableWindow(driveCombo_, !busy);
     EnableWindow(formatCheck_, !busy);
     EnableWindow(skipVentoyCheck_, !busy);
+    EnableWindow(advancedCheck_, !busy);
+    UpdateAdvancedControls();
+    if (busy) {
+        EnableWindow(pinVentoyCheck_, FALSE);
+        EnableWindow(ventoyVersionCombo_, FALSE);
+        SetTimer(hwnd_, kUiRefreshTimerId, kUiRefreshIntervalMs, nullptr);
+    } else {
+        KillTimer(hwnd_, kUiRefreshTimerId);
+        FlushInstallUi();
+    }
 }
 
-void Gui::SetProgress(const int percent, const std::wstring& status) {
-    SendMessageW(progressBar_, PBM_SETPOS, percent, 0);
-    SetWindowTextW(statusLabel_, status.c_str());
+void Gui::NotifyExtractProgress(const int percent, const std::wstring& file, const bool resetLog) {
+    std::lock_guard lock(uiMutex_);
+    if (resetLog) {
+        fileLogLines_.clear();
+        pendingFileLines_.clear();
+        pendingPercent_ = 0;
+        pendingResetLog_ = true;
+        return;
+    }
+
+    pendingPercent_ = percent;
+    if (!file.empty() && (fileLogLines_.empty() || fileLogLines_.back() != file)) {
+        fileLogLines_.push_back(file);
+        pendingFileLines_.push_back(file);
+    }
+}
+
+void Gui::FlushInstallUi() {
+    int percent = 0;
+    bool reset = false;
+    std::vector<std::wstring> newFiles;
+
+    {
+        std::lock_guard lock(uiMutex_);
+        percent = pendingPercent_;
+        reset = pendingResetLog_;
+        pendingResetLog_ = false;
+        newFiles.swap(pendingFileLines_);
+    }
+
+    if (reset) {
+        ClearFileLog();
+    }
+
+    progressPercentValue_ = percent;
+    progressPercentText_ = std::to_wstring(percent) + L"%";
+    InvalidateRect(progressBar_, nullptr, TRUE);
+
+    if (!newFiles.empty()) {
+        SetWindowTextW(currentFileLabel_, ShortDisplayPath(newFiles.back()).c_str());
+        if (fileLogList_) {
+            const size_t startIndex = fileLogLines_.size() - newFiles.size() + 1;
+            BatchAppendDetailLog(newFiles, startIndex);
+        }
+    }
+}
+
+void Gui::SetProgress(const int percent, const bool clearLog) {
+    if (clearLog) {
+        ClearFileLog();
+    }
+    progressPercentValue_ = percent;
+    progressPercentText_ = std::to_wstring(percent) + L"%";
+    InvalidateRect(progressBar_, nullptr, TRUE);
+}
+
+void Gui::ClearFileLog() {
+    fileLogLines_.clear();
+    SetWindowTextW(currentFileLabel_, L"");
+    if (fileLogList_) {
+        SendMessageW(fileLogList_, LB_RESETCONTENT, 0, 0);
+    }
+}
+
+std::wstring Gui::FormatLogLine(const size_t index, const std::wstring& path) const {
+    wchar_t prefix[16]{};
+    swprintf_s(prefix, L"%5zu  ", index);
+    return std::wstring(prefix) + path;
+}
+
+void Gui::BatchAppendDetailLog(const std::vector<std::wstring>& files, const size_t startIndex) {
+    if (!fileLogList_ || files.empty()) {
+        return;
+    }
+
+    for (size_t i = 0; i < files.size(); ++i) {
+        const std::wstring line = FormatLogLine(startIndex + i, files[i]);
+        SendMessageW(fileLogList_, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(line.c_str()));
+    }
+
+    const int count = static_cast<int>(SendMessageW(fileLogList_, LB_GETCOUNT, 0, 0));
+    if (count > 0) {
+        SendMessageW(fileLogList_, LB_SETTOPINDEX, count - 1, 0);
+    }
+}
+
+void Gui::SyncDetailLog() {
+    if (!fileLogList_) {
+        return;
+    }
+
+    SendMessageW(fileLogList_, LB_RESETCONTENT, 0, 0);
+    for (size_t i = 0; i < fileLogLines_.size(); ++i) {
+        const std::wstring line = FormatLogLine(i + 1, fileLogLines_[i]);
+        SendMessageW(fileLogList_, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(line.c_str()));
+    }
+
+    const int count = static_cast<int>(SendMessageW(fileLogList_, LB_GETCOUNT, 0, 0));
+    if (count > 0) {
+        SendMessageW(fileLogList_, LB_SETTOPINDEX, count - 1, 0);
+    }
+}
+
+void Gui::ResizeFileLogWindow(const HWND hwnd) {
+    if (!fileLogList_) {
+        return;
+    }
+    RECT rc{};
+    GetClientRect(hwnd, &rc);
+    SetWindowPos(fileLogList_, nullptr, 8, 8, rc.right - 16, rc.bottom - 16, SWP_NOZORDER);
+}
+
+void Gui::OpenFileLogWindow() {
+    if (fileLogWindow_ && IsWindow(fileLogWindow_)) {
+        ShowWindow(fileLogWindow_, SW_SHOW);
+        SetForegroundWindow(fileLogWindow_);
+        return;
+    }
+
+    RECT mainRc{};
+    GetWindowRect(hwnd_, &mainRc);
+
+    fileLogWindow_ = CreateWindowExW(
+        0, kFileLogWindowClass, i18n::Tr(L"ui.file_log_title").c_str(),
+        WS_OVERLAPPEDWINDOW, mainRc.right + 12, mainRc.top, 720, 480, hwnd_, nullptr, instance_,
+        this);
+    if (!fileLogWindow_) {
+        return;
+    }
+
+    theme::EnableDarkModeRecursive(fileLogWindow_);
+
+    const HFONT logFont = theme::MakeLogFont();
+    fileLogList_ = CreateWindowW(
+        L"LISTBOX", nullptr,
+        WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | WS_HSCROLL | LBS_NOINTEGRALHEIGHT,
+        8, 8, 680, 420, fileLogWindow_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFileLogListId)), instance_, nullptr);
+    SendMessageW(fileLogList_, WM_SETFONT, reinterpret_cast<WPARAM>(logFont), TRUE);
+
+    SyncDetailLog();
+    SendMessageW(fileLogList_, LB_SETHORIZONTALEXTENT, 8000, 0);
+    ResizeFileLogWindow(fileLogWindow_);
+    ShowWindow(fileLogWindow_, SW_SHOW);
+    UpdateWindow(fileLogWindow_);
+}
+
+LRESULT CALLBACK Gui::FileLogWndProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp) {
+    Gui* self = nullptr;
+    if (msg == WM_NCCREATE) {
+        auto* cs = reinterpret_cast<CREATESTRUCTW*>(lp);
+        self = static_cast<Gui*>(cs->lpCreateParams);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+        return TRUE;
+    }
+
+    self = reinterpret_cast<Gui*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    if (!self) {
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    }
+
+    switch (msg) {
+        case WM_SIZE:
+            self->ResizeFileLogWindow(hwnd);
+            return 0;
+        case WM_ERASEBKGND: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            RECT rc{};
+            GetClientRect(hwnd, &rc);
+            FillRect(hdc, &rc, theme::GetBrushes().window);
+            return 1;
+        }
+        case WM_CTLCOLORLISTBOX:
+        case WM_CTLCOLORSTATIC: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            SetBkMode(hdc, OPAQUE);
+            SetBkColor(hdc, theme::Colors().control);
+            SetTextColor(hdc, theme::Colors().text);
+            return reinterpret_cast<LRESULT>(theme::GetBrushes().control);
+        }
+        case WM_CLOSE:
+            DestroyWindow(hwnd);
+            return 0;
+        case WM_DESTROY:
+            self->fileLogWindow_ = nullptr;
+            self->fileLogList_ = nullptr;
+            return 0;
+        default:
+            break;
+    }
+    return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
 void Gui::ShowDone(const bool success, const std::wstring& message) {
     SetBusy(false);
-    SetProgress(success ? 100 : 0, message);
-    MessageBoxW(hwnd_, message.c_str(), success ? L"Done" : L"Error",
+    if (!success && message.empty()) {
+        SetProgress(0);
+        return;
+    }
+    SetProgress(success ? 100 : 0);
+    MessageBoxW(hwnd_, message.c_str(),
+                success ? i18n::Tr(L"titles.installation_complete").c_str()
+                        : i18n::Tr(L"titles.installation_error").c_str(),
                 success ? MB_ICONINFORMATION : MB_ICONERROR);
 }
 
@@ -102,6 +608,107 @@ bool Gui::FormatChecked() const {
 
 bool Gui::SkipVentoyChecked() const {
     return SendMessageW(skipVentoyCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+}
+
+bool Gui::AdvancedChecked() const {
+    return SendMessageW(advancedCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+}
+
+bool Gui::PinVentoyVersionChecked() const {
+    return AdvancedChecked() &&
+           SendMessageW(pinVentoyCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+}
+
+std::wstring Gui::PinnedVentoyVersion() const {
+    if (!PinVentoyVersionChecked()) {
+        return L"";
+    }
+
+    const int idx = static_cast<int>(SendMessageW(ventoyVersionCombo_, CB_GETCURSEL, 0, 0));
+    if (idx < 0 || static_cast<size_t>(idx) >= ventoyVersions_.size()) {
+        return L"";
+    }
+    return ventoyVersions_[static_cast<size_t>(idx)];
+}
+
+void Gui::EnsureVentoyVersionsLoaded() {
+    if (ventoyVersionsLoading_) {
+        return;
+    }
+
+    if (!ventoyVersionsLoaded_) {
+        if (LoadBundledVentoyVersionList(instance_, ventoyVersions_)) {
+            PopulateVentoyVersionCombo();
+            ventoyVersionsLoaded_ = true;
+        }
+    }
+
+    ventoyVersionsLoading_ = true;
+    std::thread([hwnd = hwnd_]() {
+        std::vector<std::wstring> versions;
+        const VentoyResult fetched = FetchVentoyVersions(versions);
+        LPARAM payload = 0;
+        if (fetched.success && !versions.empty()) {
+            payload = reinterpret_cast<LPARAM>(new std::vector<std::wstring>(std::move(versions)));
+        }
+        PostMessageW(hwnd, WM_MEDICAT_VENTOY_VERSIONS, 0, payload);
+    }).detach();
+}
+
+void Gui::SetVentoyVersions(std::vector<std::wstring> versions) {
+    ventoyVersionsLoading_ = false;
+    ventoyVersionsLoaded_ = true;
+    ventoyVersions_ = std::move(versions);
+    PopulateVentoyVersionCombo();
+}
+
+void Gui::PopulateVentoyVersionCombo() {
+    if (!ventoyVersionCombo_) {
+        return;
+    }
+
+    SendMessageW(ventoyVersionCombo_, CB_RESETCONTENT, 0, 0);
+    for (const auto& version : ventoyVersions_) {
+        const std::wstring display = L"v" + version;
+        SendMessageW(ventoyVersionCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(display.c_str()));
+    }
+
+    if (!ventoyVersions_.empty()) {
+        SendMessageW(ventoyVersionCombo_, CB_SETCURSEL, 0, 0);
+    }
+}
+
+void Gui::UpdateAdvancedControls() {
+    const bool expanded = AdvancedChecked();
+    const bool pin = expanded && PinVentoyVersionChecked();
+    const bool interactive = IsWindowEnabled(advancedCheck_);
+
+    ShowWindow(pinVentoyCheck_, expanded ? SW_SHOW : SW_HIDE);
+    ShowWindow(ventoyVersionCombo_, pin ? SW_SHOW : SW_HIDE);
+    EnableWindow(pinVentoyCheck_, expanded && interactive);
+    EnableWindow(ventoyVersionCombo_, pin && interactive);
+
+    if (expanded) {
+        EnsureVentoyVersionsLoaded();
+    }
+
+    const int installY = expanded ? kInstallYExpanded : kInstallYCollapsed;
+    const int progressY = expanded ? kProgressYExpanded : kProgressYCollapsed;
+    const int openLogY = expanded ? kOpenLogYExpanded : kOpenLogYCollapsed;
+    const int currentFileY = expanded ? kCurrentFileYExpanded : kCurrentFileYCollapsed;
+
+    SetWindowPos(installBtn_, nullptr, kMargin, installY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(progressBar_, nullptr, kMargin, progressY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(openLogBtn_, nullptr, 390, openLogY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(currentFileLabel_, nullptr, kMargin, currentFileY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+    RECT wr{};
+    GetWindowRect(hwnd_, &wr);
+    const int targetH = expanded ? kWindowHeightExpanded : kWindowHeightCollapsed;
+    if ((wr.bottom - wr.top) != targetH) {
+        SetWindowPos(hwnd_, nullptr, 0, 0, kWindowWidth, targetH, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        InvalidateRect(hwnd_, nullptr, TRUE);
+    }
 }
 
 LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -128,10 +735,50 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_MEDICAT_PROGRESS: {
             auto* payload = reinterpret_cast<ProgressPayload*>(lp);
             if (payload) {
-                self->SetProgress(payload->percent, payload->status);
+                self->SetProgress(payload->percent, payload->clearLog);
                 delete payload;
             }
             return 0;
+        }
+        case WM_TIMER:
+            if (wp == kUiRefreshTimerId) {
+                self->FlushInstallUi();
+            }
+            return 0;
+        case WM_ERASEBKGND: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            RECT rc{};
+            GetClientRect(hwnd, &rc);
+            FillRect(hdc, &rc, theme::GetBrushes().window);
+            const HPEN pen = CreatePen(PS_SOLID, 1, theme::Colors().border);
+            const HPEN oldPen = reinterpret_cast<HPEN>(SelectObject(hdc, pen));
+            MoveToEx(hdc, 0, kHeaderHeight - 1, nullptr);
+            LineTo(hdc, rc.right, kHeaderHeight - 1);
+            SelectObject(hdc, oldPen);
+            DeleteObject(pen);
+            return 1;
+        }
+        case WM_CTLCOLORSTATIC: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            const HWND ctl = reinterpret_cast<HWND>(lp);
+            SetBkMode(hdc, TRANSPARENT);
+            if (ctl == self->titleLabel_) {
+                SetTextColor(hdc, theme::Colors().text);
+                return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
+            }
+            if (ctl == self->subtitleLabel_ || ctl == self->currentFileLabel_) {
+                SetTextColor(hdc, theme::Colors().muted);
+                return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
+            }
+            SetTextColor(hdc, theme::Colors().text);
+            return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
+        }
+        case WM_CTLCOLOREDIT: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            SetBkMode(hdc, OPAQUE);
+            SetBkColor(hdc, theme::Colors().control);
+            SetTextColor(hdc, theme::Colors().text);
+            return reinterpret_cast<LRESULT>(theme::GetBrushes().control);
         }
         case WM_MEDICAT_DONE: {
             auto* payload = reinterpret_cast<DonePayload*>(lp);
@@ -141,7 +788,25 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             }
             return 0;
         }
+        case WM_MEDICAT_VENTOY_VERSIONS: {
+            auto* payload = reinterpret_cast<std::vector<std::wstring>*>(lp);
+            if (payload) {
+                self->SetVentoyVersions(std::move(*payload));
+                delete payload;
+            } else {
+                self->ventoyVersionsLoading_ = false;
+            }
+            return 0;
+        }
         case WM_DESTROY:
+            if (self->fileLogWindow_ && IsWindow(self->fileLogWindow_)) {
+                DestroyWindow(self->fileLogWindow_);
+            }
+            if (self->logoBitmap_) {
+                DeleteObject(self->logoBitmap_);
+                self->logoBitmap_ = nullptr;
+            }
+            theme::Shutdown();
             PostQuitMessage(0);
             return 0;
         default:
@@ -152,53 +817,132 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 
 void Gui::OnCreate(HWND hwnd) {
     hwnd_ = hwnd;
-    const HFONT font = MakeUiFont();
+    const HFONT uiFont = theme::MakeUiFont();
+    const HFONT titleFont = theme::MakeTitleFont();
+    const HFONT subtitleFont = theme::MakeSubtitleFont();
 
-    CreateWindowW(L"STATIC", L"USB drive:", WS_CHILD | WS_VISIBLE, 20, 20, 100, 22, hwnd, nullptr,
-                  instance_, nullptr);
+    logoBitmap_ = theme::LoadLogoBitmap(instance_);
+    logoStatic_ = CreateWindowW(
+        L"STATIC", nullptr, WS_CHILD | WS_VISIBLE | SS_BITMAP | SS_CENTERIMAGE,
+        kMargin, 12, 64, 64, hwnd, nullptr, instance_, nullptr);
+    if (logoBitmap_) {
+        SendMessageW(logoStatic_, STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(logoBitmap_));
+    }
+
+    titleLabel_ = CreateWindowW(
+        L"STATIC", i18n::Tr(L"ui.title_label").c_str(),
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        96, 18, 420, 28, hwnd, nullptr, instance_, nullptr);
+    wchar_t versionText[32]{};
+    swprintf_s(versionText, L"v%hs", MEDICAT_VERSION);
+    subtitleLabel_ = CreateWindowW(
+        L"STATIC", versionText,
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        96, 48, 420, 22, hwnd, nullptr, instance_, nullptr);
+
+    CreateWindowW(L"STATIC", i18n::Tr(L"ui.drive_label").c_str(), WS_CHILD | WS_VISIBLE, kMargin, kContentTop,
+                  kContentWidth, 20, hwnd, nullptr, instance_, nullptr);
     driveCombo_ = CreateWindowW(
         WC_COMBOBOXW, nullptr,
         CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL,
-        120, 18, 400, 300, hwnd, reinterpret_cast<HMENU>(kDriveComboId), instance_, nullptr);
+        kMargin, kContentTop + 22, kContentWidth, 300, hwnd,
+        reinterpret_cast<HMENU>(kDriveComboId), instance_, nullptr);
 
     formatCheck_ = CreateWindowW(
-        L"BUTTON", L"Erase everything on this USB (format)",
+        L"BUTTON", i18n::Tr(L"ui.format_checkbox").c_str(),
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-        20, 60, 500, 24, hwnd, reinterpret_cast<HMENU>(kFormatCheckId), instance_, nullptr);
+        kMargin, kContentTop + 56, kContentWidth, 24, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFormatCheckId)), instance_, nullptr);
     SendMessageW(formatCheck_, BM_SETCHECK, BST_CHECKED, 0);
 
     skipVentoyCheck_ = CreateWindowW(
-        L"BUTTON", L"Skip Ventoy (USB already has Ventoy)",
+        L"BUTTON", i18n::Tr(L"ui.skip_ventoy_checkbox").c_str(),
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-        20, 90, 500, 24, hwnd, reinterpret_cast<HMENU>(kSkipVentoyCheckId), instance_, nullptr);
+        kMargin, kContentTop + 86, kContentWidth, 24, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSkipVentoyCheckId)), instance_, nullptr);
+
+    advancedCheck_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.advanced_options").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+        kMargin, kContentTop + 116, 180, 24, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kAdvancedCheckId)), instance_, nullptr);
+
+    pinVentoyCheck_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.pin_ventoy_version").c_str(),
+        WS_CHILD | BS_AUTOCHECKBOX,
+        kMargin + 20, kContentTop + 144, 220, 24, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kPinVentoyCheckId)), instance_, nullptr);
+
+    ventoyVersionCombo_ = CreateWindowW(
+        WC_COMBOBOXW, nullptr,
+        CBS_DROPDOWNLIST | WS_CHILD | WS_VSCROLL,
+        270, kContentTop + 142, 270, 300, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVentoyVersionEditId)), instance_, nullptr);
 
     installBtn_ = CreateWindowW(
-        L"BUTTON", L"INSTALL MEDICAT",
-        WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-        20, 130, 500, 40, hwnd, reinterpret_cast<HMENU>(kInstallBtnId), instance_, nullptr);
+        L"BUTTON", i18n::Tr(L"ui.install_button").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        kMargin, kInstallYCollapsed, kContentWidth, 44, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kInstallBtnId)), instance_, nullptr);
 
     progressBar_ = CreateWindowW(
         PROGRESS_CLASSW, nullptr,
         WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
-        20, 190, 500, 24, hwnd, reinterpret_cast<HMENU>(kProgressId), instance_, nullptr);
+        kMargin, kProgressYCollapsed, 360, 28, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kProgressId)), instance_, nullptr);
     SendMessageW(progressBar_, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
+    SetPropW(progressBar_, L"MedicatGui", this);
+    const auto originalProc = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
+        progressBar_, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(ProgressBarProc)));
+    SetWindowLongPtrW(progressBar_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(originalProc));
 
-    statusLabel_ = CreateWindowW(
-        L"STATIC", L"Plug in your USB and click Install.",
-        WS_CHILD | WS_VISIBLE,
-        20, 225, 500, 40, hwnd, reinterpret_cast<HMENU>(kStatusId), instance_, nullptr);
+    openLogBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.open_file_log_button").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        390, kOpenLogYCollapsed, 150, 32, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kOpenLogBtnId)), instance_, nullptr);
 
-    for (HWND child : {driveCombo_, formatCheck_, skipVentoyCheck_, installBtn_, statusLabel_}) {
-        SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+    currentFileLabel_ = CreateWindowW(
+        L"STATIC", L"",
+        WS_CHILD | WS_VISIBLE | SS_ENDELLIPSIS,
+        kMargin, kCurrentFileYCollapsed, kContentWidth, 20, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCurrentFileLabelId)), instance_, nullptr);
+
+    for (HWND child :
+         {logoStatic_, titleLabel_, subtitleLabel_, driveCombo_, formatCheck_, skipVentoyCheck_, advancedCheck_,
+          pinVentoyCheck_, ventoyVersionCombo_, installBtn_, openLogBtn_, progressBar_, currentFileLabel_}) {
+        SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+    }
+    SendMessageW(titleLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(titleFont), TRUE);
+    SendMessageW(subtitleLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(subtitleFont), TRUE);
+
+    theme::EnableDarkMode(hwnd);
+    theme::EnableDarkModeRecursive(hwnd);
+
+    SubclassGlowButton(installBtn_, true);
+    SubclassGlowButton(openLogBtn_, false);
+
+    for (const HWND checkbox : {formatCheck_, skipVentoyCheck_, advancedCheck_, pinVentoyCheck_}) {
+        SubclassFlatCheckbox(checkbox);
+        InvalidateRect(checkbox, nullptr, TRUE);
     }
 
+    UpdateAdvancedControls();
     RefreshDrives();
 }
 
 void Gui::OnCommand(WPARAM wp) {
     const int id = LOWORD(wp);
+    if (id == kAdvancedCheckId || id == kPinVentoyCheckId) {
+        UpdateAdvancedControls();
+        return;
+    }
     if (id == kInstallBtnId && onInstall_) {
         onInstall_();
+        return;
+    }
+    if (id == kOpenLogBtnId) {
+        OpenFileLogWindow();
     }
 }
 

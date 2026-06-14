@@ -27,6 +27,7 @@ ExtractResult Extract7zArchive(
     const std::wstring& destinationRoot,
     uint64_t totalUncompressedBytes,
     uint64_t initialFreeBytes,
-    ProgressCallback onProgress);
+    ProgressCallback onProgress,
+    const std::wstring& logFilePath = L"");
 
 }  // namespace medicat

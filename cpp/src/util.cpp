@@ -21,6 +21,21 @@ std::wstring GetExeDirectory() {
     return path.substr(0, pos);
 }
 
+std::wstring GetMedicatTempDir() {
+    wchar_t temp[MAX_PATH]{};
+    const DWORD len = GetTempPathW(MAX_PATH, temp);
+    if (len == 0 || len >= MAX_PATH) {
+        return JoinPath(GetExeDirectory(), L"MedicatInstaller");
+    }
+
+    std::wstring root = JoinPath(std::wstring(temp, len), L"MedicatInstaller");
+    CreateDirectoryW(root.c_str(), nullptr);
+
+    std::wstring dir = JoinPath(root, std::to_wstring(GetCurrentProcessId()));
+    CreateDirectoryW(dir.c_str(), nullptr);
+    return dir;
+}
+
 std::wstring JoinPath(const std::wstring& a, const std::wstring& b) {
     if (a.empty()) {
         return b;
@@ -65,6 +80,13 @@ std::wstring FormatPercent(int percent) {
         percent = 100;
     }
     return std::to_wstring(percent) + L"%";
+}
+
+std::wstring ShortDisplayPath(const std::wstring& path, const size_t maxLen) {
+    if (path.size() <= maxLen) {
+        return path;
+    }
+    return L"..." + path.substr(path.size() - (maxLen - 3));
 }
 
 std::vector<std::wstring> SplitLines(const std::wstring& text) {

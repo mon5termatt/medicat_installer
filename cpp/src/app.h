@@ -16,9 +16,9 @@ public:
 
 private:
     void OnInstall();
-    void PostProgress(int percent, const std::wstring& status);
+    void PostProgress(int percent, bool clearLog = false);
     void PostDone(bool success, const std::wstring& message);
-    void RunInstallThread(std::wstring drive, bool format, bool skipVentoy);
+    void RunInstallThread(std::wstring drive, bool format, bool skipVentoy, std::wstring pinVersion, HWND hwnd);
 
     HINSTANCE instance_;
     Gui gui_;

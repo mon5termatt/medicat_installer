@@ -6,10 +6,12 @@
 namespace medicat {
 
 std::wstring GetExeDirectory();
+std::wstring GetMedicatTempDir();
 std::wstring JoinPath(const std::wstring& a, const std::wstring& b);
 bool FileExists(const std::wstring& path);
 std::wstring FormatBytes(uint64_t bytes);
 std::wstring FormatPercent(int percent);
+std::wstring ShortDisplayPath(const std::wstring& path, size_t maxLen = 60);
 std::vector<std::wstring> SplitLines(const std::wstring& text);
 
 }  // namespace medicat

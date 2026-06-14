@@ -7,8 +7,11 @@
 
 #include <atomic>
 #include <chrono>
+#include <mutex>
 #include <sstream>
+#include <string>
 #include <thread>
+#include <vector>
 
 namespace medicat {
 
@@ -89,6 +92,162 @@ int PercentFromBytes(uint64_t written, uint64_t total) {
     return static_cast<int>(pct);
 }
 
+std::string WideToUtf8(const std::wstring& text) {
+    if (text.empty()) {
+        return {};
+    }
+    const int size = WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    if (size <= 1) {
+        return {};
+    }
+    std::string out(static_cast<size_t>(size - 1), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, out.data(), size, nullptr, nullptr);
+    return out;
+}
+
+class RawLogTee {
+public:
+    bool Open(const std::wstring& path, const std::wstring& commandLine) {
+        file_ = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS,
+                            FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file_ == INVALID_HANDLE_VALUE) {
+            return false;
+        }
+
+        std::string header = "===== 7za extract log =====\r\n";
+        header += WideToUtf8(commandLine);
+        header += "\r\n\r\n";
+        WriteLocked(header.data(), header.size());
+        return true;
+    }
+
+    void WriteStdout(const char* data, const size_t len) { Write(data, len, false); }
+
+    void WriteStderr(const char* data, const size_t len) { Write(data, len, true); }
+
+    void Flush() {
+        std::lock_guard lock(mutex_);
+        FlushLocked();
+    }
+
+    void Close() {
+        std::lock_guard lock(mutex_);
+        FlushLocked();
+        if (file_ != INVALID_HANDLE_VALUE) {
+            CloseHandle(file_);
+            file_ = INVALID_HANDLE_VALUE;
+        }
+    }
+
+private:
+    void Write(const char* data, const size_t len, const bool isStderr) {
+        if (!data || len == 0) {
+            return;
+        }
+        std::lock_guard lock(mutex_);
+        if (file_ == INVALID_HANDLE_VALUE) {
+            return;
+        }
+        if (isStderr && !stderrMarkerWritten_) {
+            static constexpr char kMarker[] = "\r\n----- stderr -----\r\n";
+            WriteLocked(kMarker, sizeof(kMarker) - 1);
+            stderrMarkerWritten_ = true;
+        }
+        pending_.append(data, len);
+        if (pending_.size() >= 65536) {
+            FlushLocked();
+        }
+    }
+
+    void WriteLocked(const char* data, const size_t len) {
+        if (file_ == INVALID_HANDLE_VALUE || !data || len == 0) {
+            return;
+        }
+        DWORD written = 0;
+        WriteFile(file_, data, static_cast<DWORD>(len), &written, nullptr);
+    }
+
+    void FlushLocked() {
+        if (!pending_.empty()) {
+            WriteLocked(pending_.data(), pending_.size());
+            pending_.clear();
+        }
+    }
+
+    HANDLE file_ = INVALID_HANDLE_VALUE;
+    std::mutex mutex_;
+    std::string pending_;
+    bool stderrMarkerWritten_ = false;
+};
+
+void ProcessStdoutChunk(const std::string& chunk, std::wstring& lineBuffer, std::wstring& lastFile, int& lastPercent,
+                        const uint64_t totalUncompressedBytes, const ProgressCallback& onProgress) {
+    const int wlen = MultiByteToWideChar(CP_UTF8, 0, chunk.data(), static_cast<int>(chunk.size()), nullptr, 0);
+    if (wlen <= 0) {
+        return;
+    }
+    std::wstring wide(static_cast<size_t>(wlen), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, chunk.data(), static_cast<int>(chunk.size()), wide.data(), wlen);
+
+    for (wchar_t ch : wide) {
+        if (ch == L'\r' || ch == L'\n') {
+            int pct = -1;
+            std::wstring file;
+            if (Parse7zLine(lineBuffer, pct, file)) {
+                if (!file.empty() && file != lastFile) {
+                    lastFile = file;
+                    if (onProgress) {
+                        ExtractProgress fileProgress;
+                        fileProgress.file = file;
+                        fileProgress.percent = lastPercent >= 0 ? lastPercent : 0;
+                        fileProgress.bytesWritten = 0;
+                        fileProgress.totalBytes = totalUncompressedBytes;
+                        onProgress(fileProgress);
+                    }
+                }
+                if (pct >= 0) {
+                    lastPercent = pct;
+                }
+            }
+            lineBuffer.clear();
+        } else if (ch != L'\b') {
+            lineBuffer.push_back(ch);
+        }
+    }
+}
+
+void DrainStdout(HANDLE stdoutRead, std::wstring& lineBuffer, std::wstring& lastFile, int& lastPercent,
+                 const uint64_t totalUncompressedBytes, const ProgressCallback& onProgress, RawLogTee* logTee) {
+    for (;;) {
+        char buf[4096];
+        DWORD read = 0;
+        if (!ReadFile(stdoutRead, buf, sizeof(buf), &read, nullptr) || read == 0) {
+            break;
+        }
+        if (logTee) {
+            logTee->WriteStdout(buf, read);
+        }
+        ProcessStdoutChunk(std::string(buf, read), lineBuffer, lastFile, lastPercent, totalUncompressedBytes,
+                           onProgress);
+    }
+
+    if (!lineBuffer.empty()) {
+        int pct = -1;
+        std::wstring file;
+        if (Parse7zLine(lineBuffer, pct, file)) {
+            if (!file.empty() && file != lastFile && onProgress) {
+                ExtractProgress fileProgress;
+                fileProgress.file = file;
+                fileProgress.percent = lastPercent >= 0 ? lastPercent : 0;
+                fileProgress.bytesWritten = 0;
+                fileProgress.totalBytes = totalUncompressedBytes;
+                onProgress(fileProgress);
+            }
+        }
+        lineBuffer.clear();
+    }
+}
+
 }  // namespace
 
 ExtractResult Extract7zArchive(
@@ -97,7 +256,8 @@ ExtractResult Extract7zArchive(
     const std::wstring& destinationRoot,
     const uint64_t totalUncompressedBytes,
     const uint64_t initialFreeBytes,
-    ProgressCallback onProgress) {
+    ProgressCallback onProgress,
+    const std::wstring& logFilePath) {
     ExtractResult result;
 
     std::wstring dest = destinationRoot;
@@ -106,8 +266,11 @@ ExtractResult Extract7zArchive(
     }
     CreateDirectoryW(dest.c_str(), nullptr);
 
-    std::wstring cmd = L"\"" + sevenZipExe + L"\" x -bsp1 -bso1 -bse1 -o\"" + dest + L"\" \"" +
+    std::wstring cmd = L"\"" + sevenZipExe + L"\" x -bsp1 -bso1 -bse1 -bb1 -o\"" + dest + L"\" \"" +
                        archivePath + L"\" -aoa -y";
+
+    RawLogTee logTee;
+    const bool logging = !logFilePath.empty() && logTee.Open(logFilePath, cmd);
 
     SECURITY_ATTRIBUTES sa{};
     sa.nLength = sizeof(sa);
@@ -168,6 +331,9 @@ ExtractResult Extract7zArchive(
             if (!ReadFile(stderrRead, buf, sizeof(buf), &n, nullptr) || n == 0) {
                 break;
             }
+            if (logging) {
+                logTee.WriteStderr(buf, n);
+            }
             const int wlen = MultiByteToWideChar(CP_UTF8, 0, buf, static_cast<int>(n), nullptr, 0);
             std::wstring chunk(static_cast<size_t>(wlen), L'\0');
             MultiByteToWideChar(CP_UTF8, 0, buf, static_cast<int>(n), chunk.data(), wlen);
@@ -175,6 +341,7 @@ ExtractResult Extract7zArchive(
         }
     });
 
+    RawLogTee* logPtr = logging ? &logTee : nullptr;
     auto lastPoll = std::chrono::steady_clock::now();
     std::wstring lineBuffer;
 
@@ -189,28 +356,10 @@ ExtractResult Extract7zArchive(
             DWORD read = 0;
             if (ReadFile(stdoutRead, chunk.data(), avail, &read, nullptr) && read > 0) {
                 chunk.resize(read);
-                const int wlen =
-                    MultiByteToWideChar(CP_UTF8, 0, chunk.data(), static_cast<int>(read), nullptr, 0);
-                std::wstring wide(static_cast<size_t>(wlen), L'\0');
-                MultiByteToWideChar(CP_UTF8, 0, chunk.data(), static_cast<int>(read), wide.data(), wlen);
-
-                for (wchar_t ch : wide) {
-                    if (ch == L'\r' || ch == L'\n') {
-                        int pct = -1;
-                        std::wstring file;
-                        if (Parse7zLine(lineBuffer, pct, file)) {
-                            if (!file.empty()) {
-                                lastFile = file;
-                            }
-                            if (pct >= 0) {
-                                lastPercent = pct;
-                            }
-                        }
-                        lineBuffer.clear();
-                    } else if (ch != L'\b') {
-                        lineBuffer.push_back(ch);
-                    }
+                if (logging) {
+                    logTee.WriteStdout(chunk.data(), chunk.size());
                 }
+                ProcessStdoutChunk(chunk, lineBuffer, lastFile, lastPercent, totalUncompressedBytes, onProgress);
             }
         }
 
@@ -229,7 +378,7 @@ ExtractResult Extract7zArchive(
             ExtractProgress progress;
             progress.bytesWritten = written;
             progress.totalBytes = totalUncompressedBytes;
-            progress.file = lastFile;
+            progress.file.clear();
             if (written > 0 && totalUncompressedBytes > 0) {
                 progress.percent = PercentFromBytes(written, totalUncompressedBytes);
             } else if (lastPercent >= 0) {
@@ -253,9 +402,16 @@ ExtractResult Extract7zArchive(
     DWORD exitCode = 1;
     GetExitCodeProcess(pi.hProcess, &exitCode);
 
+    DrainStdout(stdoutRead, lineBuffer, lastFile, lastPercent, totalUncompressedBytes, onProgress, logPtr);
+
     running = false;
     if (stderrThread.joinable()) {
         stderrThread.join();
+    }
+
+    if (logging) {
+        logTee.Flush();
+        logTee.Close();
     }
 
     CloseHandle(stdoutRead);
