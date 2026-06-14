@@ -16,6 +16,14 @@ test_extract/
 extracted_medicat/
 TestOutput_*/
 
+# C++ build output
+cpp/build/
+cpp/out/
+bundle/
+*.obj
+*.pdb
+*.ilk
+
 # 7-Zip temporary files
 7z_output.tmp
 7z_error.tmp

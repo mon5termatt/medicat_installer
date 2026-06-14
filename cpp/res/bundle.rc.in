@@ -1,0 +1,4 @@
+#include "resource.h"
+
+IDR_7ZA RCDATA "@BUNDLE_7ZA_PATH@"
+IDR_7Z  RCDATA "@BUNDLE_7Z_PATH@"
