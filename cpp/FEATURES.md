@@ -22,7 +22,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Current filename during extract | ✅ | From 7za stdout parser |
 | Post-install files (icon, CheckFiles.bat) | ⬜ | PS: downloads from GitHub |
 | Install log file | ✅ | `medicat_installer.log` |
-| Raw 7za extract log | ✅ | `7za_extract.log` (pipe tee, full stdout/stderr) |
+| Raw 7za extract log | ✅ | `extract.log` (pipe tee, full stdout/stderr) |
 
 ---
 

@@ -1,101 +1,88 @@
-# MediCat Installer (PowerShell GUI)
+# MediCat USB Installer
 
-> Alpha preview – actively evolving. Expect rough edges.
+> **HIGHLY EXPERIMENTAL** — native C++ preview. Expect bugs; test on a spare drive first.
 
-This repository contains a modern PowerShell-based GUI installer for preparing a MediCat USB. It automates Ventoy installation/upgrade and extracts the main MediCat archive to the selected drive, with real-time logging and progress where possible.
+Windows GUI installer for preparing a MediCat USB: Ventoy install/upgrade, optional NTFS format, MediCat archive extraction, and MD5 verification.
 
-This version was developed rapidly with assistance from an AI coding assistant to bootstrap the GUI, background job patterns, logging, and module integration. Please review changes carefully and test before production use.
+**Latest prerelease:** [GitHub Releases](https://github.com/mon5termatt/medicat_installer/releases) (tag `3520+`, `cpp` branch)
 
 ## Status
 
-- Stage: Very early alpha
-- Active branch: `pwsh`
-- Breaking changes likely; UX and flows may change without notice
+| Branch | Installer | Notes |
+|--------|-----------|-------|
+| `cpp` | **C++ / Win32** (active) | Single `MedicatInstaller.exe`, bundled tools, experimental |
+| `pwsh` | PowerShell GUI | Previous alpha; still on GitHub for reference |
+| `main` | Legacy batch/scripts | Older community maintenance |
 
-## Highlights
+## Quick start (release build)
 
-- Windows Forms GUI (PowerShell 7+ compatible)
-- Auto UAC elevation; preserves original working directory
-- Drive picker with filtering
-  - Hides `C:` by design
-  - Optional hard drive visibility (checkbox)
-  - Detects VHD/VHDX files and includes them
-  - Defaults to `I:` in debug builds
-- Ventoy integration
-  - Auto-download of latest Ventoy release
-  - Fresh install or non-destructive upgrade (`VTOYCLI`)
-  - Optional NTFS format after install (checkbox-controlled)
-- MediCat archive extraction
-  - Prefers PowerShell modules (7Zip4PowerShell / 7zipWrapper / PS7Zip)
-  - Progress tracking via background monitor where available
-- Comprehensive logging
-  - Dual output to UI and file (`medicat_download.log`)
-  - Debug flag to control verbosity
+1. Download `MedicatInstaller.exe` from [Releases](https://github.com/mon5termatt/medicat_installer/releases).
+2. Place `MediCat.USB.v21.12.7z` in the **same folder** as the installer.
+3. Run `MedicatInstaller.exe` **as Administrator**.
+4. Select your USB drive (≥ 30 GiB; `C:` is hidden).
+5. Choose options, confirm the wipe warning, and install — or use **Verify Files** to MD5-check an existing stick.
+
+## What it does
+
+- **Ventoy** — download, extract, fresh install or non-destructive upgrade (`VTOYCLI`)
+- **Format** — optional NTFS format before extract
+- **Extract** — `MediCat.USB.v21.12.7z` via bundled `7za.exe` with live file log
+- **Verify** — post-install or standalone MD5 check against embedded `MedicatFiles.md5`
+- **i18n** — English, Spanish, French, Polish (from `i18n/translations.json`)
 
 ## Requirements
 
-- Windows 10/11 (x64) with admin rights
-- PowerShell 7+ recommended (pwsh)
-- Internet connectivity (for Ventoy download/module install)
-- Sufficient disk space for MediCat extraction (24GB+ archive)
+- Windows 10/11 x64 (ARM64 build possible from source)
+- Administrator elevation (UAC)
+- Internet for Ventoy download (first run)
+- USB drive with **≥ 30 GiB** free/total capacity
+- `MediCat.USB.v21.12.7z` beside the installer (~24 GB+ uncompressed)
 
-## Getting Started
+## Build from source
 
-1. Clone the repo and switch to the `pwsh` branch.
-2. Launch the installer as Administrator:
-   - Right-click `MedicatInstaller.ps1` → Run with PowerShell
-   - Or from an elevated PowerShell:
-     ```powershell
-     pwsh -NoProfile -ExecutionPolicy Bypass -File .\MedicatInstaller.ps1
-     ```
-   The script auto-elevates if needed and runs from its own directory.
-3. Select the target drive.
-   - `C:` is always hidden
-   - Toggle "Show hard drives" to include fixed disks
-   - VHD/VHDX are detected and listed
-4. Choose whether to format to NTFS before install (checkbox).
-   - Checked: fresh Ventoy install then NTFS format
-   - Unchecked: detect Ventoy; if present, perform non-destructive upgrade
-5. Start installation. Watch the status, progress bar, and log output.
+Requires Visual Studio 2022 (or Build Tools), CMake 3.16+, and repo assets `7za.exe`, `bin/7z.exe`, `MedicatFiles.md5`.
 
-## Logs
+```bat
+cd cpp
+cmake -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+```
 
-- Primary log: `medicat_download.log` (created in script directory)
-- All status, progress, debug messages, and message box interactions are logged
+Output: `cpp\build\Release\MedicatInstaller.exe`
 
-## Notes on Extraction
+See [`cpp/README.md`](cpp/README.md) for layout and [`cpp/FEATURES.md`](cpp/FEATURES.md) for parity checklist vs the PowerShell installer.
 
-- Prefers PowerShell modules over `7z.exe`
-- If a module is missing, the script may attempt local installation
-- Progress is estimated using file system monitoring when the module doesn’t emit progress
+## Logs (beside the exe)
 
-## Known Issues (Alpha)
+| File | When |
+|------|------|
+| `medicat_installer.log` | Always — main session log |
+| `extract.log` | During 7za extraction (raw stdout/stderr) |
+| `check.log` | During MD5 verify — one line per file (`OK` / `FAIL` / `SKIP`) |
+| `debug.log` | **On errors only** — OS/hardware info, tool versions, recent log tail |
+| `failed_files.txt` | When verification finds failures |
 
-- Progress may not reflect exact extraction state for some modules
-- Module availability and parameters differ by environment
-- Ventoy CLI errors are surfaced, but edge cases may exist
-- Large archive extraction can take a long time; ensure power and space are sufficient
+If something breaks, attach `debug.log` and `medicat_installer.log` to your issue.
 
-## Roadmap
+## Repo layout
 
-- Improve extraction progress fidelity and error messaging
-- Pluggable extraction backend with graceful fallback
-- Better Ventoy version/upgrade flow and validation
-- Configurable defaults and persistent settings
-- Localization and accessibility passes
+```
+MedicatInstaller.exe   # release binary (or cpp/build/Release/ after build)
+Medicat.USB.v21.12.7z  # user-supplied archive (not in repo)
+7za.exe                # bundled into installer at build time
+bin/7z.exe             # bundled into installer at build time
+MedicatFiles.md5       # verification manifest (bundled)
+cpp/                   # C++ source
+i18n/                  # translations
+tools/                 # build-time scripts (Ventoy list, i18n codegen)
+```
+
+Runtime folders (`Ventoy2Disk/`, `cpp/build/`, `bundle/`) are created locally and gitignored.
 
 ## Contributing
 
-- PRs welcome to the `pwsh` branch
-- Please avoid committing large binaries; `.gitignore` excludes common large artifacts (Ventoy2Disk, archives, logs)
-- When changing UI or behavior, keep logging and thread-safety patterns consistent (`form.Invoke`, background jobs)
+PRs welcome on the `cpp` branch. Do not commit archives, logs, or Ventoy extract trees. Match existing logging and UI threading patterns (`WM_APP` progress posts from worker threads).
 
 ## License
 
-- This repo contains scripts to orchestrate third-party tools (Ventoy, 7-Zip modules). Review and comply with their respective licenses.
-
-
-
----
-
-If you hit an issue, attach `medicat_download.log` and describe the drive type, chosen options, and any on-screen errors.
+Scripts and installer orchestrate third-party tools (Ventoy, 7-Zip). Comply with their respective licenses.

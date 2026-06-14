@@ -4,10 +4,14 @@ MediCat.USB.v*.7z
 
 # Ventoy2Disk Directory
 Ventoy2Disk/
+ventoy-*/
 
-# Log Files
+# Log / diagnostic output
 *.log
 medicat_download.log
+check.log
+debug.log
+extract.log
 test_*.log
 *_7zipwrapper_*.log
 
@@ -15,6 +19,11 @@ test_*.log
 test_extract/
 extracted_medicat/
 TestOutput_*/
+_pkg/
+lib/
+old/
+download/
+translate/
 
 # C++ build output
 cpp/build/
@@ -31,7 +40,7 @@ medicat_extract_list_*.txt
 ventoy_stdout_*.txt
 ventoy_stderr_*.txt
 
-# PowerShell temporary files
+# Installer output beside exe
 failed_files.txt
 
 # OS Files
