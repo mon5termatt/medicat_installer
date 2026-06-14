@@ -14,7 +14,7 @@ This version was developed rapidly with assistance from an AI coding assistant t
 
 ## Highlights
 
-- Windows Forms GUI (PowerShell 7+ compatible)
+- Windows Forms GUI (Windows PowerShell 5.1+; no PowerShell 7 required)
 - Auto UAC elevation; preserves original working directory
 - Drive picker with filtering
   - Hides `C:` by design
@@ -26,8 +26,8 @@ This version was developed rapidly with assistance from an AI coding assistant t
   - Fresh install or non-destructive upgrade (`VTOYCLI`)
   - Optional NTFS format after install (checkbox-controlled)
 - MediCat archive extraction
-  - Prefers PowerShell modules (7Zip4PowerShell / 7zipWrapper / PS7Zip)
-  - Progress tracking via background monitor where available
+  - Uses vendored `lib/` (SevenZipSharp + 7z native DLLs + .NET deps) for offline extraction with real progress
+  - Falls back to vendored `7za.exe` with folder-size progress if needed
 - Comprehensive logging
   - Dual output to UI and file (`medicat_download.log`)
   - Debug flag to control verbosity
@@ -35,18 +35,18 @@ This version was developed rapidly with assistance from an AI coding assistant t
 ## Requirements
 
 - Windows 10/11 (x64) with admin rights
-- PowerShell 7+ recommended (pwsh)
-- Internet connectivity (for Ventoy download/module install)
+- Windows PowerShell 5.1 or later (built into Windows)
+- Internet connectivity (for Ventoy download)
 - Sufficient disk space for MediCat extraction (24GB+ archive)
 
 ## Getting Started
 
 1. Clone the repo and switch to the `pwsh` branch.
 2. Launch the installer as Administrator:
-   - Right-click `MedicatInstaller.ps1` → Run with PowerShell
-   - Or from an elevated PowerShell:
+   - Right-click `MedicatInstaller.ps1` → **Run with PowerShell**
+   - Or from an elevated PowerShell window:
      ```powershell
-     pwsh -NoProfile -ExecutionPolicy Bypass -File .\MedicatInstaller.ps1
+     powershell -NoProfile -ExecutionPolicy Bypass -File .\MedicatInstaller.ps1
      ```
    The script auto-elevates if needed and runs from its own directory.
 3. Select the target drive.

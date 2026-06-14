@@ -13,6 +13,11 @@ if ($scriptPath) {
     }
 }
 
+$extractArchivePath = Join-Path $PSScriptRoot "Extract-Archive.ps1"
+if (Test-Path $extractArchivePath) {
+    . $extractArchivePath
+}
+
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
@@ -581,40 +586,8 @@ function Start-ReExtractFiles {
         Update-Status (Get-StatusTranslation -Key "re_extracting")
         Write-Log "Starting re-extraction of $($FailedFiles.Count) files"
         
-        # Check if 7z exists - check PATH first, then bin folder
-        $sevenZipPath = $null
-        
-        # Try to find 7z in PATH
-        try {
-            $path7z = Get-Command "7z.exe" -ErrorAction SilentlyContinue
-            if ($path7z) {
-                $sevenZipPath = $path7z.Source
-                Write-Log "Found 7z.exe in PATH: $sevenZipPath"
-            }
-        } catch {
-            # Not in PATH, continue to check bin folder
-        }
-        
-        # If not in PATH, check bin folder
-        if (-not $sevenZipPath) {
-            $binPath = ".\bin\7z.exe"
-            if (Test-Path $binPath) {
-                $sevenZipPath = (Resolve-Path $binPath).Path
-                Write-Log "Found 7z.exe in bin folder: $sevenZipPath"
-            }
-        }
-        
-        # If still not found, error out
-        if (-not $sevenZipPath -or -not (Test-Path $sevenZipPath)) {
-            Write-Log "ERROR: 7z.exe not found in PATH or bin folder"
-            Show-MessageBox -Message (Get-MessageTranslation -Key "7zip_not_found") -Title (Get-TitleTranslation -Key "7zip_not_found") -Icon "Error"
-            return $false
-        }
-        
-        # Find the source archive - check current directory first
         $archiveFile = Join-Path $PWD "MediCat.USB.v$script:MediCatVersion.7z"
         
-        # If not found in current directory, prompt user to select the file
         if (-not (Test-Path $archiveFile)) {
             Write-Log "Archive not found in current directory, prompting user to select file..."
             Update-Status (Get-StatusTranslation -Key "select_archive")
@@ -642,96 +615,58 @@ function Start-ReExtractFiles {
         }
         
         Write-Log "Found archive: $archiveFile"
-        Write-Log "Found 7z: $sevenZipPath"
         
-        # Normalize all file paths and create file list for batch extraction
-        Write-Log "Preparing file list for batch extraction..."
         $normalizedFiles = @()
-        
         foreach ($failedFile in $FailedFiles) {
-            # Normalize the file path - remove drive letter if present, ensure correct path format
             $fileToExtract = $failedFile.Trim()
             if ($fileToExtract -match '^[A-Z]:\\(.+)') {
                 $fileToExtract = $matches[1]
             }
-            # Remove leading backslash or forward slash
             $fileToExtract = $fileToExtract.TrimStart('\', '/')
-            
             if ($fileToExtract) {
                 $normalizedFiles += $fileToExtract
             }
         }
         
-        Write-Log "Extracting $($normalizedFiles.Count) files in batch operation..."
+        Write-Log "Extracting $($normalizedFiles.Count) files..."
         Update-Status "Extracting $($normalizedFiles.Count) files (this may take a while)..."
         Update-Progress -Value 0 -Maximum 100
         
-        # Write file list to temporary file for 7z (7z expects one file per line)
-        $fileListPath = Join-Path $env:TEMP "medicat_extract_list_$([System.Guid]::NewGuid().ToString().Substring(0,8)).txt"
-        try {
-            $normalizedFiles | Out-File -FilePath $fileListPath -Encoding UTF8
-            Write-Log "Created file list with $($normalizedFiles.Count) files: $fileListPath"
-            
-            # Extract all files in a single batch operation
-            # Using @filename syntax tells 7z to read file list from the file
-            $outputDir = $DriveLetter.TrimEnd('\')
-            $arguments = "x `"$archiveFile`" -o`"$outputDir`" @`"$fileListPath`" -aoa"
-            
-            Write-Log "Starting batch extraction..."
-            $startTime = Get-Date
-            
-            # Run extraction with progress monitoring
-            $process = Start-Process -FilePath $sevenZipPath -ArgumentList $arguments -Wait -PassThru -NoNewWindow -RedirectStandardOutput "7z_output.tmp" -RedirectStandardError "7z_error.tmp"
-            
-            $endTime = Get-Date
-            $duration = ($endTime - $startTime).TotalSeconds
-            Write-Log "Extraction completed in $([math]::Round($duration, 2)) seconds"
-            
-            # Check for errors
-            $errorContent = Get-Content "7z_error.tmp" -ErrorAction SilentlyContinue
-            
-            if ($process.ExitCode -eq 0) {
-                Write-Log "Batch extraction completed successfully"
-                $extractedCount = $normalizedFiles.Count
-                $failedExtract = @()
-            } else {
-                Write-Log "[FAIL] Extraction failed with exit code: $($process.ExitCode)"
-                if ($errorContent) {
-                    Write-Log "Error details: $($errorContent -join "`n")"
+        $outputDir = $DriveLetter.TrimEnd('\')
+        $extractResult = Invoke-MedicatArchiveExtraction `
+            -ArchivePath $archiveFile `
+            -DestinationPath $outputDir `
+            -FileList $normalizedFiles `
+            -AllowCliFallback `
+            -ScriptRoot $PSScriptRoot `
+            -OnLog { param($m) Write-Log $m } `
+            -OnProgress {
+                param($Percent, $Status, $BytesExtracted)
+                Update-Progress -Value $Percent -Maximum 100
+                if ($Status -and $Status -ne 'complete' -and $Status -ne 'starting') {
+                    Update-Status "Extracting: $Status ($Percent%)"
                 }
-                
-                # Try to determine which files failed by checking which ones exist
-                $extractedCount = 0
-                $failedExtract = @()
-                foreach ($file in $normalizedFiles) {
-                    $fullPath = Join-Path $outputDir $file
-                    if (Test-Path $fullPath) {
-                        $extractedCount++
-                    } else {
-                        $failedExtract += $file
-                    }
-                }
-                Write-Log "Verified: $extractedCount/$($normalizedFiles.Count) files exist after extraction"
             }
-            
-            # Clean up temp files
-            Remove-Item "7z_output.tmp" -ErrorAction SilentlyContinue
-            Remove-Item "7z_error.tmp" -ErrorAction SilentlyContinue
-            Remove-Item $fileListPath -ErrorAction SilentlyContinue
-            
-            Update-Progress -Value 100 -Maximum 100
-            Write-Log "Re-extraction complete: $extractedCount/$($normalizedFiles.Count) files extracted successfully"
-            
-        } catch {
-            Write-Log "ERROR preparing file list: $($_.Exception.Message)"
-            $failedExtract = $normalizedFiles
-            $extractedCount = 0
-        } finally {
-            # Clean up file list if it still exists
-            if (Test-Path $fileListPath) {
-                Remove-Item $fileListPath -ErrorAction SilentlyContinue
+        
+        if (-not $extractResult.Success) {
+            Write-Log "ERROR: Re-extraction failed: $($extractResult.ErrorMessage)"
+            Show-MessageBox -Message (Get-MessageTranslation -Key "re_extraction_error" -FormatArgs $extractResult.ErrorMessage) -Title (Get-TitleTranslation -Key "re_extraction_error") -Icon "Error"
+            return $false
+        }
+        
+        $extractedCount = 0
+        $failedExtract = @()
+        foreach ($file in $normalizedFiles) {
+            $fullPath = Join-Path $outputDir $file
+            if (Test-Path $fullPath) {
+                $extractedCount++
+            } else {
+                $failedExtract += $file
             }
         }
+        
+        Update-Progress -Value 100 -Maximum 100
+        Write-Log "Re-extraction complete via $($extractResult.Method): $extractedCount/$($normalizedFiles.Count) files verified on disk"
         
         if ($failedExtract.Count -gt 0) {
             Write-Log "WARNING: Could not extract $($failedExtract.Count) file(s):"
@@ -740,10 +675,10 @@ function Start-ReExtractFiles {
             }
             Show-MessageBox -Message (Get-MessageTranslation -Key "re_extract_failed" -FormatArgs $extractedCount, $FailedFiles.Count, $failedExtract.Count) -Title (Get-TitleTranslation -Key "re_extraction_failed") -Icon "Warning"
             return $false
-        } else {
-            Update-Status (Get-StatusTranslation -Key "re_extracting")
-            return $true
         }
+        
+        Update-Status (Get-StatusTranslation -Key "re_extracting")
+        return $true
         
     } catch {
         Write-Log "ERROR during re-extraction: $($_.Exception.Message)"

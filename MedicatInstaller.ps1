@@ -2,6 +2,30 @@
 # PowerShell-based installer with proper error handling and logging
 
 # Check if running as administrator, if not, request elevation
+function Get-MedicatPowerShellHost {
+    # Always elevate with built-in Windows PowerShell 5.1 — works even when
+    # the user launched this script from pwsh (where $PSHOME\powershell.exe does not exist).
+    $systemRoot = [Environment]::GetFolderPath('System')
+    $windowsPs = Join-Path $systemRoot 'WindowsPowerShell\v1.0\powershell.exe'
+    if (Test-Path -LiteralPath $windowsPs) {
+        return (Resolve-Path -LiteralPath $windowsPs).Path
+    }
+
+    if ($PSVersionTable.PSEdition -eq 'Desktop') {
+        $desktopHost = Join-Path $PSHOME 'powershell.exe'
+        if (Test-Path -LiteralPath $desktopHost) {
+            return (Resolve-Path -LiteralPath $desktopHost).Path
+        }
+    }
+
+    $pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+    if ($pwsh) {
+        return $pwsh
+    }
+
+    throw "Windows PowerShell not found"
+}
+
 $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 $isAdmin = $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
@@ -24,9 +48,12 @@ if (-not $isAdmin) {
     # Re-launch the script with administrator privileges
     # Set working directory to script directory to ensure all file paths work correctly
     try {
+        $hostExe = Get-MedicatPowerShellHost
+        $hostArgs = "-ExecutionPolicy Bypass -NoProfile -File `"$scriptPath`""
+
         $processStartInfo = New-Object System.Diagnostics.ProcessStartInfo
-        $processStartInfo.FileName = "powershell.exe"
-        $processStartInfo.Arguments = "-ExecutionPolicy Bypass -NoProfile -File `"$scriptPath`""
+        $processStartInfo.FileName = $hostExe
+        $processStartInfo.Arguments = $hostArgs
         $processStartInfo.WorkingDirectory = $scriptDir  # Set working directory to script location
         $processStartInfo.Verb = "runas"  # This triggers the UAC prompt
         $processStartInfo.UseShellExecute = $true
@@ -51,6 +78,13 @@ if ($scriptPath) {
     if ($scriptDir -ne $PWD.Path) {
         Set-Location $scriptDir
     }
+}
+
+$extractArchivePath = Join-Path $PSScriptRoot "Extract-Archive.ps1"
+if (Test-Path $extractArchivePath) {
+    . $extractArchivePath
+} else {
+    throw "Required file not found: Extract-Archive.ps1"
 }
 
 Add-Type -AssemblyName System.Windows.Forms
@@ -100,6 +134,8 @@ $script:DownloadPath = ""
 $script:MediCatVersion = "21.12"
 $script:LocalVersion = "1.0.0"
 $script:DebugMode = $true  # Set to $true to enable debug logging
+$script:MedicatArchiveExtractor = $null
+$script:MedicatExtractWorker = $null
 
 # Create main form
 $form = New-Object System.Windows.Forms.Form
@@ -169,6 +205,13 @@ $formatCheckBox.Location = New-Object System.Drawing.Point(20, 480)
 $formatCheckBox.AutoSize = $true
 $formatCheckBox.Checked = $true
 
+# Skip Ventoy checkbox
+$skipVentoyCheckBox = New-Object System.Windows.Forms.CheckBox
+$skipVentoyCheckBox.Text = Get-UITranslation -Key "skip_ventoy_checkbox"
+$skipVentoyCheckBox.Location = New-Object System.Drawing.Point(300, 480)
+$skipVentoyCheckBox.AutoSize = $true
+$skipVentoyCheckBox.Checked = $false
+
 # Buttons
 $installButton = New-Object System.Windows.Forms.Button
 $installButton.Text = Get-UITranslation -Key "install_button"
@@ -200,6 +243,7 @@ $mainPanel.Controls.Add($driveLabel)
 $mainPanel.Controls.Add($driveComboBox)
 $mainPanel.Controls.Add($showHardDrivesCheckBox)
 $mainPanel.Controls.Add($formatCheckBox)
+$mainPanel.Controls.Add($skipVentoyCheckBox)
 $mainPanel.Controls.Add($installButton)
 $mainPanel.Controls.Add($cancelButton)
 $mainPanel.Controls.Add($checkFilesButton)
@@ -208,29 +252,42 @@ $mainPanel.Controls.Add($refreshButton)
 $form.Controls.Add($mainPanel)
 
 # Functions
+function Invoke-InstallerUi {
+    param([scriptblock]$Action)
+
+    if ($form -and $form.IsHandleCreated -and $form.InvokeRequired) {
+        [void]$form.BeginInvoke($Action)
+    } else {
+        & $Action
+    }
+}
+
+function Set-InstallButtonsEnabled {
+    param([bool]$Enabled)
+    Invoke-InstallerUi {
+        $installButton.Enabled = $Enabled
+        $cancelButton.Enabled = $Enabled
+        $checkFilesButton.Enabled = $Enabled
+        $refreshButton.Enabled = $Enabled
+    }
+}
+
 function Write-Log {
     param($Message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $logMessage = "[$timestamp] $Message"
-    
-    # Update UI if form is available
-    try {
-        if ($logTextBox -and $logTextBox.IsHandleCreated) {
-            $form.Invoke([System.Action[string]]{
-                param($msg)
-                $logTextBox.AppendText("$msg`r`n")
-                $logTextBox.ScrollToCaret()
-            }, $logMessage) | Out-Null
-        }
-    } catch {
-        # UI not available, continue to file logging
-    }
-    
-    # Always log to file
+
     try {
         Add-Content -Path $script:LogFile -Value $logMessage -ErrorAction SilentlyContinue
-    } catch {
-        # If logging fails, try to continue
+    } catch { }
+
+    Invoke-InstallerUi {
+        try {
+            if ($logTextBox) {
+                $logTextBox.AppendText("$logMessage`r`n")
+                $logTextBox.ScrollToCaret()
+            }
+        } catch { }
     }
 }
 
@@ -238,56 +295,296 @@ function Write-DebugLog {
     param($Message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $logMessage = "[$timestamp] DEBUG: $Message"
-    
-    # Always log debug messages to file (not just when debug mode is on)
+
     try {
         Add-Content -Path $script:LogFile -Value $logMessage -ErrorAction SilentlyContinue
-    } catch {
-        # If logging fails, try to continue
-    }
-    
-    # Only show in UI if debug mode is enabled
+    } catch { }
+
     if ($script:DebugMode) {
-        try {
-            if ($logTextBox -and $logTextBox.IsHandleCreated) {
-                $form.Invoke([System.Action[string]]{
-                    param($msg)
-                    $logTextBox.AppendText("$msg`r`n")
+        Invoke-InstallerUi {
+            try {
+                if ($logTextBox) {
+                    $logTextBox.AppendText("$logMessage`r`n")
                     $logTextBox.ScrollToCaret()
-                }, $logMessage) | Out-Null
-            }
-        } catch {
-            # UI not available, continue
+                }
+            } catch { }
         }
     }
 }
 
 function Update-Status {
-    param($Message)
-    $statusLabel.Text = $Message
-    $form.Refresh()
-    # Log status updates to file
-    Write-Log "STATUS: $Message"
+    param(
+        $Message,
+        [bool]$Log = $true
+    )
+    Invoke-InstallerUi {
+        $statusLabel.Text = $Message
+        if ($Log) {
+            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+            $logMessage = "[$timestamp] STATUS: $Message"
+            try { Add-Content -Path $script:LogFile -Value $logMessage -ErrorAction SilentlyContinue } catch { }
+        }
+    }
 }
 
 function Update-Progress {
-    param($Value, $Maximum = 100)
-    $progressBar.Maximum = $Maximum
-    $progressBar.Value = $Value
-    $form.Refresh()
-    
-    # Calculate percentage
+    param(
+        $Value,
+        $Maximum = 100,
+        [bool]$Log = $true
+    )
+    Invoke-InstallerUi {
+        $progressBar.Maximum = $Maximum
+        $progressBar.Value = [math]::Min($Value, $Maximum)
+    }
+
+    if (-not $Log) {
+        return
+    }
+
     $percent = if ($Maximum -gt 0) { [math]::Round(($Value / $Maximum) * 100, 1) } else { 0 }
-    
-    # Log progress updates to file (but throttle to avoid too many log entries)
-    # Only log if percentage changed by at least 1% or is 0/100
-    if (-not $script:LastLoggedProgress -or 
-        [math]::Abs($percent - $script:LastLoggedProgress) -ge 1 -or 
-        $percent -eq 0 -or 
+
+    if (-not $script:LastLoggedProgress -or
+        [math]::Abs($percent - $script:LastLoggedProgress) -ge 1 -or
+        $percent -eq 0 -or
         $percent -eq 100) {
         Write-Log "PROGRESS: $percent% ($Value/$Maximum)"
         $script:LastLoggedProgress = $percent
     }
+}
+
+function Reset-MedicatExtractionProgressState {
+    $script:ExtractionUiState = @{
+        LastPercent = -1
+        LastPercentShown = -1
+        LastFile = $null
+        LastUiUpdate = [datetime]::MinValue
+        LastFileLog = [datetime]::MinValue
+    }
+    $script:LastLoggedProgress = $null
+    $script:LastFolderProgressPoll = $null
+    $script:ExtractionHeartbeat = $null
+    $script:MedicatLastWrittenBytes = $null
+    $script:MedicatLastWrittenChange = $null
+}
+
+function Get-MedicatExtractionProgressHandler {
+    Reset-MedicatExtractionProgressState
+
+    return {
+        param($Percent, $Status, $BytesExtracted)
+
+        $now = Get-Date
+        $percentChanged = $Percent -ne $script:ExtractionUiState.LastPercent
+        $fileChanged = $false
+
+        if ($Status -and $Status -notin @('complete', 'starting')) {
+            if ($Status -ne $script:ExtractionUiState.LastFile) {
+                $fileChanged = $true
+                $script:ExtractionUiState.LastFile = $Status
+            }
+        }
+
+        if (-not ($percentChanged -or $fileChanged) -and $Percent -ne 100) {
+            return
+        }
+
+        $elapsedMs = ($now - $script:ExtractionUiState.LastUiUpdate).TotalMilliseconds
+        if ($elapsedMs -lt 150 -and $Percent -ne 0 -and $Percent -ne 100 -and -not $fileChanged) {
+            return
+        }
+        $script:ExtractionUiState.LastUiUpdate = $now
+
+        if ($percentChanged) {
+            $script:ExtractionUiState.LastPercent = $Percent
+            Update-Progress -Value $Percent -Maximum 100 -Log:$false
+
+            if ($Percent -eq 0 -or $Percent -eq 100 -or ($Percent % 10 -eq 0)) {
+                Write-Log "PROGRESS: $Percent%"
+            } elseif (($now - $script:ExtractionUiState.LastFileLog).TotalSeconds -ge 5) {
+                Write-DebugLog "PROGRESS: $Percent%"
+                $script:ExtractionUiState.LastFileLog = $now
+            }
+        }
+
+        if ($fileChanged -and ($now - $script:ExtractionUiState.LastFileLog).TotalSeconds -ge 2) {
+            $script:ExtractionUiState.LastFileLog = $now
+            $shortLogFile = if ($Status.Length -gt 120) { '...' + $Status.Substring($Status.Length - 117) } else { $Status }
+            Write-DebugLog "Extracting ($Percent%): $shortLogFile"
+        }
+
+        $script:ExtractionUiState.LastPercentShown = $Percent
+        $currentFile = $script:ExtractionUiState.LastFile
+
+        if ($currentFile) {
+            $shortFile = if ($currentFile.Length -gt 90) {
+                '...' + $currentFile.Substring($currentFile.Length - 87)
+            } else {
+                $currentFile
+            }
+            Update-Status (Get-StatusTranslation -Key "extracting_file" -FormatArgs $Percent, $shortFile) -Log:$false
+        } elseif ($BytesExtracted -gt 0) {
+            $mb = [math]::Round($BytesExtracted / 1MB, 1)
+            Update-Status (Get-StatusTranslation -Key "extracting_progress" -FormatArgs $Percent, $mb) -Log:$false
+        } elseif ($Percent -ge 0) {
+            Update-Status (Get-StatusTranslation -Key "extracting_progress" -FormatArgs $Percent, 0) -Log:$false
+        }
+    }
+}
+
+function Initialize-MedicatExtractRunspace {
+    if ($script:MedicatExtractRunspace) {
+        return
+    }
+
+    $script:MedicatExtractRunspace = [runspacefactory]::CreateRunspace()
+    $script:MedicatExtractRunspace.Open()
+
+    $initPs = [powershell]::Create()
+    $initPs.Runspace = $script:MedicatExtractRunspace
+    $root = $PSScriptRoot.Replace("'", "''")
+    [void]$initPs.AddScript(". '$root\Extract-Archive.ps1'")
+    $initPs.Invoke() | Out-Null
+    $initPs.Dispose()
+}
+
+function Start-MedicatExtractionWorker {
+    param(
+        [hashtable]$Context
+    )
+
+    if ($script:MedicatExtractTimer) {
+        return
+    }
+
+    if (-not (Test-MedicatCliReady -ScriptRoot $PSScriptRoot)) {
+        $fail = [pscustomobject]@{
+            Success = $false
+            ErrorMessage = '7za.exe not found'
+        }
+        Complete-MedicatInstallationAfterExtract -Result $fail -Context $Context
+        Set-InstallButtonsEnabled $true
+        return
+    }
+
+    $script:MedicatActiveProgressHandler = Get-MedicatExtractionProgressHandler
+
+    $destinationPath = Get-MedicatDestinationRoot -DriveLetter $Context.DestinationPath
+    if (-not $destinationPath) {
+        $destinationPath = Get-MedicatDestinationRoot -DriveLetter $Context.DriveLetter
+    }
+
+    $deviceId = Get-MedicatDriveDeviceId -DestinationPath $destinationPath
+    $initialFreeBytes = if ($deviceId) { Get-MedicatDriveFreeBytes -DeviceId $deviceId } else { 0 }
+    $sevenZipExe = Get-Medicat7ZipExecutable -ScriptRoot $PSScriptRoot
+    $uncompressedTotal = Get-ArchiveUncompressedSize `
+        -ArchivePath $Context.ArchivePath `
+        -ScriptRoot $PSScriptRoot `
+        -SevenZipExe $sevenZipExe `
+        -PreferCli `
+        -OnLog { param($m) Write-DebugLog $m }
+
+    $Context.DestinationPath = $destinationPath
+    $Context.UncompressedTotal = $uncompressedTotal
+    $Context.InitialFreeBytes = $initialFreeBytes
+    $script:MedicatExtractContext = $Context
+
+    Write-Log "Extraction started via 7za.exe"
+    Write-DebugLog "Destination: $destinationPath (initial free: $([math]::Round($initialFreeBytes / 1GB, 2)) GB)"
+    Write-DebugLog "Uncompressed size: $([math]::Round($uncompressedTotal / 1MB, 2)) MB"
+    & $script:MedicatActiveProgressHandler 0 "starting" 0
+
+    Initialize-MedicatExtractRunspace
+
+    $script:MedicatCliProgressQueue = New-Object System.Collections.Concurrent.ConcurrentQueue[object]
+    $script:MedicatCliExtractPs = [powershell]::Create()
+    $script:MedicatCliExtractPs.Runspace = $script:MedicatExtractRunspace
+
+    [void]$script:MedicatCliExtractPs.AddScript({
+        param($ArchivePath, $DestinationPath, $ScriptRoot, $ProgressQueue, $UncompressedTotal, $InitialFreeBytes, $LogFile)
+
+        $onLog = {
+            param($m)
+            $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] DEBUG: $m"
+            Add-Content -LiteralPath $LogFile -Value $line -ErrorAction SilentlyContinue
+        }
+
+        Invoke-MedicatCliArchiveExtraction `
+            -ArchivePath $ArchivePath `
+            -DestinationPath $DestinationPath `
+            -ScriptRoot $ScriptRoot `
+            -UncompressedTotal $UncompressedTotal `
+            -InitialFreeBytes $InitialFreeBytes `
+            -ProgressQueue $ProgressQueue `
+            -OnLog $onLog
+    })
+    [void]$script:MedicatCliExtractPs.AddArgument($Context.ArchivePath)
+    [void]$script:MedicatCliExtractPs.AddArgument($destinationPath)
+    [void]$script:MedicatCliExtractPs.AddArgument($PSScriptRoot)
+    [void]$script:MedicatCliExtractPs.AddArgument($script:MedicatCliProgressQueue)
+    [void]$script:MedicatCliExtractPs.AddArgument($uncompressedTotal)
+    [void]$script:MedicatCliExtractPs.AddArgument($initialFreeBytes)
+    [void]$script:MedicatCliExtractPs.AddArgument($script:LogFile)
+
+    $script:MedicatCliExtractAsync = $script:MedicatCliExtractPs.BeginInvoke()
+
+    $script:MedicatExtractTimer = New-Object System.Windows.Forms.Timer
+    $script:MedicatExtractTimer.Interval = 100
+    $script:MedicatExtractTimer.Add_Tick({
+        $entry = $null
+        while ($script:MedicatCliProgressQueue.TryDequeue([ref]$entry)) {
+            & $script:MedicatActiveProgressHandler $entry[0] $entry[1] $entry[2]
+        }
+
+        if (-not $script:MedicatCliExtractAsync.IsCompleted) {
+            $ctx = $script:MedicatExtractContext
+            if ($ctx -and $ctx.InitialFreeBytes -gt 0 -and $ctx.UncompressedTotal -gt 0) {
+                $now = Get-Date
+                if (-not $script:LastFolderProgressPoll -or ($now - $script:LastFolderProgressPoll).TotalMilliseconds -ge 2000) {
+                    $script:LastFolderProgressPoll = $now
+                    $written = Get-MedicatDriveWrittenBytes -DestinationPath $ctx.DestinationPath -InitialFreeBytes $ctx.InitialFreeBytes
+                    if ($null -ne $written -and $written -gt 0) {
+                        $pct = [int][math]::Min(99, [math]::Round(($written / $ctx.UncompressedTotal) * 100))
+                        $bytes = [int64][math]::Min($ctx.UncompressedTotal, $written)
+                        $file = if ($script:ExtractionUiState) { $script:ExtractionUiState.LastFile } else { $null }
+                        & $script:MedicatActiveProgressHandler $pct $file $bytes
+                    }
+                }
+            }
+            return
+        }
+
+        $script:MedicatExtractTimer.Stop()
+        $script:MedicatExtractTimer.Dispose()
+        $script:MedicatExtractTimer = $null
+
+        try {
+            $output = $script:MedicatCliExtractPs.EndInvoke($script:MedicatCliExtractAsync)
+            $result = if ($output -is [array] -and $output.Count -eq 1) { $output[0] } else { $output }
+
+            if (-not $result) {
+                $errParts = @()
+                foreach ($err in $script:MedicatCliExtractPs.Streams.Error) {
+                    if ($err.Exception.Message) { $errParts += $err.Exception.Message }
+                }
+                $errMsg = if ($errParts.Count -gt 0) { $errParts -join '; ' } else { 'Extraction returned no result' }
+                $result = [pscustomobject]@{ Success = $false; ErrorMessage = $errMsg }
+            }
+
+            Complete-MedicatInstallationAfterExtract -Result $result -Context $script:MedicatExtractContext
+        } catch {
+            $fail = [pscustomobject]@{ Success = $false; ErrorMessage = $_.Exception.Message }
+            Complete-MedicatInstallationAfterExtract -Result $fail -Context $script:MedicatExtractContext
+        } finally {
+            if ($script:MedicatCliExtractPs) {
+                $script:MedicatCliExtractPs.Dispose()
+                $script:MedicatCliExtractPs = $null
+            }
+            $script:MedicatCliProgressQueue = $null
+            Set-InstallButtonsEnabled $true
+        }
+    })
+    $script:MedicatExtractTimer.Start()
 }
 
 # Helper function to show MessageBox and log it
@@ -340,6 +637,42 @@ function Show-MessageBox {
 
 
 
+function Test-MedicatVhdDisk {
+    param(
+        $BusType,
+        [string]$FriendlyName
+    )
+
+    $busTypeStr = [string]$BusType
+    if ($BusType -in 5, 15) { return $true }
+    if ($busTypeStr -eq 'File Backed Virtual' -or $busTypeStr -like '*File Backed Virtual*') { return $true }
+    if ($FriendlyName -like '*Virtual Disk*') { return $true }
+    return $false
+}
+
+function Get-VhdDriveLetters {
+    $vhdDrives = @()
+    try {
+        $disks = Get-CimInstance -Namespace root/Microsoft/Windows/Storage -ClassName MSFT_Disk -ErrorAction SilentlyContinue
+        foreach ($disk in $disks) {
+            if (-not (Test-MedicatVhdDisk -BusType $disk.BusType -FriendlyName $disk.FriendlyName)) {
+                continue
+            }
+
+            $partitions = Get-CimInstance -Namespace root/Microsoft/Windows/Storage -ClassName MSFT_Partition `
+                -Filter "DiskNumber = $($disk.Number)" -ErrorAction SilentlyContinue
+            foreach ($partition in $partitions) {
+                if ($partition.DriveLetter -and $partition.DriveLetter -ne 'C') {
+                    $vhdDrives += "$($partition.DriveLetter):"
+                }
+            }
+        }
+    } catch {
+        # VHD detection failure should not block the drive list
+    }
+    return $vhdDrives
+}
+
 function Get-DriveList {
     # Get checkbox state
     $showHardDrives = $showHardDrivesCheckBox.Checked
@@ -350,33 +683,8 @@ function Get-DriveList {
         $_.Size -gt 1GB
     } | Sort-Object DeviceID
     
-    # Detect VHD/VHDX drives by checking disk BusType
-    # VHD/VHDX drives have BusType = 5 (File Backed Virtual) or BusType = "File Backed Virtual"
-    $vhdDrives = @()
-    try {
-        $allDisks = Get-Disk -ErrorAction SilentlyContinue
-        foreach ($disk in $allDisks) {
-            # Check if this is a VHD/VHDX (File Backed Virtual)
-            # BusType can be an enum (5) or string ("File Backed Virtual")
-            $busTypeStr = [string]$disk.BusType
-            $isVHD = ($disk.BusType -eq 5 -or 
-                     $busTypeStr -eq "File Backed Virtual" -or 
-                     $busTypeStr -like "*File Backed Virtual*")
-            
-            if ($isVHD) {
-                # Get all partitions and their drive letters for this VHD disk
-                $partitions = Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue
-                foreach ($partition in $partitions) {
-                    if ($partition.DriveLetter -and $partition.DriveLetter -ne 'C') {
-                        $vhdDrives += "$($partition.DriveLetter):"
-                    }
-                }
-            }
-        }
-    } catch {
-        # Silently fail VHD detection if there's an error (Write-Log may not be available yet)
-        # VHD detection failure shouldn't prevent drive list from populating
-    }
+    # Detect VHD/VHDX drives via Storage CIM (fast; Get-Disk takes ~15s on some systems)
+    $vhdDrives = Get-VhdDriveLetters
     
     # Filter drives based on checkbox state
     # Always include: Removable (USB) drives and VHD drives
@@ -446,90 +754,6 @@ function Refresh-DriveList {
     Write-Log "Drive list refreshed"
 }
 
-function Download-BinFiles {
-    <#
-    .SYNOPSIS
-    Downloads all required bin files to the bin folder.
-    
-    .DESCRIPTION
-    Downloads all installer binaries and utilities needed for the MediCat installer.
-    #>
-    try {
-        Write-Log "Starting bin files download..."
-        Update-Status (Get-StatusTranslation -Key "downloading_files")
-        
-        # Create bin directory if it doesn't exist
-        if (-not (Test-Path "./bin")) {
-            New-Item -ItemType Directory -Path "./bin" -Force | Out-Null
-            Write-Log "Created bin directory"
-        }
-        
-        # Define all bin files to download
-        $binFiles = @(
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE"; Path="./bin/QuickSFV.exe"; Size=103424},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini"; Path="./bin/QuickSFV.ini"; Size=158},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat"; Path="./bin/Box.bat"; Size=5874},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat"; Path="./bin/Button.bat"; Size=5254},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe"; Path="./bin/GetInput.exe"; Size=3584},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat"; Path="./bin/Getlen.bat"; Size=1897},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe"; Path="./bin/batbox.exe"; Size=1536},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe"; Path="./bin/folderbrowse.exe"; Size=8192}
-        )
-        
-        # Download 7z files based on architecture
-        $arch = if ([Environment]::Is64BitOperatingSystem) { "64" } else { "32" }
-        $binFiles += @(
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/$arch.exe"; Path="./bin/7z.exe"; Size=""},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/$arch.dll"; Path="./bin/7z.dll"; Size=""}
-        )
-        
-        Update-Progress -Value 0 -Maximum $binFiles.Count
-        
-        $successCount = 0
-        for ($i = 0; $i -lt $binFiles.Count; $i++) {
-            $file = $binFiles[$i]
-            Write-Log "Downloading: $($file.Path)"
-            
-            if ($file.Size) {
-                # File has size validation
-                if (Invoke-Download -Url $file.Url -OutputPath $file.Path -ExpectedSize $file.Size) {
-                    $successCount++
-                    Write-Log "[GOOD] $($file.Path)"
-                } else {
-                    Write-Log "[BAD] $($file.Path)"
-                }
-            } else {
-                # No size validation (7z files)
-                if (Invoke-Download -Url $file.Url -OutputPath $file.Path) {
-                    $successCount++
-                    Write-Log "[GOOD] $($file.Path)"
-                } else {
-                    Write-Log "[BAD] $($file.Path)"
-                }
-            }
-            
-            Update-Progress -Value ($i + 1) -Maximum $binFiles.Count
-        }
-        
-        Write-Log "Bin files download complete: $successCount/$($binFiles.Count) files downloaded successfully"
-        
-        if ($successCount -eq $binFiles.Count) {
-            Update-Status (Get-StatusTranslation -Key "bin_download_complete")
-            return $true
-        } else {
-            Update-Status (Get-StatusTranslation -Key "bin_download_errors")
-            Show-MessageBox -Message (Get-MessageTranslation -Key "bin_download_incomplete" -FormatArgs $successCount, $binFiles.Count) -Title (Get-TitleTranslation -Key "download_incomplete") -Icon "Warning"
-            return $false
-        }
-        
-    } catch {
-        Write-Log "ERROR during bin files download: $($_.Exception.Message)"
-        Update-Status (Get-StatusTranslation -Key "bin_download_failed")
-        Show-MessageBox -Message (Get-MessageTranslation -Key "bin_download_error" -FormatArgs $_.Exception.Message) -Title (Get-TitleTranslation -Key "download_error") -Icon "Error"
-        return $false
-    }
-}
-
 function Test-InternetConnection {
     try {
         $ping = Test-Connection -ComputerName "8.8.8.8" -Count 1 -Quiet
@@ -551,12 +775,30 @@ function Invoke-Download {
     
     try {
         Write-Log "Downloading: $Url"
-        $webClient = New-Object System.Net.WebClient
-        $webClient.DownloadFile($Url, $OutputPath)
+
+        $parentDir = Split-Path -Parent $OutputPath
+        if ($parentDir -and -not (Test-Path -LiteralPath $parentDir)) {
+            New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+        }
+
+        $resolvedOutput = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputPath)
+        $prevProtocol = [Net.ServicePointManager]::SecurityProtocol
+        $tls = [Net.SecurityProtocolType]::Tls12
+        if ([enum]::IsDefined([Net.SecurityProtocolType], 'Tls13')) {
+            $tls = $tls -bor [Net.SecurityProtocolType]::Tls13
+        }
+        [Net.ServicePointManager]::SecurityProtocol = $tls
+
+        try {
+            Invoke-WebRequest -Uri $Url -OutFile $resolvedOutput -UseBasicParsing -TimeoutSec 600 `
+                -Headers @{ 'User-Agent' = 'MediCat-Installer/1.0' }
+        } finally {
+            [Net.ServicePointManager]::SecurityProtocol = $prevProtocol
+        }
         
-        if (Test-Path $OutputPath) {
-            $actualSize = (Get-Item $OutputPath).Length
-            Write-Log "Downloaded: $OutputPath ($actualSize bytes)"
+        if (Test-Path -LiteralPath $resolvedOutput) {
+            $actualSize = (Get-Item -LiteralPath $resolvedOutput).Length
+            Write-Log "Downloaded: $resolvedOutput ($actualSize bytes)"
             
             if ($ExpectedSize -and $actualSize -ne $ExpectedSize) {
                 Write-Log "WARNING: Size mismatch. Expected: $ExpectedSize, Got: $actualSize"
@@ -564,7 +806,7 @@ function Invoke-Download {
             }
             return $true
         } else {
-            Write-Log "ERROR: File not created: $OutputPath"
+            Write-Log "ERROR: File not created: $resolvedOutput"
             return $false
         }
     } catch {
@@ -722,41 +964,25 @@ function Install-Ventoy {
                 return $false
             }
             
-            # Extract Ventoy zip
+            # Extract Ventoy zip (lib/ SevenZipSharp or 7za.exe fallback)
             Update-Status (Get-StatusTranslation -Key "extracting_ventoy")
             Write-Log "Extracting Ventoy archive..."
-            
-            # Find 7z.exe
-            $sevenZipPath = $null
-            try {
-                $path7z = Get-Command "7z.exe" -ErrorAction SilentlyContinue
-                if ($path7z) {
-                    $sevenZipPath = $path7z.Source
-                }
-            } catch { }
-            
-            if (-not $sevenZipPath) {
-                $binPath = ".\bin\7z.exe"
-                if (Test-Path $binPath) {
-                    $sevenZipPath = (Resolve-Path $binPath).Path
-                }
-            }
-            
-            if (-not $sevenZipPath) {
-                Write-Log "ERROR: 7z.exe not found for extracting Ventoy"
+
+            $extractResult = Invoke-MedicatArchiveExtraction `
+                -ArchivePath (Resolve-Path $ventoyZip).Path `
+                -DestinationPath $PWD.Path `
+                -AllowCliFallback `
+                -ScriptRoot $PSScriptRoot `
+                -OnLog { param($m) Write-DebugLog $m } `
+                -OnProgress (Get-MedicatExtractionProgressHandler)
+
+            if (-not $extractResult.Success) {
+                Write-Log "ERROR: Failed to extract Ventoy archive: $($extractResult.ErrorMessage)"
                 Remove-Item $ventoyZip -ErrorAction SilentlyContinue
                 return $false
             }
-            
-            # Extract with 7z
-            $extractArgs = "x `"$ventoyZip`" -r -aoa"
-            $process = Start-Process -FilePath $sevenZipPath -ArgumentList $extractArgs -Wait -PassThru -NoNewWindow
-            
-            if ($process.ExitCode -ne 0) {
-                Write-Log "ERROR: Failed to extract Ventoy archive (exit code: $($process.ExitCode))"
-                Remove-Item $ventoyZip -ErrorAction SilentlyContinue
-                return $false
-            }
+
+            Write-Log "Ventoy archive extracted via $($extractResult.Method)"
             
             # Remove old Ventoy2Disk directory if it exists
             if (Test-Path $ventoyDir) {
@@ -887,10 +1113,50 @@ function Install-Ventoy {
     }
 }
 
+function Complete-MedicatInstallationAfterExtract {
+    param(
+        $Result,
+        [hashtable]$Context
+    )
+
+    $driveLetter = $Context.DriveLetter
+    $startTime = $Context.StartTime
+
+    if (-not $Result -or -not $Result.Success) {
+        $errorText = if ($Result -and $Result.ErrorMessage) { $Result.ErrorMessage } else { 'Extraction returned no result' }
+        Write-Log "ERROR: Extraction failed: $errorText"
+        Show-MessageBox -Message (Get-MessageTranslation -Key "extraction_failed" -FormatArgs $errorText) -Title (Get-TitleTranslation -Key "extraction_failed") -Icon "Error"
+        return
+    }
+
+    $duration = ((Get-Date) - $startTime).TotalMinutes
+    Write-Log "Extraction completed via $($Result.Method) in $([math]::Round($duration, 2)) minutes"
+    Write-Log "MediCat archive extracted successfully"
+    Update-Progress -Value 100 -Maximum 100
+    Update-Status (Get-StatusTranslation -Key "extraction_success")
+    Update-Status (Get-StatusTranslation -Key "copying_files")
+    $finalFiles = @(
+        @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/icon.ico"; Path="$driveLetter/autorun.ico"},
+        @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat"; Path="$driveLetter/CheckFiles.bat"}
+    )
+
+    foreach ($file in $finalFiles) {
+        if (Invoke-Download -Url $file.Url -OutputPath $file.Path) {
+            Write-Log "[GOOD] $($file.Path)"
+        } else {
+            Write-Log "[BAD] $($file.Path)"
+        }
+    }
+
+    Update-Status (Get-StatusTranslation -Key "installation_complete")
+    Write-Log "MediCat installation completed successfully"
+    Show-MessageBox -Message (Get-MessageTranslation -Key "installation_complete" -FormatArgs $driveLetter) -Title (Get-TitleTranslation -Key "installation_complete") -Icon "Information"
+}
+
 function Start-MediatInstallation {
-    $installButton.Enabled = $false
-    $cancelButton.Enabled = $false
-    
+    Set-InstallButtonsEnabled $false
+    $asyncExtractStarted = $false
+
     try {
         # Initialize log
         Write-Log "MediCat Installation Started"
@@ -911,74 +1177,6 @@ function Start-MediatInstallation {
         $driveLetter = $selectedDrive.Substring(0, 2)
         Write-Log "Selected drive: $driveLetter"
         
-        # Download bin files
-        Update-Status (Get-StatusTranslation -Key "downloading_files")
-        Update-Progress -Value 0 -Maximum 8
-        
-        $binFiles = @(
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.EXE"; Path="./bin/QuickSFV.exe"; Size=103424},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/QuickSFV.ini"; Path="./bin/QuickSFV.ini"; Size=158},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Box.bat"; Path="./bin/Box.bat"; Size=5874},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Button.bat"; Path="./bin/Button.bat"; Size=5254},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/GetInput.exe"; Path="./bin/GetInput.exe"; Size=3584},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/Getlen.bat"; Path="./bin/Getlen.bat"; Size=1897},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/batbox.exe"; Path="./bin/batbox.exe"; Size=1536},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/bin/folderbrowse.exe"; Path="./bin/folderbrowse.exe"; Size=8192}
-        )
-        
-        # Create bin directory
-        if (-not (Test-Path "./bin")) {
-            New-Item -ItemType Directory -Path "./bin" -Force | Out-Null
-        }
-        
-        $successCount = 0
-        for ($i = 0; $i -lt $binFiles.Count; $i++) {
-            $file = $binFiles[$i]
-            if (Invoke-Download -Url $file.Url -OutputPath $file.Path -ExpectedSize $file.Size) {
-                $successCount++
-                Write-Log "[GOOD] $($file.Path)"
-            } else {
-                Write-Log "[BAD] $($file.Path)"
-            }
-            Update-Progress -Value ($i + 1)
-        }
-        
-        if ($successCount -lt $binFiles.Count) {
-            Write-Log "WARNING: Only $successCount of $($binFiles.Count) files downloaded successfully"
-        }
-        
-        # Download 7z files
-        Update-Status (Get-StatusTranslation -Key "downloading_7zip")
-        $arch = if ([Environment]::Is64BitOperatingSystem) { "64" } else { "32" }
-        
-        $sevenZipFiles = @(
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/$arch.exe"; Path="./bin/7z.exe"},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/7z/$arch.dll"; Path="./bin/7z.dll"}
-        )
-        
-        foreach ($file in $sevenZipFiles) {
-            if (Invoke-Download -Url $file.Url -OutputPath $file.Path) {
-                Write-Log "[GOOD] $($file.Path)"
-            } else {
-                Write-Log "[BAD] $($file.Path)"
-            }
-        }
-        
-        # Download translation files
-        Update-Status (Get-StatusTranslation -Key "downloading_translations")
-        $translationFiles = @(
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/motd.ps1"; Path="./bin/motd.ps1"},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/licence.ps1"; Path="./bin/licence.ps1"}
-        )
-        
-        foreach ($file in $translationFiles) {
-            if (Invoke-Download -Url $file.Url -OutputPath $file.Path) {
-                Write-Log "[GOOD] $($file.Path)"
-            } else {
-                Write-Log "[BAD] $($file.Path)"
-            }
-        }
-        
         # Check for MediCat files
         Update-Status (Get-StatusTranslation -Key "checking_files")
         $medicatFileName = "MediCat.USB.v$script:MediCatVersion.7z"
@@ -990,11 +1188,32 @@ function Start-MediatInstallation {
         }
         Write-Log "Found MediCat archive: $medicatFile"
         
-        # Check if format checkbox is checked
+        # Check install options
         $shouldFormat = $formatCheckBox.Checked
+        $skipVentoy = $skipVentoyCheckBox.Checked
         Write-Log "Format checkbox is: $(if ($shouldFormat) { 'Checked' } else { 'Unchecked' })"
-        
-        if ($shouldFormat) {
+        Write-Log "Skip Ventoy checkbox is: $(if ($skipVentoy) { 'Checked' } else { 'Unchecked' })"
+
+        if ($skipVentoy) {
+            Write-Log "Skipping Ventoy install/upgrade (user option)"
+            if ($shouldFormat) {
+                Update-Status (Get-StatusTranslation -Key "formatting_drive")
+                Write-Log "Formatting $driveLetter to NTFS with label 'Medicat' (Ventoy skipped)..."
+                try {
+                    $driveForFormat = $driveLetter.TrimEnd('\', ':') + ":"
+                    $formatArgs = "$driveForFormat /FS:NTFS /X /Q /V:Medicat /Y"
+                    Write-Log "Running: format.com $formatArgs"
+                    $formatProcess = Start-Process -FilePath "format.com" -ArgumentList $formatArgs -Wait -PassThru -NoNewWindow
+                    if ($formatProcess.ExitCode -eq 0) {
+                        Write-Log "Drive formatted successfully to NTFS"
+                    } else {
+                        Write-Log "WARNING: Format command returned exit code: $($formatProcess.ExitCode)"
+                    }
+                } catch {
+                    Write-Log "WARNING: Could not format drive: $($_.Exception.Message)"
+                }
+            }
+        } elseif ($shouldFormat) {
             # Format is checked - do fresh install
             Write-Log "Formatting is enabled - performing fresh Ventoy installation"
             
@@ -1071,552 +1290,26 @@ function Start-MediatInstallation {
         Update-Status (Get-StatusTranslation -Key "extracting_archive")
         Write-Log "Extracting MediCat files from $medicatFile to $driveLetter"
         
-        $outputDir = $driveLetter.TrimEnd('\')
-        $usePowerShellModule = $false
-        
-        # Try to use PowerShell 7Zip4PowerShell module first (native PowerShell solution)
-        try {
-            Write-DebugLog "Checking for 7Zip4PowerShell module..."
-            
-            # Search specifically for 7Zip4PowerShell module (case-insensitive)
-            $allModules = Get-Module -ListAvailable -ErrorAction SilentlyContinue
-            $module = $allModules | Where-Object { 
-                $_.Name -eq '7Zip4PowerShell' -or 
-                $_.Name -eq '7Zip4Powershell' -or
-                $_.Name -like '7Zip4PowerShell*'
-            } | Select-Object -First 1
-            
-            if ($module) {
-                $moduleName = $module.Name
-                Write-DebugLog "Found 7Zip4PowerShell module: $($module.Name) v$($module.Version) at $($module.Path)"
-            } else {
-                Write-DebugLog "7Zip4PowerShell module not found in installed modules"
-                Write-Log "7Zip4PowerShell module not found. Attempting to install..."
-                
-                # Attempt to install the module locally
-                try {
-                    Update-Status (Get-StatusTranslation -Key "installing_module")
-                    Write-Log "Installing 7Zip4PowerShell module..."
-                    
-                    # Check for NuGet provider
-                    $nuget = Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue
-                    if (-not $nuget) {
-                        Write-Log "Installing NuGet package provider..."
-                        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser -ErrorAction Stop | Out-Null
-                        Write-Log "NuGet provider installed"
-                    }
-                    
-                    # Ensure PSGallery is trusted
-                    try {
-                        $repo = Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue
-                        if ($repo -and $repo.InstallationPolicy -eq "Untrusted") {
-                            Write-Log "Setting PSGallery to trusted..."
-                            Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction Stop
-                            Write-Log "PSGallery set to trusted"
-                        }
-                    } catch {
-                        Write-Log "WARN: Could not set PSGallery policy (may require admin): $($_.Exception.Message)"
-                        Write-Log "Attempting installation anyway..."
-                    }
-                    
-                    # Try to find the module in gallery (try both name variations)
-                    $galleryModuleName = $null
-                    $moduleNames = @("7Zip4PowerShell", "7Zip4Powershell")
-                    foreach ($name in $moduleNames) {
-                        try {
-                            $galleryModule = Find-Module -Name $name -Repository PSGallery -ErrorAction Stop
-                            $galleryModuleName = $galleryModule.Name
-                            Write-Log "Found $galleryModuleName v$($galleryModule.Version) in PowerShell Gallery"
-                            break
-                        } catch {
-                            continue
-                        }
-                    }
-                    
-                    if (-not $galleryModuleName) {
-                        throw "Module not found in PowerShell Gallery. Tried: $($moduleNames -join ', ')"
-                    }
-                    
-                    # Install the module for current user
-                    Write-Log "Downloading and installing $galleryModuleName (this may take a moment)..."
-                    Install-Module -Name $galleryModuleName -Force -Scope CurrentUser -ErrorAction Stop
-                    Write-Log "Successfully installed $galleryModuleName module"
-                    
-                    # Refresh module list and find the newly installed module
-                    Start-Sleep -Seconds 1
-                    $allModules = Get-Module -ListAvailable -ErrorAction SilentlyContinue
-                    $module = $allModules | Where-Object { 
-                        $_.Name -eq $galleryModuleName -or
-                        $_.Name -eq '7Zip4PowerShell' -or 
-                        $_.Name -eq '7Zip4Powershell' -or
-                        $_.Name -like '7Zip4PowerShell*'
-                    } | Select-Object -First 1
-                    
-                    if ($module) {
-                        $moduleName = $module.Name
-                        Write-Log "7Zip4PowerShell module installed successfully: $($module.Name) v$($module.Version)"
-                    } else {
-                        throw "Module installed but not found in module list"
-                    }
-                    
-                } catch {
-                    $installError = $_.Exception.Message
-                    Write-Log "ERROR: Failed to install 7Zip4PowerShell module: $installError"
-                    Write-DebugLog "Install exception type: $($_.Exception.GetType().Name)"
-                    Write-DebugLog "Install exception details: $($_.Exception | Format-List | Out-String)"
-                    
-                    if ($_.Exception.Message -like "*admin*" -or $_.Exception.Message -like "*permission*" -or $_.Exception.Message -like "*access*") {
-                        Show-MessageBox -Message (Get-MessageTranslation -Key "module_install_failed_admin" -FormatArgs $installError) -Title (Get-TitleTranslation -Key "module_install_failed") -Icon "Error"
-                    } else {
-                        Show-MessageBox -Message (Get-MessageTranslation -Key "module_install_failed" -FormatArgs $installError) -Title (Get-TitleTranslation -Key "module_install_failed") -Icon "Error"
-                    }
-                    $moduleName = $null
-                    $module = $null
-                }
-            }
-            
-            if ($module) {
-                Write-Log "Attempting to import 7Zip4PowerShell module ($moduleName)..."
-                Import-Module $moduleName -Force -ErrorAction Stop
-                
-                # Check for extraction cmdlet names used by 7Zip4PowerShell
-                # 7Zip4PowerShell typically uses Expand-7Zip or Expand-SevenZip
-                $expandCmdNames = @("Expand-7Zip", "Expand-SevenZip")
-                $expandCmd = $null
-                
-                foreach ($cmdName in $expandCmdNames) {
-                    $cmd = Get-Command $cmdName -ErrorAction SilentlyContinue
-                    if ($cmd -and $cmd.ModuleName -eq $moduleName) {
-                        $expandCmd = $cmd
-                        Write-DebugLog "Found extraction cmdlet: $cmdName in module $moduleName"
-                        break
-                    }
-                }
-                
-                if ($expandCmd) {
-                    Write-Log "Using 7Zip4PowerShell module for extraction ($($expandCmd.Name))"
-                    $usePowerShellModule = $true
-                    $script:Expand7ZipCmdlet = $expandCmd.Name  # Store cmdlet name for use later
-                    $script:Expand7ZipModuleName = $moduleName   # Store module name
-                } else {
-                    Write-Log "WARNING: 7Zip4PowerShell module found but extraction cmdlet not available"
-                    $loadedModule = Get-Module $moduleName
-                    if ($loadedModule) {
-                        $commands = $loadedModule.ExportedCommands.Keys -join ", "
-                        Write-DebugLog "Available commands in module: $commands"
-                    }
-                    $usePowerShellModule = $false
-                }
-            } else {
-                Write-Log "7Zip4PowerShell module not found. Falling back to 7z.exe"
-                Write-DebugLog "To install 7Zip4PowerShell: Install-Module 7Zip4PowerShell"
-                $usePowerShellModule = $false
-            }
-        } catch {
-            Write-Log "7Zip4PowerShell module check failed: $($_.Exception.Message)"
-            Write-DebugLog "Exception details: $($_.Exception.GetType().Name) - $($_.Exception.Message)"
-            Write-DebugLog "Stack trace: $($_.ScriptStackTrace)"
-            Write-Log "7Zip4PowerShell module not available"
-            $usePowerShellModule = $false
-        }
-        
-        if (-not $usePowerShellModule) {
-            # TEMP: 7z.exe fallback removed - only using 7Zip4PowerShell module
-            Write-Log "ERROR: 7Zip4PowerShell module not available"
-            Show-MessageBox -Message (Get-MessageTranslation -Key "module_required") -Title (Get-TitleTranslation -Key "module_required") -Icon "Error"
-            return
-            
-            # TEMP: Commented out 7z.exe fallback
-            # Write-Log "Will use 7z.exe for extraction"
-            # # Fall back to 7z.exe
-            # $sevenZipPath = $null
-            # try {
-            #     $path7z = Get-Command "7z.exe" -ErrorAction SilentlyContinue
-            #     if ($path7z) {
-            #         $sevenZipPath = $path7z.Source
-            #         Write-Log "Found 7z.exe in PATH: $sevenZipPath"
-            #     }
-            # } catch {
-            #     # Not in PATH, continue to check bin folder
-            # }
-            # 
-            # if (-not $sevenZipPath) {
-            #     $binPath = ".\bin\7z.exe"
-            #     if (Test-Path $binPath) {
-            #         $sevenZipPath = (Resolve-Path $binPath).Path
-            #         Write-Log "Found 7z.exe in bin folder: $sevenZipPath"
-            #     }
-            # }
-            # 
-            # if (-not $sevenZipPath -or -not (Test-Path $sevenZipPath)) {
-            #     Write-Log "ERROR: 7z.exe not found in PATH or bin folder"
-            #     [System.Windows.Forms.MessageBox]::Show(
-            #         "No extraction method available.`n`nNeither 7Zip4PowerShell module nor 7z.exe found.`n`nRecommended: Install 7Zip4PowerShell module:`nInstall-Module 7Zip4PowerShell`n`nAlternative: Ensure 7-Zip is installed or bin files are downloaded.",
-            #         "Extraction Tool Not Found",
-            #         "OK",
-            #         "Error"
-            #     )
-            #     return
-            # }
-            
-            # TEMP: 7z.exe extraction args commented out
-            # Extract using 7z.exe with progress monitoring
-            # # x = extract with full paths
-            # # -o = output directory
-            # # -aoa = overwrite all existing files
-            # # -bb0 = output progress with percentage
-            # $extractArgs = "x `"$medicatFile`" -o`"$outputDir`" -aoa -y -bb0"
-            # Write-Log "7z command: $sevenZipPath $extractArgs"
-        }
-        
-        Write-Log "Starting full archive extraction..."
-        Write-Log "Archive: $medicatFile"
-        Write-Log "Destination: $outputDir"
-        
+        $outputDir = Get-MedicatDestinationRoot -DriveLetter $driveLetter
         $startTime = Get-Date
         Update-Progress -Value 0 -Maximum 100
-        
-        $extractionSuccess = $false
-        $extractionError = $null
-        
-        try {
-            if ($usePowerShellModule) {
-                # Use PowerShell 7Zip4PowerShell module (native PowerShell)
-                $cmdletName = $script:Expand7ZipCmdlet
-                Write-Log "Using PowerShell cmdlet: $cmdletName"
-                
-                # Monitor extraction progress by tracking destination directory changes
-                Update-Status (Get-StatusTranslation -Key "extracting_powershell")
-                Update-Progress -Value 0 -Maximum 100
-                
-                try {
-                    # Use 7Zip4PowerShell module's Expand-7Zip or Expand-SevenZip cmdlet
-                    Write-DebugLog "Attempting extraction with 7Zip4PowerShell cmdlet: $cmdletName"
-                    Write-DebugLog "Archive: $medicatFile"
-                    Write-DebugLog "Target: $outputDir"
-                    Write-DebugLog "Module: $script:Expand7ZipModuleName"
-                    
-                    # Get initial file count/size in destination (may be 0 if empty)
-                    $initialFileCount = 0
-                    $initialSize = 0
-                    if (Test-Path $outputDir) {
-                        $initialFiles = Get-ChildItem -Path $outputDir -Recurse -File -ErrorAction SilentlyContinue
-                        $initialFileCount = $initialFiles.Count
-                        $initialSize = ($initialFiles | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
-                    }
-                    Write-DebugLog "Initial destination: $initialFileCount files, $([math]::Round($initialSize / 1MB, 2)) MB"
-                    
-                    # Get archive size for progress estimation
-                    $archiveInfo = Get-Item $medicatFile -ErrorAction SilentlyContinue
-                    $archiveSize = if ($archiveInfo) { $archiveInfo.Length } else { 0 }
-                    Write-DebugLog "Archive size: $([math]::Round($archiveSize / 1GB, 2)) GB"
-                    
-                    # Get cmdlet and check parameter patterns
-                    $extractionCmd = Get-Command $cmdletName
-                    $paramNames = $extractionCmd.Parameters.Keys
-                    Write-DebugLog "Available parameters: $($paramNames -join ', ')"
-                    
-                    # Expand-7Zip uses: ArchiveFileName (required), TargetPath (required)
-                    # Optional: Password, SecurePassword
-                    $params = @{}
-                    
-                    if ($paramNames -contains "ArchiveFileName") {
-                        $params["ArchiveFileName"] = $medicatFile
-                        if ($paramNames -contains "TargetPath") {
-                            $params["TargetPath"] = $outputDir
-                        } else {
-                            throw "Expand-7Zip cmdlet is missing required TargetPath parameter"
-                        }
-                    } elseif ($paramNames -contains "Path") {
-                        # Fallback for other cmdlet variations
-                        $params["Path"] = $medicatFile
-                        if ($paramNames -contains "DestinationPath") {
-                            $params["DestinationPath"] = $outputDir
-                        } elseif ($paramNames -contains "TargetPath") {
-                            $params["TargetPath"] = $outputDir
-                        } else {
-                            throw "Could not find destination path parameter"
-                        }
-                    } else {
-                        # Try positional parameters as fallback
-                        Write-DebugLog "Using positional parameters"
-                        & $cmdletName $medicatFile $outputDir
-                        $extractionSuccess = $true
-                        Write-Log "Extraction completed using positional parameters"
-                    }
-                    
-                    # Run extraction in background job to monitor progress
-                    if (-not $extractionSuccess) {
-                        Write-DebugLog "Calling $cmdletName with parameters: ArchiveFileName=$medicatFile, TargetPath=$outputDir"
-                        
-                        # Create a script block for the extraction job
-                        $extractScript = {
-                            param($CmdletName, $ArchiveFile, $TargetPath, $Params)
-                            Import-Module 7Zip4PowerShell -Force -ErrorAction Stop
-                            & $CmdletName @Params
-                        }
-                        
-                        # Start the extraction job
-                        $extractJob = Start-Job -ScriptBlock $extractScript -ArgumentList $cmdletName, $medicatFile, $outputDir, $params
-                        Write-Log "Extraction started in background job (ID: $($extractJob.Id))"
-                        
-                        # Monitor progress while job is running
-                        $lastProgress = 0
-                        $progressUpdateInterval = 1.0  # Update every second
-                        $lastUpdate = Get-Date
-                        
-                        while ($extractJob.State -eq "Running") {
-                            # Process UI events to keep window responsive
-                            [System.Windows.Forms.Application]::DoEvents()
-                            
-                            # Update progress based on destination directory size
-                            if ((Get-Date) - $lastUpdate -gt [TimeSpan]::FromSeconds($progressUpdateInterval)) {
-                                if (Test-Path $outputDir) {
-                                    try {
-                                        $currentFiles = Get-ChildItem -Path $outputDir -Recurse -File -ErrorAction SilentlyContinue
-                                        $currentFileCount = $currentFiles.Count
-                                        $currentSize = ($currentFiles | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
-                                        
-                                        # Estimate progress based on size (rough estimate since we don't know final size)
-                                        if ($archiveSize -gt 0) {
-                                            # Estimated extraction ratio is typically 2-4x archive size (compressed to uncompressed)
-                                            # Use a conservative estimate of 2x for progress calculation
-                                            $estimatedFinalSize = $archiveSize * 2
-                                            $progressPercent = [math]::Min(95, [math]::Round(($currentSize - $initialSize) / $estimatedFinalSize * 100))
-                                        } else {
-                                            # Fallback: progress based on file count growth (very rough)
-                                            if ($currentFileCount -gt $initialFileCount) {
-                                                $progressPercent = [math]::Min(95, [math]::Round(($currentFileCount - $initialFileCount) / 1000 * 100))
-                                            } else {
-                                                $progressPercent = 0
-                                            }
-                                        }
-                                        
-                                        # Only update if progress changed significantly (>1%)
-                                        if ($progressPercent -ne $lastProgress) {
-                                            $lastProgress = $progressPercent
-                                            Update-Progress -Value $progressPercent -Maximum 100
-                                            $extractedMB = [math]::Round(($currentSize - $initialSize) / 1MB, 1)
-                                            Update-Status (Get-StatusTranslation -Key "extracting_progress" -FormatArgs $progressPercent, $extractedMB)
-                                            Write-DebugLog "Progress: $progressPercent%, Files: $currentFileCount, Size: $([math]::Round($currentSize / 1MB, 1)) MB"
-                                        }
-                                    } catch {
-                                        # Ignore errors during progress monitoring
-                                        Write-DebugLog "Progress monitoring error: $($_.Exception.Message)"
-                                    }
-                                }
-                                $lastUpdate = Get-Date
-                            }
-                            
-                            Start-Sleep -Milliseconds 250
-                        }
-                        
-                        # Wait for job to complete
-                        Wait-Job $extractJob | Out-Null
-                        
-                        # Check job state first
-                        $jobState = $extractJob.State
-                        
-                        # Get job results and check for errors
-                        $jobResult = Receive-Job $extractJob 2>&1
-                        
-                        # Check if there were errors in the output stream
-                        $jobErrors = $jobResult | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] }
-                        
-                        # Also check the job's error collection
-                        if ($extractJob.Error) {
-                            $jobErrors = @($jobErrors) + @($extractJob.Error)
-                        }
-                        
-                        Remove-Job $extractJob -Force
-                        
-                        if ($jobState -eq "Completed") {
-                            if ($jobErrors -and $jobErrors.Count -gt 0) {
-                                Write-Log "Warning: Extraction completed with some errors/warnings"
-                                foreach ($err in $jobErrors) {
-                                    Write-DebugLog "Job warning/error: $err"
-                                }
-                            }
-                            $extractionSuccess = $true
-                            Update-Progress -Value 100 -Maximum 100
-                            Update-Status (Get-StatusTranslation -Key "extraction_complete")
-                            Write-Log "Extraction completed using 7Zip4PowerShell module ($cmdletName from $script:Expand7ZipModuleName)"
-                        } elseif ($jobState -eq "Failed") {
-                            $errorMsg = if ($jobErrors -and $jobErrors.Count -gt 0) { 
-                                ($jobErrors | ForEach-Object { $_.ToString() } | Out-String).Trim()
-                            } else { 
-                                "Unknown error - job state: $jobState"
-                            }
-                            throw "Extraction job failed. Error: $errorMsg"
-                        } else {
-                            throw "Extraction job stopped unexpectedly. State: $jobState"
-                        }
-                    }
-                } catch {
-                    $extractionError = $_.Exception.Message
-                    Write-Log "ERROR: PowerShell extraction failed: $extractionError"
-                    Write-DebugLog "Exception type: $($_.Exception.GetType().Name)"
-                    Write-DebugLog "Exception details: $($_.Exception | Format-List | Out-String)"
-                    throw
-                }
-                
-            } else {
-                # TEMP: 7z.exe extraction path commented out
-                throw "7Zip4PowerShell module is required. 7z.exe fallback is temporarily disabled."
-                
-                # Use 7z.exe with progress monitoring
-                # # Run extraction with progress monitoring
-                # $stdoutFile = Join-Path $env:TEMP "medicat_extract_stdout_$([System.Guid]::NewGuid().ToString().Substring(0,8)).txt"
-                # $stderrFile = Join-Path $env:TEMP "medicat_extract_stderr_$([System.Guid]::NewGuid().ToString().Substring(0,8)).txt"
-                # 
-                # # Start process and monitor progress in real-time
-                # $processInfo = New-Object System.Diagnostics.ProcessStartInfo
-                # $processInfo.FileName = $sevenZipPath
-                # $processInfo.Arguments = $extractArgs
-                # $processInfo.UseShellExecute = $false
-                # $processInfo.RedirectStandardOutput = $true
-                # $processInfo.RedirectStandardError = $true
-                # $processInfo.CreateNoWindow = $true
-                # 
-                # $extractProcess = New-Object System.Diagnostics.Process
-                # $extractProcess.StartInfo = $processInfo
-                # 
-                # # Create string builders for output
-                # $outputBuilder = New-Object System.Text.StringBuilder
-                # $errorBuilder = New-Object System.Text.StringBuilder
-                # 
-                # # Start the process
-                # $extractProcess.Start() | Out-Null
-                # 
-                # # Read output in real-time with progress updates
-                # # Read synchronously but with UI updates
-                # $stdOut = $extractProcess.StandardOutput
-                # $stdErr = $extractProcess.StandardError
-                # $lastPercent = 0
-                # 
-                # # Read output while process is running
-                # while (-not $extractProcess.HasExited -or $stdOut.Peek() -ge 0 -or $stdErr.Peek() -ge 0) {
-                #     # Process UI events to keep window responsive
-                #     [System.Windows.Forms.Application]::DoEvents()
-                #     
-                #     # Read from stdout if available
-                #     while ($stdOut.Peek() -ge 0) {
-                #         try {
-                #             $line = $stdOut.ReadLine()
-                #             if ($line) {
-                #                 $outputBuilder.AppendLine($line) | Out-Null
-                #                 
-                #                 # Parse progress percentage from 7z output
-                #                 # 7z with -bb0 outputs progress as "  XX%" or similar
-                #                 if ($line -match '(\d+)%') {
-                #                     $percent = [int]$matches[1]
-                #                     if ($percent -ge 0 -and $percent -le 100 -and $percent -ne $lastPercent) {
-                #                         $lastPercent = $percent
-                #                         $progressBar.Value = $percent
-                #                         $statusLabel.Text = "Extracting... $percent%"
-                #                         $progressBar.Refresh()
-                #                         $statusLabel.Refresh()
-                #                     }
-                #                 }
-                #             }
-                #         } catch {
-                #             break
-                #         }
-                #     }
-                #     
-                #     # Read from stderr if available
-                #     while ($stdErr.Peek() -ge 0) {
-                #         try {
-                #             $line = $stdErr.ReadLine()
-                #             if ($line) {
-                #                 $errorBuilder.AppendLine($line) | Out-Null
-                #             }
-                #         } catch {
-                #             break
-                #         }
-                #     }
-                #     
-                #     Start-Sleep -Milliseconds 100
-                # }
-                # 
-                # # Wait for process to fully exit
-                # $extractProcess.WaitForExit()
-                # 
-                # # Get final output
-                # $output = $outputBuilder.ToString()
-                # $errorOutput = $errorBuilder.ToString()
-                # 
-                # # Save output to files for logging
-                # if ($output) {
-                #     $output | Out-File -FilePath $stdoutFile -Encoding UTF8
-                # }
-                # if ($errorOutput) {
-                #     $errorOutput | Out-File -FilePath $stderrFile -Encoding UTF8
-                # }
-                # 
-                # # Clean up temp files
-                # Remove-Item $stdoutFile -ErrorAction SilentlyContinue
-                # Remove-Item $stderrFile -ErrorAction SilentlyContinue
-                # 
-                # if ($extractProcess.ExitCode -eq 0) {
-                #     $extractionSuccess = $true
-                #     Write-Log "Extraction completed using 7z.exe"
-                # } else {
-                #     $extractionError = "Exit code: $($extractProcess.ExitCode)"
-                #     Write-Log "ERROR: Extraction failed with exit code: $($extractProcess.ExitCode)"
-                #     
-                #     # Log error output
-                #     if ($errorOutput) {
-                #         Write-Log "Extraction errors:"
-                #         $errorOutput.Split("`n") | ForEach-Object { if ($_.Trim()) { Write-Log "  $_" } }
-                #     }
-                #     throw "Extraction failed"
-                # }
-            }
-            
-            if ($extractionSuccess) {
-                $endTime = Get-Date
-                $duration = ($endTime - $startTime).TotalMinutes
-                Write-Log "Extraction completed in $([math]::Round($duration, 2)) minutes"
-                Write-Log "MediCat archive extracted successfully"
-                Update-Progress -Value 100 -Maximum 100
-                Update-Status (Get-StatusTranslation -Key "extraction_success")
-            }
-            
-        } catch {
-            Write-Log "ERROR: Exception during extraction: $($_.Exception.Message)"
-            if ($extractionError) {
-                Write-Log "Additional error details: $extractionError"
-            }
-            Show-MessageBox -Message (Get-MessageTranslation -Key "extraction_failed" -FormatArgs $_.Exception.Message) -Title (Get-TitleTranslation -Key "extraction_failed") -Icon "Error"
-            return
+
+        $asyncExtractStarted = $true
+        Start-MedicatExtractionWorker -Context @{
+            ArchivePath = $medicatFile
+            DestinationPath = $outputDir
+            DriveLetter = $driveLetter
+            StartTime = $startTime
         }
-        
-        # Copy final files
-        Update-Status (Get-StatusTranslation -Key "copying_files")
-        $finalFiles = @(
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/icon.ico"; Path="$driveLetter/autorun.ico"},
-            @{Url="https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/hasher/CheckFiles.bat"; Path="$driveLetter/CheckFiles.bat"}
-        )
-        
-        foreach ($file in $finalFiles) {
-            if (Invoke-Download -Url $file.Url -OutputPath $file.Path) {
-                Write-Log "[GOOD] $($file.Path)"
-            } else {
-                Write-Log "[BAD] $($file.Path)"
-            }
-        }
-        
-        Update-Status (Get-StatusTranslation -Key "installation_complete")
-        Write-Log "MediCat installation completed successfully"
-        Show-MessageBox -Message (Get-MessageTranslation -Key "installation_complete" -FormatArgs $driveLetter) -Title (Get-TitleTranslation -Key "installation_complete") -Icon "Information"
-        
+        return
+
     } catch {
         Write-Log "ERROR: $($_.Exception.Message)"
         Show-MessageBox -Message (Get-MessageTranslation -Key "installation_error" -FormatArgs $_.Exception.Message) -Title (Get-TitleTranslation -Key "installation_error") -Icon "Error"
     } finally {
-        $installButton.Enabled = $true
-        $cancelButton.Enabled = $true
+        if (-not $asyncExtractStarted) {
+            Set-InstallButtonsEnabled $true
+        }
     }
 }
 
@@ -1775,40 +1468,8 @@ function Start-ReExtractFiles {
         Update-Status (Get-StatusTranslation -Key "re_extracting")
         Write-Log "Starting re-extraction of $($FailedFiles.Count) files"
         
-        # Check if 7z exists - check PATH first, then bin folder
-        $sevenZipPath = $null
-        
-        # Try to find 7z in PATH
-        try {
-            $path7z = Get-Command "7z.exe" -ErrorAction SilentlyContinue
-            if ($path7z) {
-                $sevenZipPath = $path7z.Source
-                Write-Log "Found 7z.exe in PATH: $sevenZipPath"
-            }
-        } catch {
-            # Not in PATH, continue to check bin folder
-        }
-        
-        # If not in PATH, check bin folder
-        if (-not $sevenZipPath) {
-            $binPath = ".\bin\7z.exe"
-            if (Test-Path $binPath) {
-                $sevenZipPath = (Resolve-Path $binPath).Path
-                Write-Log "Found 7z.exe in bin folder: $sevenZipPath"
-            }
-        }
-        
-        # If still not found, error out
-        if (-not $sevenZipPath -or -not (Test-Path $sevenZipPath)) {
-            Write-Log "ERROR: 7z.exe not found in PATH or bin folder"
-            Show-MessageBox -Message (Get-MessageTranslation -Key "7zip_not_found") -Title (Get-TitleTranslation -Key "7zip_not_found") -Icon "Error"
-            return $false
-        }
-        
-        # Find the source archive - check current directory first
         $archiveFile = Join-Path $PWD "MediCat.USB.v$script:MediCatVersion.7z"
         
-        # If not found in current directory, prompt user to select the file
         if (-not (Test-Path $archiveFile)) {
             Write-Log "Archive not found in current directory, prompting user to select file..."
             Update-Status (Get-StatusTranslation -Key "select_archive")
@@ -1836,98 +1497,52 @@ function Start-ReExtractFiles {
         }
         
         Write-Log "Found archive: $archiveFile"
-        Write-Log "Found 7z: $sevenZipPath"
         
-        # Normalize all file paths and create file list for batch extraction
-        Write-Log "Preparing file list for batch extraction..."
-        $filesToExtract = @()
         $normalizedFiles = @()
-        
         foreach ($failedFile in $FailedFiles) {
-            # Normalize the file path - remove drive letter if present, ensure correct path format
             $fileToExtract = $failedFile.Trim()
             if ($fileToExtract -match '^[A-Z]:\\(.+)') {
                 $fileToExtract = $matches[1]
             }
-            # Remove leading backslash or forward slash
             $fileToExtract = $fileToExtract.TrimStart('\', '/')
-            
             if ($fileToExtract) {
                 $normalizedFiles += $fileToExtract
             }
         }
         
-        Write-Log "Extracting $($normalizedFiles.Count) files in batch operation..."
+        Write-Log "Extracting $($normalizedFiles.Count) files..."
         Update-Status "Extracting $($normalizedFiles.Count) files (this may take a while)..."
         Update-Progress -Value 0 -Maximum 100
         
-        # Write file list to temporary file for 7z (7z expects one file per line)
-        $fileListPath = Join-Path $env:TEMP "medicat_extract_list_$([System.Guid]::NewGuid().ToString().Substring(0,8)).txt"
-        try {
-            $normalizedFiles | Out-File -FilePath $fileListPath -Encoding UTF8
-            Write-Log "Created file list with $($normalizedFiles.Count) files: $fileListPath"
-            
-            # Extract all files in a single batch operation
-            # Using @filename syntax tells 7z to read file list from the file
-            $outputDir = $DriveLetter.TrimEnd('\')
-            $arguments = "x `"$archiveFile`" -o`"$outputDir`" @`"$fileListPath`" -aoa"
-            
-            Write-Log "Starting batch extraction..."
-            $startTime = Get-Date
-            
-            # Run extraction with progress monitoring
-            $process = Start-Process -FilePath $sevenZipPath -ArgumentList $arguments -Wait -PassThru -NoNewWindow -RedirectStandardOutput "7z_output.tmp" -RedirectStandardError "7z_error.tmp"
-            
-            $endTime = Get-Date
-            $duration = ($endTime - $startTime).TotalSeconds
-            Write-Log "Extraction completed in $([math]::Round($duration, 2)) seconds"
-            
-            # Check for errors
-            $errorContent = Get-Content "7z_error.tmp" -ErrorAction SilentlyContinue
-            $outputContent = Get-Content "7z_output.tmp" -ErrorAction SilentlyContinue
-            
-            if ($process.ExitCode -eq 0) {
-                Write-Log "Batch extraction completed successfully"
-                $extractedCount = $normalizedFiles.Count
-                $failedExtract = @()
+        $outputDir = Get-MedicatDestinationRoot -DriveLetter $DriveLetter
+        $extractResult = Invoke-MedicatArchiveExtraction `
+            -ArchivePath $archiveFile `
+            -DestinationPath $outputDir `
+            -FileList $normalizedFiles `
+            -AllowCliFallback `
+            -ScriptRoot $PSScriptRoot `
+            -OnLog { param($m) Write-DebugLog $m } `
+            -OnProgress (Get-MedicatExtractionProgressHandler)
+        
+        if (-not $extractResult.Success) {
+            Write-Log "ERROR: Re-extraction failed: $($extractResult.ErrorMessage)"
+            Show-MessageBox -Message (Get-MessageTranslation -Key "re_extraction_error" -FormatArgs $extractResult.ErrorMessage) -Title (Get-TitleTranslation -Key "re_extraction_error") -Icon "Error"
+            return $false
+        }
+        
+        $extractedCount = 0
+        $failedExtract = @()
+        foreach ($file in $normalizedFiles) {
+            $fullPath = Join-Path $outputDir $file
+            if (Test-Path $fullPath) {
+                $extractedCount++
             } else {
-                Write-Log "[FAIL] Extraction failed with exit code: $($process.ExitCode)"
-                if ($errorContent) {
-                    Write-Log "Error details: $($errorContent -join "`n")"
-                }
-                
-                # Try to determine which files failed by checking which ones exist
-                $extractedCount = 0
-                $failedExtract = @()
-                foreach ($file in $normalizedFiles) {
-                    $fullPath = Join-Path $outputDir $file
-                    if (Test-Path $fullPath) {
-                        $extractedCount++
-                    } else {
-                        $failedExtract += $file
-                    }
-                }
-                Write-Log "Verified: $extractedCount/$($normalizedFiles.Count) files exist after extraction"
-            }
-            
-            # Clean up temp files
-            Remove-Item "7z_output.tmp" -ErrorAction SilentlyContinue
-            Remove-Item "7z_error.tmp" -ErrorAction SilentlyContinue
-            Remove-Item $fileListPath -ErrorAction SilentlyContinue
-            
-            Update-Progress -Value 100 -Maximum 100
-            Write-Log "Re-extraction complete: $extractedCount/$($normalizedFiles.Count) files extracted successfully"
-            
-        } catch {
-            Write-Log "ERROR preparing file list: $($_.Exception.Message)"
-            $failedExtract = $normalizedFiles
-            $extractedCount = 0
-        } finally {
-            # Clean up file list if it still exists
-            if (Test-Path $fileListPath) {
-                Remove-Item $fileListPath -ErrorAction SilentlyContinue
+                $failedExtract += $file
             }
         }
+        
+        Update-Progress -Value 100 -Maximum 100
+        Write-Log "Re-extraction complete via $($extractResult.Method): $extractedCount/$($normalizedFiles.Count) files verified on disk"
         
         if ($failedExtract.Count -gt 0) {
             Write-Log "WARNING: Could not extract $($failedExtract.Count) file(s):"
@@ -1936,10 +1551,10 @@ function Start-ReExtractFiles {
             }
             Show-MessageBox -Message (Get-MessageTranslation -Key "re_extract_failed" -FormatArgs $extractedCount, $FailedFiles.Count, $failedExtract.Count) -Title (Get-TitleTranslation -Key "re_extraction_failed") -Icon "Warning"
             return $false
-        } else {
-            Update-Status (Get-StatusTranslation -Key "re_extracting")
-            return $true
         }
+        
+        Update-Status (Get-StatusTranslation -Key "re_extracting")
+        return $true
         
     } catch {
         Write-Log "ERROR during re-extraction: $($_.Exception.Message)"
@@ -1984,26 +1599,23 @@ $form.Add_KeyDown({
 # Enable keyboard focus for the form
 $form.KeyPreview = $true
 
-# Initialize
-Write-Log "MediCat Installer v$script:LocalVersion Started"
-Write-Log "Running with Administrator privileges - Ventoy installation enabled"
-Get-DriveList
+$form.Add_Shown({
+    Write-Log "MediCat Installer v$script:LocalVersion Started"
+    Write-Log "PowerShell host: $($PSVersionTable.PSEdition) $($PSVersionTable.PSVersion)"
+    Write-Log "Running with Administrator privileges - Ventoy installation enabled"
+    Update-Status (Get-StatusTranslation -Key "loading_drives")
+    Get-DriveList
 
-# Check if bin files exist, download if missing
-$requiredBinFiles = @("7z.exe", "7z.dll", "QuickSFV.exe", "GetInput.exe")
-$missingFiles = @()
-foreach ($file in $requiredBinFiles) {
-    if (-not (Test-Path ".\bin\$file")) {
-        $missingFiles += $file
+    if (Test-MedicatCliReady -ScriptRoot $PSScriptRoot) {
+        Write-Log "Extraction ready (7za.exe)"
+    } elseif (Test-MedicatLibReady -ScriptRoot $PSScriptRoot) {
+        Write-Log "Extraction libraries ready (lib/ SevenZipSharp)"
+    } else {
+        Write-Log "WARNING: lib/ extraction libraries incomplete - will fall back to 7za.exe if available"
     }
-}
 
-if ($missingFiles.Count -gt 0) {
-    Write-Log "Missing bin files detected, downloading..."
-    Download-BinFiles | Out-Null
-} else {
-    Write-Log "All required bin files present"
-}
+    Update-Status (Get-StatusTranslation -Key "status_ready")
+})
 
 # Show form
 $form.ShowDialog()

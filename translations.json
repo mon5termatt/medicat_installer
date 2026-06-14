@@ -3,10 +3,10 @@
     "ui": {
       "form_title": "MediCat Installer v{0} [Administrator]",
       "title_label": "MediCat USB Installer",
-      "status_ready": "Ready to install MediCat",
       "drive_label": "Select USB Drive:",
       "show_hard_drives": "Show hard drives",
       "format_checkbox": "Format drive before installation",
+      "skip_ventoy_checkbox": "Skip Ventoy install/upgrade",
       "install_button": "Install MediCat",
       "cancel_button": "Cancel",
       "check_files_button": "Check USB Files",
@@ -18,6 +18,7 @@
     },
     "status": {
       "status_ready": "Ready to install MediCat",
+      "loading_drives": "Loading drives...",
       "downloading_files": "Downloading installer files...",
       "downloading_7zip": "Downloading 7-Zip files...",
       "downloading_translations": "Downloading translation files...",
@@ -31,6 +32,7 @@
       "extracting_archive": "Extracting MediCat archive (this will take a while)...",
       "extracting_powershell": "Extracting archive using PowerShell (this may take a while)...",
       "extracting_progress": "Extracting... {0}% ({1} MB extracted)",
+      "extracting_file": "{0}% — {1}",
       "extraction_complete": "Extraction completed",
       "extraction_success": "Extraction completed successfully",
       "copying_files": "Copying installer files...",
@@ -44,7 +46,7 @@
       "bin_download_complete": "All bin files downloaded successfully",
       "bin_download_errors": "Bin files download completed with errors",
       "bin_download_failed": "Bin files download failed",
-      "installing_module": "Installing 7Zip4PowerShell module (required for extraction)..."
+      "installing_module": "Loading extraction libraries from lib/..."
     },
     "messages": {
       "no_internet": "No internet connection detected. Please check your connection and try again.",
@@ -53,9 +55,9 @@
       "ventoy_install_failed": "Ventoy installation failed. Please check the log for details.",
       "ventoy_upgrade_failed": "Ventoy upgrade failed. Please check the log for details.",
       "extraction_failed": "Failed to extract MediCat archive.\n\nError: {0}\n\nCheck the log for details.",
-      "module_required": "7Zip4PowerShell module is required for extraction.\n\nPlease install it:\nInstall-Module 7Zip4PowerShell\n\nAfter installation, run this installer again.",
-      "module_install_failed": "Failed to install 7Zip4PowerShell module.\n\nError: {0}\n\nPlease try installing manually:\nInstall-Module 7Zip4PowerShell -Scope CurrentUser",
-      "module_install_failed_admin": "Failed to install 7Zip4PowerShell module. Administrator privileges may be required.\n\nError: {0}\n\nPlease try running PowerShell as Administrator and installing manually:\nInstall-Module 7Zip4PowerShell -Scope CurrentUser",
+      "module_required": "Extraction libraries are missing from the lib/ folder.\n\nEnsure lib/ contains SevenZipSharp.dll and 7z64.dll (or 7z.dll on 32-bit).\n\nRe-download the installer or restore the lib/ folder from the repository.",
+      "module_install_failed": "Failed to load extraction libraries.\n\nError: {0}\n\nEnsure the lib/ folder is complete. See lib/NOTICE.txt.",
+      "module_install_failed_admin": "Failed to load extraction libraries.\n\nError: {0}\n\nEnsure the lib/ folder is complete and readable.",
       "installation_complete": "MediCat has been installed successfully to {0}",
       "installation_error": "An error occurred during installation: {0}",
       "verification_complete": "File verification completed successfully. All {0} files are intact.",
@@ -67,7 +69,7 @@
       "re_extraction_error": "An error occurred during re-extraction: {0}",
       "bin_download_incomplete": "Downloaded {0} of {1} bin files. Some files may have failed. Check the log for details.",
       "bin_download_error": "An error occurred while downloading bin files: {0}",
-      "7zip_not_found": "7z.exe not found in system PATH or bin folder.\n\nPlease ensure 7-Zip is installed or the installer files are downloaded.",
+      "7zip_not_found": "Extraction libraries could not be used.\n\nEnsure lib/ contains SevenZipSharp.dll and 7z64.dll, or 7za.exe is present.",
       "archive_not_found": "Source archive not found: {0}\nPlease ensure the archive exists.",
       "selection_cancelled": "Archive file selection was cancelled. Re-extraction cannot proceed.",
       "no_drive_for_check": "Please select a USB drive first."
@@ -87,8 +89,8 @@
       "ventoy_install_failed": "Ventoy Installation Failed",
       "ventoy_upgrade_failed": "Ventoy Upgrade Failed",
       "extraction_failed": "Extraction Failed",
-      "module_required": "7Zip4PowerShell Module Required",
-      "module_install_failed": "Module Installation Failed",
+      "module_required": "Extraction Libraries Missing",
+      "module_install_failed": "Library Load Failed",
       "installation_complete": "Installation Complete",
       "installation_error": "Installation Error",
       "verification_complete": "Verification Complete",
@@ -143,7 +145,7 @@
       "ventoy_install_failed": "Ventoy installation failed with exit code: {0}",
       "format_failed": "Could not format drive: {0}",
       "extraction_exception": "Exception during extraction: {0}",
-      "module_check_failed": "7Zip4PowerShell module check failed: {0}",
+      "module_check_failed": "Extraction library check failed: {0}",
       "internet_check_failed": "Error checking internet connection: {0}"
     }
   },
@@ -151,10 +153,10 @@
     "ui": {
       "form_title": "Instalador MediCat v{0} [Administrador]",
       "title_label": "Instalador USB MediCat",
-      "status_ready": "Listo para instalar MediCat",
       "drive_label": "Seleccionar unidad USB:",
       "show_hard_drives": "Mostrar discos duros",
       "format_checkbox": "Formatear unidad antes de la instalación",
+      "skip_ventoy_checkbox": "Omitir instalación/actualización de Ventoy",
       "install_button": "Instalar MediCat",
       "cancel_button": "Cancelar",
       "check_files_button": "Verificar archivos USB",
@@ -166,6 +168,7 @@
     },
     "status": {
       "status_ready": "Listo para instalar MediCat",
+      "loading_drives": "Cargando unidades...",
       "downloading_files": "Descargando archivos del instalador...",
       "downloading_7zip": "Descargando archivos 7-Zip...",
       "downloading_translations": "Descargando archivos de traducción...",
@@ -179,6 +182,7 @@
       "extracting_archive": "Extrayendo archivo MediCat (esto tomará un tiempo)...",
       "extracting_powershell": "Extrayendo archivo usando PowerShell (esto puede tardar un tiempo)...",
       "extracting_progress": "Extrayendo... {0}% ({1} MB extraídos)",
+      "extracting_file": "{0}% — {1}",
       "extraction_complete": "Extracción completada",
       "extraction_success": "Extracción completada exitosamente",
       "copying_files": "Copiando archivos del instalador...",
@@ -192,7 +196,7 @@
       "bin_download_complete": "Todos los archivos bin descargados exitosamente",
       "bin_download_errors": "Descarga de archivos bin completada con errores",
       "bin_download_failed": "Descarga de archivos bin falló",
-      "installing_module": "Instalando módulo 7Zip4PowerShell (requerido para extracción)..."
+      "installing_module": "Cargando bibliotecas de extracción desde lib/..."
     },
     "messages": {
       "no_internet": "No se detectó conexión a internet. Por favor verifique su conexión e intente nuevamente.",
@@ -201,9 +205,9 @@
       "ventoy_install_failed": "Instalación de Ventoy falló. Por favor revise el registro para más detalles.",
       "ventoy_upgrade_failed": "Actualización de Ventoy falló. Por favor revise el registro para más detalles.",
       "extraction_failed": "Falló al extraer archivo MediCat.\n\nError: {0}\n\nRevise el registro para más detalles.",
-      "module_required": "El módulo 7Zip4PowerShell es requerido para la extracción.\n\nPor favor instálelo:\nInstall-Module 7Zip4PowerShell\n\nDespués de la instalación, ejecute este instalador nuevamente.",
-      "module_install_failed": "Falló al instalar el módulo 7Zip4PowerShell.\n\nError: {0}\n\nPor favor intente instalar manualmente:\nInstall-Module 7Zip4PowerShell -Scope CurrentUser",
-      "module_install_failed_admin": "Falló al instalar el módulo 7Zip4PowerShell. Pueden requerirse privilegios de administrador.\n\nError: {0}\n\nPor favor intente ejecutar PowerShell como Administrador e instalar manualmente:\nInstall-Module 7Zip4PowerShell -Scope CurrentUser",
+      "module_required": "Faltan las bibliotecas de extracción en la carpeta lib/.\n\nAsegúrese de que lib/ contenga SevenZipSharp.dll y 7z64.dll (o 7z.dll en 32 bits).\n\nVuelva a descargar el instalador o restaure lib/ desde el repositorio.",
+      "module_install_failed": "No se pudieron cargar las bibliotecas de extracción.\n\nError: {0}\n\nAsegúrese de que la carpeta lib/ esté completa. Vea lib/NOTICE.txt.",
+      "module_install_failed_admin": "No se pudieron cargar las bibliotecas de extracción.\n\nError: {0}\n\nAsegúrese de que la carpeta lib/ esté completa y sea legible.",
       "installation_complete": "MediCat ha sido instalado exitosamente en {0}",
       "installation_error": "Ocurrió un error durante la instalación: {0}",
       "verification_complete": "Verificación de archivos completada exitosamente. Todos los {0} archivos están intactos.",
@@ -215,7 +219,7 @@
       "re_extraction_error": "Ocurrió un error durante la re-extracción: {0}",
       "bin_download_incomplete": "Descargados {0} de {1} archivos bin. Algunos archivos pueden haber fallado. Revise el registro para más detalles.",
       "bin_download_error": "Ocurrió un error al descargar archivos bin: {0}",
-      "7zip_not_found": "7z.exe no encontrado en PATH del sistema o carpeta bin.\n\nPor favor asegúrese de que 7-Zip esté instalado o que los archivos del instalador estén descargados.",
+      "7zip_not_found": "No se pudieron usar las bibliotecas de extracción.\n\nAsegúrese de que lib/ contenga SevenZipSharp.dll y 7z64.dll, o que 7za.exe esté presente.",
       "archive_not_found": "Archivo fuente no encontrado: {0}\nPor favor asegúrese de que el archivo exista.",
       "selection_cancelled": "La selección del archivo fue cancelada. La re-extracción no puede continuar.",
       "no_drive_for_check": "Por favor seleccione una unidad USB primero."
@@ -235,8 +239,8 @@
       "ventoy_install_failed": "Instalación Ventoy Falló",
       "ventoy_upgrade_failed": "Actualización Ventoy Falló",
       "extraction_failed": "Extracción Falló",
-      "module_required": "Módulo 7Zip4PowerShell Requerido",
-      "module_install_failed": "Instalación de Módulo Falló",
+      "module_required": "Bibliotecas de Extracción Faltantes",
+      "module_install_failed": "Error al Cargar Bibliotecas",
       "installation_complete": "Instalación Completa",
       "installation_error": "Error de Instalación",
       "verification_complete": "Verificación Completa",
@@ -291,7 +295,7 @@
       "ventoy_install_failed": "Instalación de Ventoy falló con código de salida: {0}",
       "format_failed": "No se pudo formatear la unidad: {0}",
       "extraction_exception": "Excepción durante la extracción: {0}",
-      "module_check_failed": "Verificación del módulo 7Zip4PowerShell falló: {0}",
+      "module_check_failed": "Error al verificar bibliotecas de extracción: {0}",
       "internet_check_failed": "Error al verificar conexión a internet: {0}"
     }
   },
@@ -303,6 +307,7 @@
       "drive_label": "Sélectionner le lecteur USB:",
       "show_hard_drives": "Afficher les disques durs",
       "format_checkbox": "Formatter le lecteur avant l'installation",
+      "skip_ventoy_checkbox": "Ignorer l'installation/mise à jour Ventoy",
       "install_button": "Installer MediCat",
       "cancel_button": "Annuler",
       "check_files_button": "Vérifier les fichiers USB",
@@ -314,6 +319,7 @@
     },
     "status": {
       "status_ready": "Prêt à installer MediCat",
+      "loading_drives": "Chargement des lecteurs...",
       "downloading_files": "Téléchargement des fichiers d'installation...",
       "downloading_7zip": "Téléchargement des fichiers 7-Zip...",
       "downloading_translations": "Téléchargement des fichiers de traduction...",
@@ -327,6 +333,7 @@
       "extracting_archive": "Extraction de l'archive MediCat (cela prendra du temps)...",
       "extracting_powershell": "Extraction de l'archive avec PowerShell (cela peut prendre du temps)...",
       "extracting_progress": "Extraction... {0}% ({1} MB extraits)",
+      "extracting_file": "{0}% — {1}",
       "extraction_complete": "Extraction terminée",
       "extraction_success": "Extraction terminée avec succès",
       "copying_files": "Copie des fichiers d'installation...",
@@ -340,7 +347,7 @@
       "bin_download_complete": "Tous les fichiers bin téléchargés avec succès",
       "bin_download_errors": "Téléchargement des fichiers bin terminé avec des erreurs",
       "bin_download_failed": "Téléchargement des fichiers bin échoué",
-      "installing_module": "Installation du module 7Zip4PowerShell (requis pour l'extraction)..."
+      "installing_module": "Chargement des bibliothèques d'extraction depuis lib/..."
     },
     "messages": {
       "no_internet": "Aucune connexion Internet détectée. Veuillez vérifier votre connexion et réessayer.",
@@ -349,9 +356,9 @@
       "ventoy_install_failed": "L'installation de Ventoy a échoué. Veuillez consulter le journal pour plus de détails.",
       "ventoy_upgrade_failed": "La mise à jour de Ventoy a échoué. Veuillez consulter le journal pour plus de détails.",
       "extraction_failed": "Échec de l'extraction de l'archive MediCat.\n\nErreur: {0}\n\nConsultez le journal pour plus de détails.",
-      "module_required": "Le module 7Zip4PowerShell est requis pour l'extraction.\n\nVeuillez l'installer:\nInstall-Module 7Zip4PowerShell\n\nAprès l'installation, exécutez à nouveau cet installateur.",
-      "module_install_failed": "Échec de l'installation du module 7Zip4PowerShell.\n\nErreur: {0}\n\nVeuillez essayer d'installer manuellement:\nInstall-Module 7Zip4PowerShell -Scope CurrentUser",
-      "module_install_failed_admin": "Échec de l'installation du module 7Zip4PowerShell. Des privilèges d'administrateur peuvent être requis.\n\nErreur: {0}\n\nVeuillez essayer d'exécuter PowerShell en tant qu'administrateur et installer manuellement:\nInstall-Module 7Zip4PowerShell -Scope CurrentUser",
+      "module_required": "Les bibliothèques d'extraction sont absentes du dossier lib/.\n\nAssurez-vous que lib/ contient SevenZipSharp.dll et 7z64.dll (ou 7z.dll en 32 bits).\n\nRetéléchargez l'installateur ou restaurez lib/ depuis le dépôt.",
+      "module_install_failed": "Échec du chargement des bibliothèques d'extraction.\n\nErreur: {0}\n\nAssurez-vous que le dossier lib/ est complet. Voir lib/NOTICE.txt.",
+      "module_install_failed_admin": "Échec du chargement des bibliothèques d'extraction.\n\nErreur: {0}\n\nAssurez-vous que le dossier lib/ est complet et accessible.",
       "installation_complete": "MediCat a été installé avec succès sur {0}",
       "installation_error": "Une erreur s'est produite lors de l'installation: {0}",
       "verification_complete": "Vérification des fichiers terminée avec succès. Tous les {0} fichiers sont intacts.",
@@ -363,7 +370,7 @@
       "re_extraction_error": "Une erreur s'est produite lors de la ré-extraction: {0}",
       "bin_download_incomplete": "{0} fichiers bin téléchargés sur {1}. Certains fichiers ont peut-être échoué. Consultez le journal pour plus de détails.",
       "bin_download_error": "Une erreur s'est produite lors du téléchargement des fichiers bin: {0}",
-      "7zip_not_found": "7z.exe introuvable dans le PATH système ou le dossier bin.\n\nVeuillez vous assurer que 7-Zip est installé ou que les fichiers d'installation sont téléchargés.",
+      "7zip_not_found": "Les bibliothèques d'extraction n'ont pas pu être utilisées.\n\nAssurez-vous que lib/ contient SevenZipSharp.dll et 7z64.dll, ou que 7za.exe est présent.",
       "archive_not_found": "Archive source introuvable: {0}\nVeuillez vous assurer que l'archive existe.",
       "selection_cancelled": "La sélection du fichier d'archive a été annulée. La ré-extraction ne peut pas continuer.",
       "no_drive_for_check": "Veuillez d'abord sélectionner un lecteur USB."
@@ -383,8 +390,8 @@
       "ventoy_install_failed": "Échec de l'Installation Ventoy",
       "ventoy_upgrade_failed": "Échec de la Mise à Jour Ventoy",
       "extraction_failed": "Échec de l'Extraction",
-      "module_required": "Module 7Zip4PowerShell Requis",
-      "module_install_failed": "Échec de l'Installation du Module",
+      "module_required": "Bibliothèques d'Extraction Manquantes",
+      "module_install_failed": "Échec du Chargement des Bibliothèques",
       "installation_complete": "Installation Terminée",
       "installation_error": "Erreur d'Installation",
       "verification_complete": "Vérification Terminée",
@@ -439,7 +446,7 @@
       "ventoy_install_failed": "Installation Ventoy échouée avec le code de sortie: {0}",
       "format_failed": "Impossible de formater le lecteur: {0}",
       "extraction_exception": "Exception pendant l'extraction: {0}",
-      "module_check_failed": "Vérification du module 7Zip4PowerShell échouée: {0}",
+      "module_check_failed": "Échec de la vérification des bibliothèques d'extraction: {0}",
       "internet_check_failed": "Erreur lors de la vérification de la connexion Internet: {0}"
     }
   },
@@ -451,6 +458,7 @@
       "drive_label": "Wybierz dysk USB:",
       "show_hard_drives": "Pokaż dyski twarde",
       "format_checkbox": "Sformatuj dysk przed instalacją",
+      "skip_ventoy_checkbox": "Pomiń instalację/aktualizację Ventoy",
       "install_button": "Zainstaluj MediCat",
       "cancel_button": "Anuluj",
       "check_files_button": "Zweryfikuj pliki USB",
@@ -462,6 +470,7 @@
     },
     "status": {
       "status_ready": "Gotowy do instalacji MediCat",
+      "loading_drives": "Ładowanie dysków...",
       "downloading_files": "Pobieranie plikow instalatora...",
       "downloading_7zip": "Pobieranie plikow 7-Zip...",
       "downloading_translations": "Pobieranie plikow tlumaczen...",
@@ -475,6 +484,7 @@
       "extracting_archive": "Rozpakowywanie archiwum MediCat (może to chwilę potrwać)...",
       "extracting_powershell": "Rozpakowywanie archiwum za pomocą programu PowerShell (może to chwilę potrwać)...",
       "extracting_progress": "Rozpakowywanie... {0}% ({1} MB wypakowano)",
+      "extracting_file": "{0}% — {1}",
       "extraction_complete": "Rozpakowywanie zakończone",
       "extraction_success": "Rozpakowywanie zakończone pomyślnie",
       "copying_files": "Kopiowanie plików instalatora...",
@@ -488,7 +498,7 @@
       "bin_download_complete": "Wszystkie pliki bin zostały pomyślnie pobrane",
       "bin_download_errors": "Pobieranie plików bin zakończyło się z problemami",
       "bin_download_failed": "Pobieranie plików bin nie powiodło się",
-      "installing_module": "Instalowanie modułu 7Zip4PowerShell (wymaganego do rozpakowania)... "
+      "installing_module": "Ładowanie bibliotek rozpakowywania z lib/..."
     },
     "messages": {
       "no_internet": "Nie wykryto połączenia z Internetem. Sprawdź połączenie i spróbuj ponownie.",
@@ -497,9 +507,9 @@
       "ventoy_install_failed": "Instalacja Ventoy nie powiodła się. Sprawdź dziennik, aby uzyskać szczegółowe informacje.",
       "ventoy_upgrade_failed": "Aktualizacja Ventoy nie powiodła się. Sprawdź dziennik, aby uzyskać szczegółowe informacje.",
       "extraction_failed": "Nie udało się rozpakować archiwum MediCat.\n\nBłąd: {0}\n\nSzczegółowe informacje można znaleźć w dzienniku",
-      "module_required": "Do rozpakowania wymagany jest moduł 7Zip4PowerShell.\n\nZainstaluj go:\nInstall-Module 7Zip4PowerShell\n\nPo instalacji uruchom ponownie ten instalator.",
-      "module_install_failed": "Nie udało się zainstalować modułu 7Zip4PowerShell.\n\nBłąd: {0}\n\nSpróbuj zainstalować ręcznie:\nInstall-Module 7Zip4PowerShell -Scope CurrentUser",
-      "module_install_failed_admin": "Nie udało się zainstalować modułu 7Zip4PowerShell. Może być wymagane uprawnienie administratora.\n\nBłąd: {0}\n\nSpróbuj uruchomić program PowerShell jako administrator i zainstalować ręcznie:\nInstall-Module 7Zip4PowerShell -Scope CurrentUser",
+      "module_required": "Brakuje bibliotek rozpakowywania w folderze lib/.\n\nUpewnij się, że lib/ zawiera SevenZipSharp.dll i 7z64.dll (lub 7z.dll w 32-bit).\n\nPobierz instalator ponownie lub przywróć folder lib/ z repozytorium.",
+      "module_install_failed": "Nie udało się załadować bibliotek rozpakowywania.\n\nBłąd: {0}\n\nUpewnij się, że folder lib/ jest kompletny. Zobacz lib/NOTICE.txt.",
+      "module_install_failed_admin": "Nie udało się załadować bibliotek rozpakowywania.\n\nBłąd: {0}\n\nUpewnij się, że folder lib/ jest kompletny i dostępny.",
       "installation_complete": "Program MediCat został pomyślnie zainstalowany w lokalizacji {0}",
       "installation_error": "Wystąpił błąd podczas instalacji: {0}",
       "verification_complete": "Weryfikacja plików zakończona pomyślnie. Wszystkie {0} pliki są nienaruszone.",
@@ -511,7 +521,7 @@
       "re_extraction_error": "Wystąpił błąd podczas ponownego rozpakowywania: {0}",
       "bin_download_incomplete": "Pobrano {0} z {1} plików bin. Niektóre pliki mogły nie zostać pobrane. Szczegółowe informacje można znaleźć w dzienniku.",
       "bin_download_error": "Wystąpił błąd podczas pobierania plików bin: {0}",
-      "7zip_not_found": "Nie znaleziono pliku 7z.exe w ścieżce PATH systemu lub folderze bin.\n\nUpewnij się, że program 7-Zip jest zainstalowany lub że pliki instalatora zostały pobrane.",
+      "7zip_not_found": "Nie można było użyć bibliotek ekstrakcji.\n\nUpewnij się, że lib/ zawiera SevenZipSharp.dll i 7z64.dll, lub że 7za.exe jest obecny.",
       "archive_not_found": "Nie znaleziono archiwum źródłowego: {0}\nUpewnij się, że archiwum istnieje.",
       "selection_cancelled": "Wybór pliku archiwum został anulowany. Nie można kontynuować ponownego rozpakowywania.",
       "no_drive_for_check": "Najpierw wybierz dysk USB."
@@ -531,8 +541,8 @@
       "ventoy_install_failed": "Niepowodzenie instalacji Ventoy",
       "ventoy_upgrade_failed": "Niepowodzenie aktualizacji Ventoy",
       "extraction_failed": "Niepowodzenie wypakowywania",
-      "module_required": "Wymagany moduł 7Zip4PowerShell",
-      "module_install_failed": "Instalacja modułu nie powiodła się",
+      "module_required": "Brak Bibliotek Rozpakowywania",
+      "module_install_failed": "Błąd Ładowania Bibliotek",
       "installation_complete": "Instalacja zakończona",
       "installation_error": "Błąd instalacji",
       "verification_complete": "Weryfikacja zakończona",
@@ -587,7 +597,7 @@
       "ventoy_install_failed": "Instalacja Ventoy nie powiodła się z kodem wyjścia: {0}",
       "format_failed": "Nie można sformatować dysku: {0}",
       "extraction_exception": "Wyjątek podczas rozpakowywania: {0}",
-      "module_check_failed": "Niepowodzenie sprawdzania modułu 7Zip4PowerShell: {0}",
+      "module_check_failed": "Sprawdzanie bibliotek rozpakowywania nie powiodło się: {0}",
       "internet_check_failed": "Błąd podczas sprawdzania połączenia internetowego: {0}"
     }
   }
