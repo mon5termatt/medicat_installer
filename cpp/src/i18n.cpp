@@ -15,8 +15,13 @@ std::unordered_map<std::wstring, std::wstring> g_strings;
 
 void IndexLanguage(const std::wstring& lang) {
     g_strings.clear();
-    for (const auto& entry : generated::StringsFor(lang)) {
+
+    for (const auto& entry : generated::StringsFor(L"en")) {
         g_strings.emplace(entry.key, entry.value);
+    }
+
+    for (const auto& entry : generated::StringsFor(lang)) {
+        g_strings[entry.key] = entry.value;
     }
 }
 

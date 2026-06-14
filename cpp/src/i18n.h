@@ -5,7 +5,7 @@
 
 namespace medicat::i18n {
 
-// Detect UI language from Windows (en, es, fr, or fallback en).
+// Detect UI language from Windows (en, es, fr, pl, tr, or fallback en).
 std::wstring DetectLanguage();
 
 bool Load(const std::wstring& languageCode = L"");
