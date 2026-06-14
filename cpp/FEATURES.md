@@ -63,7 +63,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Feature | Status | Notes |
 |---------|--------|-------|
 | **Refresh drives** button | ⬜ | PS: `refresh_button` |
-| **Show hard drives** checkbox | ⬜ | PS: optional fixed disks |
+| **Show all drives** checkbox | ✅ | Includes fixed disks (HDD/SSD) ≥ 30 GiB; `C:` still hidden |
 | Default select first VHD | ✅ | |
 | Drive size / free display | ✅ | `ui.drive_format` |
 | Cancel button | ⬜ | PS had cancel |

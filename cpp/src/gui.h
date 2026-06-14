@@ -51,6 +51,7 @@ public:
     bool PinVentoyVersionChecked() const;
     bool VentoySecureBootChecked() const;
     bool VentoyGptChecked() const;
+    bool ShowAllDrivesChecked() const;
     std::wstring PinnedVentoyVersion() const;
     HWND Hwnd() const { return hwnd_; }
 
@@ -78,6 +79,7 @@ private:
     HWND titleLabel_ = nullptr;
     HWND versionLabel_ = nullptr;
     HWND driveCombo_ = nullptr;
+    HWND showAllDrivesCheck_ = nullptr;
     HWND formatCheck_ = nullptr;
     HWND skipVentoyCheck_ = nullptr;
     HWND advancedCheck_ = nullptr;

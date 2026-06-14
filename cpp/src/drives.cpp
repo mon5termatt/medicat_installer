@@ -146,6 +146,8 @@ bool TryAddDrive(std::vector<DriveInfo>& drives, wchar_t letter, const std::wstr
     std::wstring typeLabel;
     if (kind == L"VHD") {
         typeLabel = i18n::Tr(L"ui.drive_type_vhd");
+    } else if (kind == L"HDD") {
+        typeLabel = i18n::Tr(L"ui.drive_type_hdd");
     } else {
         typeLabel = i18n::Tr(L"ui.drive_type_usb");
     }
@@ -228,7 +230,7 @@ bool IdentityMatches(const DriveIdentity& a, const DriveIdentity& b) {
 
 }  // namespace
 
-std::vector<DriveInfo> ListTargetDrives() {
+std::vector<DriveInfo> ListTargetDrives(const bool includeAllDrives) {
     std::vector<DriveInfo> drives;
     const std::set<wchar_t> vhdLetters = GetVhdDriveLetters();
     const DWORD mask = GetLogicalDrives();
@@ -246,12 +248,15 @@ std::vector<DriveInfo> ListTargetDrives() {
         const UINT driveType = GetDriveTypeW(root.c_str());
         const bool isVhd = vhdLetters.count(letter) > 0;
         const bool isUsb = driveType == DRIVE_REMOVABLE;
+        const bool isFixed = driveType == DRIVE_FIXED;
 
-        if (!isVhd && !isUsb) {
-            continue;
+        if (isVhd) {
+            TryAddDrive(drives, letter, L"VHD");
+        } else if (isUsb) {
+            TryAddDrive(drives, letter, L"USB");
+        } else if (includeAllDrives && isFixed) {
+            TryAddDrive(drives, letter, L"HDD");
         }
-
-        TryAddDrive(drives, letter, isVhd ? L"VHD" : L"USB");
     }
 
     return drives;

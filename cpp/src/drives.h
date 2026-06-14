@@ -26,8 +26,8 @@ struct DriveIdentity {
 // Minimum total drive capacity (30 GiB — leeway below nominal 32 GB USB sticks).
 constexpr uint64_t kMinDriveCapacityBytes = 30ULL * 1024ULL * 1024ULL * 1024ULL;
 
-// USB + mounted VHD/VHDX drives (excludes C:). Matches legacy installer behavior.
-std::vector<DriveInfo> ListTargetDrives();
+// USB + mounted VHD/VHDX drives (excludes C:). Set includeAllDrives for fixed disks too.
+std::vector<DriveInfo> ListTargetDrives(bool includeAllDrives = false);
 int DefaultDriveIndex(const std::vector<DriveInfo>& drives);
 DriveIdentity GetDriveIdentity(const std::wstring& driveLetter);
 std::wstring ResolveDriveLetterAfterVentoy(const std::wstring& expectedLetter, const DriveIdentity& before);

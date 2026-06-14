@@ -46,9 +46,16 @@ constexpr int kActionRowGap = 12;
 constexpr int kCurrentFileHeight = 20;
 constexpr int kBottomChrome = kVersionBottomMargin + kVersionLabelHeight + 8;
 
-constexpr int kAdvancedY = kContentTop + 116;
+constexpr int kDriveComboY = kContentTop + 22;
+constexpr int kShowAllDrivesY = kDriveComboY + 32;
+constexpr int kFormatY = kShowAllDrivesY + 28;
+constexpr int kSkipVentoyY = kFormatY + 30;
+constexpr int kAdvancedY = kSkipVentoyY + 30;
+constexpr int kPinVentoyY = kAdvancedY + 28;
+constexpr int kVentoyComboY = kPinVentoyY - 2;
+constexpr int kVentoySecureBootY = kPinVentoyY + 28;
+constexpr int kGptY = kVentoySecureBootY + 30;
 constexpr int kOptionsBottomCollapsed = kAdvancedY + kCheckboxHeight;
-constexpr int kGptY = kContentTop + 202;
 constexpr int kOptionsBottomExpanded = kGptY + kCheckboxHeight;
 
 constexpr int kInstallYCollapsed = kOptionsBottomCollapsed + kSectionGap;
@@ -64,6 +71,7 @@ constexpr int kWindowHeightCollapsed = kCurrentFileYCollapsed + kCurrentFileHeig
 constexpr int kWindowHeightExpanded = kCurrentFileYExpanded + kCurrentFileHeight + kBottomChrome + 16;
 
 constexpr int kDriveComboId = 1001;
+constexpr int kShowAllDrivesCheckId = 1016;
 constexpr int kFormatCheckId = 1002;
 constexpr int kSkipVentoyCheckId = 1003;
 constexpr int kInstallBtnId = 1004;
@@ -403,6 +411,7 @@ void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
     EnableWindow(installBtn_, !busy);
     EnableWindow(verifyFilesBtn_, !busy);
     EnableWindow(driveCombo_, !busy);
+    EnableWindow(showAllDrivesCheck_, !busy);
     EnableWindow(formatCheck_, !busy);
     EnableWindow(skipVentoyCheck_, !busy);
     EnableWindow(advancedCheck_, !busy);
@@ -683,6 +692,10 @@ bool Gui::VentoyGptChecked() const {
            SendMessageW(ventoyGptCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
 }
 
+bool Gui::ShowAllDrivesChecked() const {
+    return SendMessageW(showAllDrivesCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+}
+
 std::wstring Gui::PinnedVentoyVersion() const {
     if (!PinVentoyVersionChecked()) {
         return L"";
@@ -947,20 +960,26 @@ void Gui::OnCreate(HWND hwnd) {
     driveCombo_ = CreateWindowW(
         WC_COMBOBOXW, nullptr,
         CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL,
-        kMargin, kContentTop + 22, kContentWidth, 300, hwnd,
+        kMargin, kDriveComboY, kContentWidth, 300, hwnd,
         reinterpret_cast<HMENU>(kDriveComboId), instance_, nullptr);
+
+    showAllDrivesCheck_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.show_all_drives").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+        kMargin, kShowAllDrivesY, kContentWidth, kCheckboxHeight, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kShowAllDrivesCheckId)), instance_, nullptr);
 
     formatCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.format_checkbox").c_str(),
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-        kMargin, kContentTop + 56, kContentWidth, 24, hwnd,
+        kMargin, kFormatY, kContentWidth, kCheckboxHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFormatCheckId)), instance_, nullptr);
     SendMessageW(formatCheck_, BM_SETCHECK, BST_CHECKED, 0);
 
     skipVentoyCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.skip_ventoy_checkbox").c_str(),
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-        kMargin, kContentTop + 86, kContentWidth, 24, hwnd,
+        kMargin, kSkipVentoyY, kContentWidth, kCheckboxHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSkipVentoyCheckId)), instance_, nullptr);
 
     advancedCheck_ = CreateWindowW(
@@ -972,19 +991,19 @@ void Gui::OnCreate(HWND hwnd) {
     pinVentoyCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.pin_ventoy_version").c_str(),
         WS_CHILD | BS_AUTOCHECKBOX,
-        kMargin + 20, kContentTop + 144, 220, 24, hwnd,
+        kMargin + 20, kPinVentoyY, 220, kCheckboxHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kPinVentoyCheckId)), instance_, nullptr);
 
     ventoyVersionCombo_ = CreateWindowW(
         WC_COMBOBOXW, nullptr,
         CBS_DROPDOWNLIST | WS_CHILD | WS_VSCROLL,
-        270, kContentTop + 142, 270, 300, hwnd,
+        270, kVentoyComboY, 270, 300, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVentoyVersionEditId)), instance_, nullptr);
 
     ventoySecureBootCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.ventoy_secure_boot").c_str(),
         WS_CHILD | BS_AUTOCHECKBOX,
-        kMargin + 20, kContentTop + 172, kContentWidth - 20, 24, hwnd,
+        kMargin + 20, kVentoySecureBootY, kContentWidth - 20, kCheckboxHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVentoySecureBootCheckId)), instance_, nullptr);
     SendMessageW(ventoySecureBootCheck_, BM_SETCHECK, BST_CHECKED, 0);
 
@@ -1030,9 +1049,9 @@ void Gui::OnCreate(HWND hwnd) {
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCurrentFileLabelId)), instance_, nullptr);
 
     for (HWND child :
-         {logoStatic_, titleLabel_, versionLabel_, driveCombo_, formatCheck_, skipVentoyCheck_, advancedCheck_,
-          pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_, verifyFilesBtn_,
-          openLogBtn_, progressBar_, currentFileLabel_}) {
+         {logoStatic_, titleLabel_, versionLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_, skipVentoyCheck_,
+          advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_,
+          verifyFilesBtn_, openLogBtn_, progressBar_, currentFileLabel_}) {
         SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
     }
     SendMessageW(titleLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(titleFont), TRUE);
@@ -1045,8 +1064,8 @@ void Gui::OnCreate(HWND hwnd) {
     SubclassGlowButton(verifyFilesBtn_, false);
     SubclassGlowButton(openLogBtn_, false);
 
-    for (const HWND checkbox :
-         {formatCheck_, skipVentoyCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_}) {
+    for (const HWND checkbox : {formatCheck_, skipVentoyCheck_, showAllDrivesCheck_, advancedCheck_, pinVentoyCheck_,
+                                ventoySecureBootCheck_, ventoyGptCheck_}) {
         SubclassFlatCheckbox(checkbox);
         InvalidateRect(checkbox, nullptr, TRUE);
     }
@@ -1058,6 +1077,10 @@ void Gui::OnCreate(HWND hwnd) {
 
 void Gui::OnCommand(WPARAM wp) {
     const int id = LOWORD(wp);
+    if (id == kShowAllDrivesCheckId) {
+        RefreshDrives();
+        return;
+    }
     if (id == kAdvancedCheckId || id == kPinVentoyCheckId) {
         UpdateAdvancedControls();
         return;
@@ -1076,14 +1099,36 @@ void Gui::OnCommand(WPARAM wp) {
 }
 
 void Gui::RefreshDrives() {
+    std::wstring previous;
+    const int previousIdx = static_cast<int>(SendMessageW(driveCombo_, CB_GETCURSEL, 0, 0));
+    if (previousIdx >= 0) {
+        const auto* letter =
+            reinterpret_cast<std::wstring*>(SendMessageW(driveCombo_, CB_GETITEMDATA, previousIdx, 0));
+        if (letter) {
+            previous = *letter;
+        }
+    }
+
+    const int count = static_cast<int>(SendMessageW(driveCombo_, CB_GETCOUNT, 0, 0));
+    for (int i = 0; i < count; ++i) {
+        const auto* letter = reinterpret_cast<std::wstring*>(SendMessageW(driveCombo_, CB_GETITEMDATA, i, 0));
+        delete letter;
+    }
+
     SendMessageW(driveCombo_, CB_RESETCONTENT, 0, 0);
-    const auto drives = ListTargetDrives();
-    for (const auto& d : drives) {
+    const auto drives = ListTargetDrives(ShowAllDrivesChecked());
+    int restoreIdx = -1;
+    for (size_t i = 0; i < drives.size(); ++i) {
+        const auto& d = drives[i];
         SendMessageW(driveCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(d.display.c_str()));
         const int idx = static_cast<int>(SendMessageW(driveCombo_, CB_GETCOUNT, 0, 0)) - 1;
         SendMessageW(driveCombo_, CB_SETITEMDATA, idx, reinterpret_cast<LPARAM>(new std::wstring(d.letter)));
+        if (!previous.empty() && d.letter == previous) {
+            restoreIdx = idx;
+        }
     }
-    const int def = DefaultDriveIndex(drives);
+
+    const int def = restoreIdx >= 0 ? restoreIdx : DefaultDriveIndex(drives);
     if (def >= 0) {
         SendMessageW(driveCombo_, CB_SETCURSEL, def, 0);
     }
