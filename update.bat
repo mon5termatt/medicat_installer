@@ -19,7 +19,7 @@ DEL "Medicat Installer.bat" 2>nul
 DEL "MediCat_Installer.bat" 2>nul
 cls
 echo.Updating Medicat Installer. Please wait while the new file is downloaded.
-powershell -c "$data = curl https://api.github.com/repos/mon5termatt/medicat_installer/git/refs/tag -UseBasicParsing | ConvertFrom-Json; $data[-1].ref -replace 'refs/tags/', '' | Out-File -Encoding 'UTF8' -FilePath './ver.ini'"
+powershell -c "$data = curl https://api.github.com/repos/mon5termatt/medicat_installer/releases/latest -UseBasicParsing | ConvertFrom-Json; $data.tag_name | Out-File -Encoding 'UTF8' -FilePath './ver.ini'"
 set /p ver= < ver.ini
 set ver=%ver:~-4%
 del ver.ini /Q
