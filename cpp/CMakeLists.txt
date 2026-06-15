@@ -71,22 +71,16 @@ add_custom_command(
     WORKING_DIRECTORY "${REPO_ROOT}"
 )
 
+# This function makes it so when a new code file is added, the project
+#   is reconfigured automatically (iirc)
+set_property(
+  DIRECTORY APPEND
+  PROPERTY CMAKE_CONFIGURE_DEPENDS
+  "src/*.cpp"
+)
+file(GLOB_RECURSE SOURCE_FILES "src/*.cpp" "src/*.hpp")
 add_executable(MedicatInstaller WIN32
-    src/main.cpp
-    src/app.cpp
-    src/gui.cpp
-    src/drives.cpp
-    src/extract.cpp
-    src/ventoy.cpp
-    src/download.cpp
-    src/util.cpp
-    src/log.cpp
-    src/bundle.cpp
-    src/i18n.cpp
-    src/theme.cpp
-    src/verify.cpp
-    src/offline.cpp
-    src/debug.cpp
+    ${SOURCE_FILES}
     "${CMAKE_BINARY_DIR}/bundle.rc"
     "${CMAKE_BINARY_DIR}/ventoy_versions.txt"
     "${I18N_GEN}"
