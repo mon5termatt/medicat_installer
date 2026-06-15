@@ -78,7 +78,8 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 |---------|--------|-------|
 | `translations.json` shared format | ✅ | `i18n/translations.json` |
 | Build-time codegen | ✅ | `tools/i18n_codegen.py` |
-| Auto-detect OS language | ✅ | `en` / `es` / `fr` / `de` |
+| Auto-detect OS language | ✅ | `en` / `es` / `fr` / `pl` / `tr` |
+| In-app language selector | ✅ | Header combo; live UI refresh |
 | All UI strings via i18n | 🟡 | Main window + Ventoy flow wired |
 | Language override setting | ⬜ | Future: CLI flag or ini |
 

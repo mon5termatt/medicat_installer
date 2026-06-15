@@ -79,10 +79,10 @@ PostDone(success, message, title);                 // WM_MEDICAT_DONE
 
 ## i18n
 
-- Source: `i18n/translations.json` (EN, ES, FR, PL)
+- Source: `i18n/translations.json` (EN, ES, FR, PL, TR)
 - Build codegen: `tools/i18n_codegen.py` → `cpp/src/i18n_generated.h`
 - Usage: `i18n::Tr(L"key")` or `i18n::Tr(L"key", arg1, arg2)`
-- Add keys to **all four languages** in `translations.json`; rebuild regenerates header
+- Add keys to **all five languages** in `translations.json`; rebuild regenerates header
 
 ## Build
 

@@ -51,3 +51,7 @@ desktop.ini
 # Cursor rules
 .cursorrules
 .cursor/
+
+# IDE / local build artifacts
+.vs/
+cpp/build-ninja/

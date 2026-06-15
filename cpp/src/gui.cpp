@@ -23,13 +23,13 @@ namespace {
 #define INSTALLER_VERSION "dev"
 #endif
 
-constexpr int kHeaderHeight = 88;
-constexpr int kHeaderLogoY = 8;
-constexpr int kHeaderTitleY = 60;
+constexpr int kHeaderHeight = 84;
+constexpr int kHeaderLogoY = 10;
+constexpr int kHeaderTitleY = 18;
 constexpr int kLogoMaxSize = 48;
 constexpr int kVersionLabelHeight = 18;
 constexpr int kVersionBottomMargin = 10;
-constexpr int kContentTop = 96;
+constexpr int kContentTop = 94;
 constexpr int kMargin = 20;
 constexpr int kContentWidth = 520;
 constexpr int kWindowWidth = 560;
@@ -71,6 +71,7 @@ constexpr int kWindowHeightCollapsed = kCurrentFileYCollapsed + kCurrentFileHeig
 constexpr int kWindowHeightExpanded = kCurrentFileYExpanded + kCurrentFileHeight + kBottomChrome + 16;
 
 constexpr int kDriveComboId = 1001;
+constexpr int kLanguageComboId = 1018;
 constexpr int kShowAllDrivesCheckId = 1016;
 constexpr int kFormatCheckId = 1002;
 constexpr int kSkipVentoyCheckId = 1003;
@@ -89,6 +90,35 @@ constexpr int kVerifyFilesBtnId = 1015;
 constexpr UINT_PTR kUiRefreshTimerId = 1;
 constexpr UINT kUiRefreshIntervalMs = 250;
 constexpr wchar_t kFileLogWindowClass[] = L"MedicatFileLogWindow";
+
+struct LanguageOption {
+    const wchar_t* code;
+    const wchar_t* nativeName;
+};
+
+constexpr LanguageOption kLanguageOptions[] = {
+    {L"en", L"English"},
+    {L"es", L"Español"},
+    {L"fr", L"Français"},
+    {L"pl", L"Polski"},
+    {L"tr", L"Türkçe"},
+};
+
+int LanguageIndexForCode(const std::wstring& code) {
+    for (size_t i = 0; i < std::size(kLanguageOptions); ++i) {
+        if (code == kLanguageOptions[i].code) {
+            return static_cast<int>(i);
+        }
+    }
+    return 0;
+}
+
+const wchar_t* LanguageCodeForIndex(const int index) {
+    if (index < 0 || index >= static_cast<int>(std::size(kLanguageOptions))) {
+        return kLanguageOptions[0].code;
+    }
+    return kLanguageOptions[index].code;
+}
 
 struct GlowButtonState {
     WNDPROC original = nullptr;
@@ -411,6 +441,7 @@ void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
     EnableWindow(installBtn_, !busy);
     EnableWindow(verifyFilesBtn_, !busy);
     EnableWindow(driveCombo_, !busy);
+    EnableWindow(languageCombo_, !busy);
     EnableWindow(showAllDrivesCheck_, !busy);
     EnableWindow(formatCheck_, !busy);
     EnableWindow(skipVentoyCheck_, !busy);
@@ -850,6 +881,14 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_SIZE:
             self->LayoutVersionLabel();
             return 0;
+        case WM_PAINT: {
+            PAINTSTRUCT ps{};
+            const HDC hdc = BeginPaint(hwnd, &ps);
+            RECT logoRect{12, 10, 12 + kLogoMaxSize, 10 + kLogoMaxSize};
+            theme::PaintLogo(hdc, self->instance_, logoRect, kLogoMaxSize);
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
         case WM_ERASEBKGND: {
             HDC hdc = reinterpret_cast<HDC>(wp);
             RECT rc{};
@@ -927,26 +966,32 @@ void Gui::OnCreate(HWND hwnd) {
     const HFONT subtitleFont = theme::MakeSubtitleFont();
 
     logoBitmap_ = theme::LoadLogoBitmap(instance_, kLogoMaxSize);
-    int logoWidth = kLogoMaxSize;
-    int logoHeight = kLogoMaxSize;
-    if (logoBitmap_) {
-        BITMAP bm{};
-        GetObjectW(logoBitmap_, sizeof(bm), &bm);
-        logoWidth = bm.bmWidth;
-        logoHeight = bm.bmHeight;
+    if (!logoBitmap_) {
+        logoStatic_ = CreateWindowW(
+            L"STATIC", nullptr, WS_CHILD | WS_VISIBLE | SS_ICON | SS_LEFT,
+            12, kHeaderLogoY, kLogoMaxSize, kLogoMaxSize, hwnd, nullptr, instance_, nullptr);
+        const HICON fallbackIcon = LoadIconW(instance_, MAKEINTRESOURCEW(IDI_APP_ICON));
+        if (fallbackIcon) {
+            SendMessageW(logoStatic_, STM_SETICON, 0, reinterpret_cast<LPARAM>(fallbackIcon));
+        }
     }
-    const int logoX = (kWindowWidth - logoWidth) / 2;
-    logoStatic_ = CreateWindowW(
-        L"STATIC", nullptr, WS_CHILD | WS_VISIBLE | SS_BITMAP | SS_CENTERIMAGE,
-        logoX, kHeaderLogoY, logoWidth, logoHeight, hwnd, nullptr, instance_, nullptr);
-    if (logoBitmap_) {
-        SendMessageW(logoStatic_, STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(logoBitmap_));
+
+    languageCombo_ = CreateWindowW(
+        WC_COMBOBOXW, nullptr,
+        CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL,
+        388, 20, 160, 120, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kLanguageComboId)), instance_, nullptr);
+    SendMessageW(languageCombo_, CB_SETDROPPEDWIDTH, 220, 0);
+    SendMessageW(languageCombo_, CB_SETMINVISIBLE, 5, 0);
+    for (const LanguageOption& option : kLanguageOptions) {
+        SendMessageW(languageCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(option.nativeName));
     }
+    SendMessageW(languageCombo_, CB_SETCURSEL, LanguageIndexForCode(i18n::DetectLanguage()), 0);
 
     titleLabel_ = CreateWindowW(
         L"STATIC", i18n::Tr(L"ui.title_label").c_str(),
-        WS_CHILD | WS_VISIBLE | SS_CENTER,
-        kMargin, kHeaderTitleY, kContentWidth, 26, hwnd, nullptr, instance_, nullptr);
+        WS_CHILD | WS_VISIBLE | SS_LEFT | SS_LEFTNOWORDWRAP,
+        72, kHeaderTitleY, 250, 28, hwnd, nullptr, instance_, nullptr);
 
     wchar_t versionText[32]{};
     swprintf_s(versionText, L"v%hs", INSTALLER_VERSION);
@@ -955,43 +1000,45 @@ void Gui::OnCreate(HWND hwnd) {
         WS_CHILD | WS_VISIBLE | SS_RIGHT,
         kMargin, 0, kContentWidth, kVersionLabelHeight, hwnd, nullptr, instance_, nullptr);
 
-    CreateWindowW(L"STATIC", i18n::Tr(L"ui.drive_label").c_str(), WS_CHILD | WS_VISIBLE, kMargin, kContentTop,
-                  kContentWidth, 20, hwnd, nullptr, instance_, nullptr);
+    driveLabel_ = CreateWindowW(
+        L"STATIC", i18n::Tr(L"ui.drive_label").c_str(),
+        WS_CHILD | WS_VISIBLE | SS_LEFT | SS_LEFTNOWORDWRAP,
+        kMargin, kContentTop, kContentWidth, 24, hwnd, nullptr, instance_, nullptr);
     driveCombo_ = CreateWindowW(
         WC_COMBOBOXW, nullptr,
         CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL,
         kMargin, kDriveComboY, kContentWidth, 300, hwnd,
-        reinterpret_cast<HMENU>(kDriveComboId), instance_, nullptr);
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kDriveComboId)), instance_, nullptr);
 
     showAllDrivesCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.show_all_drives").c_str(),
-        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-        kMargin, kShowAllDrivesY, kContentWidth, kCheckboxHeight, hwnd,
+        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | BS_MULTILINE,
+        kMargin, kShowAllDrivesY, kContentWidth, kCheckboxHeight + 8, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kShowAllDrivesCheckId)), instance_, nullptr);
 
     formatCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.format_checkbox").c_str(),
-        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-        kMargin, kFormatY, kContentWidth, kCheckboxHeight, hwnd,
+        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | BS_MULTILINE,
+        kMargin, kFormatY, kContentWidth, kCheckboxHeight + 8, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFormatCheckId)), instance_, nullptr);
     SendMessageW(formatCheck_, BM_SETCHECK, BST_CHECKED, 0);
 
     skipVentoyCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.skip_ventoy_checkbox").c_str(),
-        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-        kMargin, kSkipVentoyY, kContentWidth, kCheckboxHeight, hwnd,
+        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | BS_MULTILINE,
+        kMargin, kSkipVentoyY, kContentWidth, kCheckboxHeight + 8, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSkipVentoyCheckId)), instance_, nullptr);
 
     advancedCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.advanced_options").c_str(),
-        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-        kMargin, kAdvancedY, 180, kCheckboxHeight, hwnd,
+        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | BS_MULTILINE,
+        kMargin, kAdvancedY, 260, kCheckboxHeight + 8, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kAdvancedCheckId)), instance_, nullptr);
 
     pinVentoyCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.pin_ventoy_version").c_str(),
-        WS_CHILD | BS_AUTOCHECKBOX,
-        kMargin + 20, kPinVentoyY, 220, kCheckboxHeight, hwnd,
+        WS_CHILD | BS_AUTOCHECKBOX | BS_MULTILINE,
+        kMargin + 20, kPinVentoyY, 260, kCheckboxHeight + 8, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kPinVentoyCheckId)), instance_, nullptr);
 
     ventoyVersionCombo_ = CreateWindowW(
@@ -1002,15 +1049,15 @@ void Gui::OnCreate(HWND hwnd) {
 
     ventoySecureBootCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.ventoy_secure_boot").c_str(),
-        WS_CHILD | BS_AUTOCHECKBOX,
-        kMargin + 20, kVentoySecureBootY, kContentWidth - 20, kCheckboxHeight, hwnd,
+        WS_CHILD | BS_AUTOCHECKBOX | BS_MULTILINE,
+        kMargin + 20, kVentoySecureBootY, kContentWidth - 20, kCheckboxHeight + 8, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVentoySecureBootCheckId)), instance_, nullptr);
     SendMessageW(ventoySecureBootCheck_, BM_SETCHECK, BST_CHECKED, 0);
 
     ventoyGptCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.ventoy_gpt_partition").c_str(),
-        WS_CHILD | BS_AUTOCHECKBOX,
-        kMargin + 20, kGptY, kContentWidth - 20, kCheckboxHeight, hwnd,
+        WS_CHILD | BS_AUTOCHECKBOX | BS_MULTILINE,
+        kMargin + 20, kGptY, kContentWidth - 20, kCheckboxHeight + 8, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVentoyGptCheckId)), instance_, nullptr);
 
     installBtn_ = CreateWindowW(
@@ -1049,10 +1096,12 @@ void Gui::OnCreate(HWND hwnd) {
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCurrentFileLabelId)), instance_, nullptr);
 
     for (HWND child :
-         {logoStatic_, titleLabel_, versionLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_, skipVentoyCheck_,
-          advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_,
-          verifyFilesBtn_, openLogBtn_, progressBar_, currentFileLabel_}) {
-        SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+         {languageCombo_, titleLabel_, versionLabel_, driveLabel_, driveCombo_, showAllDrivesCheck_,
+          formatCheck_, skipVentoyCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_,
+          ventoyVersionCombo_, installBtn_, verifyFilesBtn_, openLogBtn_, progressBar_, currentFileLabel_}) {
+        if (child && IsWindow(child)) {
+            SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+        }
     }
     SendMessageW(titleLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(titleFont), TRUE);
     SendMessageW(versionLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(subtitleFont), TRUE);
@@ -1073,10 +1122,16 @@ void Gui::OnCreate(HWND hwnd) {
     UpdateAdvancedControls();
     LayoutVersionLabel();
     RefreshDrives();
+    RefreshTranslatedUi();
 }
 
 void Gui::OnCommand(WPARAM wp) {
     const int id = LOWORD(wp);
+    if (id == kLanguageComboId && HIWORD(wp) == CBN_SELCHANGE) {
+        const int selected = static_cast<int>(SendMessageW(languageCombo_, CB_GETCURSEL, 0, 0));
+        ApplyLanguageSelection(LanguageCodeForIndex(selected));
+        return;
+    }
     if (id == kShowAllDrivesCheckId) {
         RefreshDrives();
         return;
@@ -1095,6 +1150,80 @@ void Gui::OnCommand(WPARAM wp) {
     }
     if (id == kOpenLogBtnId) {
         OpenFileLogWindow();
+    }
+}
+
+void Gui::ApplyLanguageSelection(const std::wstring& languageCode) {
+    const int selected = LanguageIndexForCode(languageCode);
+    i18n::Load(languageCode);
+    if (languageCombo_ && IsWindow(languageCombo_)) {
+        SendMessageW(languageCombo_, CB_SETCURSEL, selected, 0);
+    }
+    RefreshTranslatedUi();
+}
+
+void Gui::RefreshTranslatedUi() {
+    const auto refreshControl = [](HWND child) {
+        if (child && IsWindow(child)) {
+            RedrawWindow(child, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ERASE);
+        }
+    };
+
+    if (titleLabel_ && IsWindow(titleLabel_)) {
+        SetWindowTextW(titleLabel_, i18n::Tr(L"ui.title_label").c_str());
+    }
+    if (driveLabel_ && IsWindow(driveLabel_)) {
+        SetWindowTextW(driveLabel_, i18n::Tr(L"ui.drive_label").c_str());
+    }
+    if (driveCombo_ && IsWindow(driveCombo_)) {
+        RefreshDrives();
+    }
+    if (showAllDrivesCheck_ && IsWindow(showAllDrivesCheck_)) {
+        SetWindowTextW(showAllDrivesCheck_, i18n::Tr(L"ui.show_all_drives").c_str());
+    }
+    if (formatCheck_ && IsWindow(formatCheck_)) {
+        SetWindowTextW(formatCheck_, i18n::Tr(L"ui.format_checkbox").c_str());
+    }
+    if (skipVentoyCheck_ && IsWindow(skipVentoyCheck_)) {
+        SetWindowTextW(skipVentoyCheck_, i18n::Tr(L"ui.skip_ventoy_checkbox").c_str());
+    }
+    if (advancedCheck_ && IsWindow(advancedCheck_)) {
+        SetWindowTextW(advancedCheck_, i18n::Tr(L"ui.advanced_options").c_str());
+    }
+    if (pinVentoyCheck_ && IsWindow(pinVentoyCheck_)) {
+        SetWindowTextW(pinVentoyCheck_, i18n::Tr(L"ui.pin_ventoy_version").c_str());
+    }
+    if (ventoySecureBootCheck_ && IsWindow(ventoySecureBootCheck_)) {
+        SetWindowTextW(ventoySecureBootCheck_, i18n::Tr(L"ui.ventoy_secure_boot").c_str());
+    }
+    if (ventoyGptCheck_ && IsWindow(ventoyGptCheck_)) {
+        SetWindowTextW(ventoyGptCheck_, i18n::Tr(L"ui.ventoy_gpt_partition").c_str());
+    }
+    if (installBtn_ && IsWindow(installBtn_)) {
+        SetWindowTextW(installBtn_, i18n::Tr(L"ui.install_button").c_str());
+    }
+    if (verifyFilesBtn_ && IsWindow(verifyFilesBtn_)) {
+        SetWindowTextW(verifyFilesBtn_, i18n::Tr(L"ui.check_files_button").c_str());
+    }
+    if (openLogBtn_ && IsWindow(openLogBtn_)) {
+        SetWindowTextW(openLogBtn_, i18n::Tr(L"ui.open_file_log_button").c_str());
+    }
+    if (fileLogWindow_ && IsWindow(fileLogWindow_)) {
+        SetWindowTextW(fileLogWindow_, i18n::Tr(L"ui.file_log_title").c_str());
+    }
+    if (versionLabel_ && IsWindow(versionLabel_)) {
+        wchar_t versionText[32]{};
+        swprintf_s(versionText, L"v%hs", INSTALLER_VERSION);
+        SetWindowTextW(versionLabel_, versionText);
+    }
+
+    for (HWND child : {titleLabel_, versionLabel_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_,
+                       skipVentoyCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_,
+                       installBtn_, verifyFilesBtn_, openLogBtn_, progressBar_, currentFileLabel_, languageCombo_}) {
+        refreshControl(child);
+    }
+    if (hwnd_ && IsWindow(hwnd_)) {
+        RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ERASE);
     }
 }
 

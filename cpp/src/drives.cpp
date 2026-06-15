@@ -140,8 +140,8 @@ bool TryAddDrive(std::vector<DriveInfo>& drives, wchar_t letter, const std::wstr
     info.totalBytes = totalBytes.QuadPart;
     info.freeBytes = freeBytesAvailable.QuadPart;
 
-    const double freeGb = static_cast<double>(info.freeBytes) / (1024.0 * 1024.0 * 1024.0);
-    const double totalGb = static_cast<double>(info.totalBytes) / (1024.0 * 1024.0 * 1024.0);
+    const auto freeGb = static_cast<uint64_t>(info.freeBytes / (1024ULL * 1024ULL * 1024ULL));
+    const auto totalGb = static_cast<uint64_t>(info.totalBytes / (1024ULL * 1024ULL * 1024ULL));
 
     std::wstring typeLabel;
     if (kind == L"VHD") {

@@ -28,7 +28,7 @@ Windows GUI installer for preparing a MediCat USB: Ventoy install/upgrade, optio
 - **Format** — optional NTFS format before extract
 - **Extract** — `MediCat.USB.v21.12.7z` via bundled `7za.exe` with live file log
 - **Verify** — post-install or standalone MD5 check against embedded `MedicatFiles.md5`
-- **i18n** — English, Spanish, French, Polish (from `i18n/translations.json`)
+- **i18n** — English, Spanish, French, Polish, Turkish + in-app language selector
 
 ## Requirements
 

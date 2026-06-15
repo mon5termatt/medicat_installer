@@ -100,7 +100,18 @@ HBITMAP CreateHBitmapFromWicBitmap(IWICBitmapSource* source) {
         return nullptr;
     }
 
-    memcpy(bits, pixels.data(), bufferSize);
+    std::vector<BYTE> bgraPixels(bufferSize);
+    memcpy(bgraPixels.data(), pixels.data(), bufferSize);
+    for (size_t i = 0; i < bgraPixels.size(); i += 4) {
+        const BYTE alpha = bgraPixels[i + 3];
+        if (alpha != 0) {
+            bgraPixels[i] = static_cast<BYTE>((bgraPixels[i] * alpha + 127) / 255);
+            bgraPixels[i + 1] = static_cast<BYTE>((bgraPixels[i + 1] * alpha + 127) / 255);
+            bgraPixels[i + 2] = static_cast<BYTE>((bgraPixels[i + 2] * alpha + 127) / 255);
+        }
+    }
+
+    memcpy(bits, bgraPixels.data(), bufferSize);
     return bitmap;
 }
 
@@ -211,6 +222,7 @@ HBITMAP LoadLogoBitmap(const HINSTANCE instance, const int maxSize) {
     Gdiplus::Graphics graphics(&dst);
     graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+    graphics.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
     graphics.DrawImage(src, 0, 0, dstW, dstH);
     delete src;
 
@@ -219,6 +231,94 @@ HBITMAP LoadLogoBitmap(const HINSTANCE instance, const int maxSize) {
         return nullptr;
     }
     return bitmap;
+}
+
+bool PaintLogo(HDC hdc, const HINSTANCE instance, const RECT& bounds, const int maxSize) {
+    if (!hdc || !instance) {
+        return false;
+    }
+
+    HRSRC resource = FindResourceW(instance, MAKEINTRESOURCEW(IDR_LOGO_PNG), RT_RCDATA);
+    if (!resource) {
+        return false;
+    }
+
+    const HGLOBAL loaded = LoadResource(instance, resource);
+    if (!loaded) {
+        return false;
+    }
+
+    const void* data = LockResource(loaded);
+    const DWORD size = SizeofResource(instance, resource);
+    if (!data || size == 0) {
+        return false;
+    }
+
+    HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, size);
+    if (!mem) {
+        return false;
+    }
+
+    void* dest = GlobalLock(mem);
+    if (!dest) {
+        GlobalFree(mem);
+        return false;
+    }
+    memcpy(dest, data, size);
+    GlobalUnlock(mem);
+
+    IStream* stream = nullptr;
+    if (FAILED(CreateStreamOnHGlobal(mem, TRUE, &stream))) {
+        GlobalFree(mem);
+        return false;
+    }
+
+    auto* bitmap = Gdiplus::Bitmap::FromStream(stream);
+    stream->Release();
+    if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok) {
+        delete bitmap;
+        return false;
+    }
+
+    const INT srcW = bitmap->GetWidth();
+    const INT srcH = bitmap->GetHeight();
+    if (srcW <= 0 || srcH <= 0) {
+        delete bitmap;
+        return false;
+    }
+
+    const int limit = std::max(1, maxSize);
+    const float scale =
+        std::min(static_cast<float>(limit) / static_cast<float>(srcW),
+                 static_cast<float>(limit) / static_cast<float>(srcH));
+    const int dstW = std::max(1, static_cast<int>(static_cast<float>(srcW) * scale + 0.5f));
+    const int dstH = std::max(1, static_cast<int>(static_cast<float>(srcH) * scale + 0.5f));
+
+    Gdiplus::Bitmap scaled(dstW, dstH, PixelFormat32bppPARGB);
+    Gdiplus::Graphics scaledGraphics(&scaled);
+    scaledGraphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+    scaledGraphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+    scaledGraphics.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
+    scaledGraphics.DrawImage(bitmap, 0, 0, dstW, dstH);
+    delete bitmap;
+
+    Gdiplus::Graphics target(hdc);
+    target.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
+    target.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+    const int width = bounds.right - bounds.left;
+    const int height = bounds.bottom - bounds.top;
+    target.DrawImage(&scaled, bounds.left, bounds.top, width > 0 ? width : dstW, height > 0 ? height : dstH);
+    return true;
+}
+
+HICON LoadLogoIcon(const HINSTANCE instance, const int size) {
+    const int iconSize = std::max(1, size);
+    HICON icon = static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
+                                               iconSize, iconSize, LR_DEFAULTCOLOR | LR_SHARED));
+    if (!icon) {
+        icon = LoadIconW(instance, MAKEINTRESOURCEW(IDI_APP_ICON));
+    }
+    return icon;
 }
 
 HFONT MakeUiFont() {
