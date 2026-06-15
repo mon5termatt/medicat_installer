@@ -2,6 +2,7 @@
 
 #include "download.h"
 #include "extract.h"
+#include "offline.h"
 #include "resource.h"
 #include "util.h"
 
@@ -172,12 +173,22 @@ VentoyResult FetchLatestVentoyVersion(std::wstring& version) {
     std::wstring body;
     std::wstring error;
     if (!HttpGet(L"https://api.github.com/repos/ventoy/Ventoy/releases/latest", body, error)) {
+        if (ResolveOfflineVentoyVersion(L"", version)) {
+            result.success = true;
+            result.version = version;
+            return result;
+        }
         result.error = L"Could not fetch Ventoy version: " + error;
         return result;
     }
 
     version = NormalizeVersion(ParseLatestTagFromGitHubJson(body));
     if (version.empty()) {
+        if (ResolveOfflineVentoyVersion(L"", version)) {
+            result.success = true;
+            result.version = version;
+            return result;
+        }
         result.error = L"Could not parse latest Ventoy version from GitHub";
         return result;
     }
@@ -279,20 +290,33 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
     if (needsDownload) {
         if (!localVersion.empty() && localVersion != targetVersion) {
             LogLine(options, L"Updating Ventoy from v" + localVersion + L" to v" + targetVersion);
-        } else {
+        } else if (!OfflineVentoyZipExists(targetVersion)) {
             LogLine(options, L"Downloading Ventoy v" + targetVersion);
         }
 
-        SetStatus(options, L"downloading_ventoy:" + targetVersion);
+        const std::wstring cachedZip = GetOfflineVentoyZipPath(targetVersion);
+        const std::wstring workingZip = JoinPath(options.root, L"ventoy.zip");
+        std::wstring zipPath;
+        bool deleteWorkingZip = false;
 
-        const std::wstring zipUrl = L"https://github.com/ventoy/Ventoy/releases/download/v" + targetVersion +
-                                    L"/ventoy-" + targetVersion + L"-windows.zip";
-        const std::wstring zipPath = JoinPath(options.root, L"ventoy.zip");
+        if (OfflineVentoyZipExists(targetVersion)) {
+            LogLine(options, L"Using offline Ventoy cache for v" + targetVersion);
+            zipPath = cachedZip;
+        } else {
+            SetStatus(options, L"downloading_ventoy:" + targetVersion);
 
-        std::wstring error;
-        if (!HttpDownloadFile(zipUrl, zipPath, error)) {
-            result.error = L"Failed to download Ventoy: " + error;
-            return result;
+            const std::wstring zipUrl = L"https://github.com/ventoy/Ventoy/releases/download/v" + targetVersion +
+                                        L"/ventoy-" + targetVersion + L"-windows.zip";
+            zipPath = workingZip;
+            deleteWorkingZip = true;
+
+            std::wstring error;
+            if (!HttpDownloadFile(zipUrl, zipPath, error)) {
+                result.error = L"Failed to download Ventoy: " + error;
+                return result;
+            }
+
+            CacheVentoyZip(targetVersion, zipPath);
         }
 
         SetStatus(options, L"extracting_ventoy");
@@ -306,7 +330,9 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
                 }
             });
 
-        DeleteFileW(zipPath.c_str());
+        if (deleteWorkingZip) {
+            DeleteFileW(zipPath.c_str());
+        }
 
         if (!extract.success) {
             result.error = L"Failed to extract Ventoy: " + extract.error;

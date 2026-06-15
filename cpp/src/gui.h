@@ -69,6 +69,7 @@ private:
     std::wstring FormatLogLine(size_t index, const std::wstring& path) const;
     void UpdateAdvancedControls();
     void LayoutVersionLabel();
+    void LayoutHeader();
     void EnsureVentoyVersionsLoaded();
     void PopulateVentoyVersionCombo();
     void SetVentoyVersions(std::vector<std::wstring> versions);

@@ -85,6 +85,7 @@ add_executable(MedicatInstaller WIN32
     src/i18n.cpp
     src/theme.cpp
     src/verify.cpp
+    src/offline.cpp
     src/debug.cpp
     "${CMAKE_BINARY_DIR}/bundle.rc"
     "${CMAKE_BINARY_DIR}/ventoy_versions.txt"

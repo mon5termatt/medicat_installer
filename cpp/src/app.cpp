@@ -6,6 +6,7 @@
 #include "drives.h"
 #include "extract.h"
 #include "i18n.h"
+#include "offline.h"
 #include "util.h"
 #include "ventoy.h"
 #include "verify.h"
@@ -17,6 +18,20 @@
 namespace medicat {
 
 constexpr wchar_t kMediCatArchiveName[] = L"MediCat.USB.v21.12.7z";
+
+std::wstring ResolveMediCatArchivePath(const std::wstring& root) {
+    const std::wstring besideExe = JoinPath(root, kMediCatArchiveName);
+    if (FileExists(besideExe)) {
+        return besideExe;
+    }
+
+    const std::wstring offline = ResolveOfflineArchivePath(kMediCatArchiveName);
+    if (!offline.empty()) {
+        return offline;
+    }
+
+    return besideExe;
+}
 
 namespace {
 
@@ -141,7 +156,7 @@ std::wstring App::WriteErrorDebugLog(const std::wstring& message, const std::wst
     context.sevenZaPath = sevenZa_;
     context.sevenZPath = sevenZ_;
     context.md5ManifestPath = md5Manifest_;
-    context.archivePath = JoinPath(root_, kMediCatArchiveName);
+    context.archivePath = ResolveMediCatArchivePath(root_);
     context.formatChecked = gui_.FormatChecked();
     context.skipVentoyChecked = gui_.SkipVentoyChecked();
     context.ventoySecureBoot = gui_.VentoySecureBootChecked();
@@ -312,7 +327,7 @@ void App::OnInstall() {
         return;
     }
 
-    const std::wstring archive = JoinPath(root_, kMediCatArchiveName);
+    const std::wstring archive = ResolveMediCatArchivePath(root_);
     if (!FileExists(archive)) {
         MessageBoxW(gui_.Hwnd(),
                     i18n::Tr(L"messages.file_not_found", kMediCatArchiveName).c_str(),
@@ -411,7 +426,7 @@ bool ReconcileDriveLetter(HWND hwnd, std::wstring& drive, const DriveIdentity& i
 void App::RunInstallThread(std::wstring drive, bool format, bool skipVentoy, std::wstring pinVersion,
                             VentoyInstallOptions ventoyInstall, HWND hwnd) {
     const std::wstring root = root_;
-    const std::wstring archive = JoinPath(root, kMediCatArchiveName);
+    const std::wstring archive = ResolveMediCatArchivePath(root);
     const std::wstring sevenZip = sevenZa_;
 
     auto fail = [&](const std::wstring& msg) {
@@ -439,7 +454,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool skipVentoy, std
         }
 
         std::wstring netError;
-        if (!TestInternetConnection(netError)) {
+        if (!CanInstallVentoyOffline(root, pinVersion) && !TestInternetConnection(netError)) {
             log_->Error(L"Internet check failed: " + netError);
             fail(i18n::Tr(L"messages.no_internet"));
             return;

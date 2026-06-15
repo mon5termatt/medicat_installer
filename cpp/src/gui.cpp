@@ -2,6 +2,7 @@
 
 #include "drives.h"
 #include "i18n.h"
+#include "offline.h"
 #include "resource.h"
 #include "theme.h"
 #include "util.h"
@@ -23,16 +24,24 @@ namespace {
 #define INSTALLER_VERSION "dev"
 #endif
 
-constexpr int kHeaderHeight = 84;
-constexpr int kHeaderLogoY = 10;
-constexpr int kHeaderTitleY = 18;
-constexpr int kLogoMaxSize = 48;
-constexpr int kVersionLabelHeight = 18;
-constexpr int kVersionBottomMargin = 10;
-constexpr int kContentTop = 94;
 constexpr int kMargin = 20;
 constexpr int kContentWidth = 520;
 constexpr int kWindowWidth = 560;
+constexpr int kHeaderHeight = 84;
+constexpr int kLogoMaxSize = 48;
+constexpr int kHeaderLogoX = kMargin;
+constexpr int kHeaderLogoY = (kHeaderHeight - kLogoMaxSize) / 2;
+constexpr int kHeaderTitleX = kHeaderLogoX + kLogoMaxSize + 10;
+constexpr int kHeaderTitleY = kHeaderLogoY + 10;
+constexpr int kLanguageComboWidth = 148;
+constexpr int kLanguageComboHeight = 24;
+constexpr int kLanguageComboInset = 24;
+constexpr int kLanguageComboX = kMargin + kContentWidth - kLanguageComboWidth - kLanguageComboInset;
+constexpr int kLanguageComboY = kHeaderTitleY;
+constexpr int kHeaderTitleWidth = kLanguageComboX - kHeaderTitleX - 12;
+constexpr int kVersionLabelHeight = 18;
+constexpr int kVersionBottomMargin = 10;
+constexpr int kContentTop = kHeaderHeight + 10;
 
 constexpr int kCheckboxHeight = 24;
 constexpr int kSectionGap = 12;
@@ -745,7 +754,10 @@ void Gui::EnsureVentoyVersionsLoaded() {
     }
 
     if (!ventoyVersionsLoaded_) {
-        if (LoadBundledVentoyVersionList(instance_, ventoyVersions_)) {
+        if (LoadOfflineVentoyVersionList(ventoyVersions_)) {
+            PopulateVentoyVersionCombo();
+            ventoyVersionsLoaded_ = true;
+        } else if (LoadBundledVentoyVersionList(instance_, ventoyVersions_)) {
             PopulateVentoyVersionCombo();
             ventoyVersionsLoaded_ = true;
         }
@@ -796,6 +808,21 @@ void Gui::LayoutVersionLabel() {
     const int y = rc.bottom - kVersionBottomMargin - kVersionLabelHeight;
     SetWindowPos(versionLabel_, nullptr, kMargin, y, rc.right - 2 * kMargin, kVersionLabelHeight,
                  SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void Gui::LayoutHeader() {
+    if (logoStatic_ && IsWindow(logoStatic_)) {
+        SetWindowPos(logoStatic_, nullptr, kHeaderLogoX, kHeaderLogoY, kLogoMaxSize, kLogoMaxSize,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (titleLabel_ && IsWindow(titleLabel_)) {
+        SetWindowPos(titleLabel_, nullptr, kHeaderTitleX, kHeaderTitleY, kHeaderTitleWidth, 28,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (languageCombo_ && IsWindow(languageCombo_)) {
+        SetWindowPos(languageCombo_, nullptr, kLanguageComboX, kLanguageComboY, kLanguageComboWidth,
+                     kLanguageComboHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
 }
 
 void Gui::UpdateAdvancedControls() {
@@ -879,12 +906,14 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             }
             return 0;
         case WM_SIZE:
+            self->LayoutHeader();
             self->LayoutVersionLabel();
             return 0;
         case WM_PAINT: {
             PAINTSTRUCT ps{};
             const HDC hdc = BeginPaint(hwnd, &ps);
-            RECT logoRect{12, 10, 12 + kLogoMaxSize, 10 + kLogoMaxSize};
+            RECT logoRect{kHeaderLogoX, kHeaderLogoY, kHeaderLogoX + kLogoMaxSize,
+                          kHeaderLogoY + kLogoMaxSize};
             theme::PaintLogo(hdc, self->instance_, logoRect, kLogoMaxSize);
             EndPaint(hwnd, &ps);
             return 0;
@@ -969,7 +998,7 @@ void Gui::OnCreate(HWND hwnd) {
     if (!logoBitmap_) {
         logoStatic_ = CreateWindowW(
             L"STATIC", nullptr, WS_CHILD | WS_VISIBLE | SS_ICON | SS_LEFT,
-            12, kHeaderLogoY, kLogoMaxSize, kLogoMaxSize, hwnd, nullptr, instance_, nullptr);
+            kHeaderLogoX, kHeaderLogoY, kLogoMaxSize, kLogoMaxSize, hwnd, nullptr, instance_, nullptr);
         const HICON fallbackIcon = LoadIconW(instance_, MAKEINTRESOURCEW(IDI_APP_ICON));
         if (fallbackIcon) {
             SendMessageW(logoStatic_, STM_SETICON, 0, reinterpret_cast<LPARAM>(fallbackIcon));
@@ -979,9 +1008,9 @@ void Gui::OnCreate(HWND hwnd) {
     languageCombo_ = CreateWindowW(
         WC_COMBOBOXW, nullptr,
         CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL,
-        388, 20, 160, 120, hwnd,
+        kLanguageComboX, kLanguageComboY, kLanguageComboWidth, 120, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kLanguageComboId)), instance_, nullptr);
-    SendMessageW(languageCombo_, CB_SETDROPPEDWIDTH, 220, 0);
+    SendMessageW(languageCombo_, CB_SETDROPPEDWIDTH, kLanguageComboWidth + 24, 0);
     SendMessageW(languageCombo_, CB_SETMINVISIBLE, 5, 0);
     for (const LanguageOption& option : kLanguageOptions) {
         SendMessageW(languageCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(option.nativeName));
@@ -991,7 +1020,7 @@ void Gui::OnCreate(HWND hwnd) {
     titleLabel_ = CreateWindowW(
         L"STATIC", i18n::Tr(L"ui.title_label").c_str(),
         WS_CHILD | WS_VISIBLE | SS_LEFT | SS_LEFTNOWORDWRAP,
-        72, kHeaderTitleY, 250, 28, hwnd, nullptr, instance_, nullptr);
+        kHeaderTitleX, kHeaderTitleY, kHeaderTitleWidth, 28, hwnd, nullptr, instance_, nullptr);
 
     wchar_t versionText[32]{};
     swprintf_s(versionText, L"v%hs", INSTALLER_VERSION);
@@ -1120,6 +1149,7 @@ void Gui::OnCreate(HWND hwnd) {
     }
 
     UpdateAdvancedControls();
+    LayoutHeader();
     LayoutVersionLabel();
     RefreshDrives();
     RefreshTranslatedUi();

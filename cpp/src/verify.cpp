@@ -1,6 +1,7 @@
 #include "verify.h"
 
 #include "download.h"
+#include "offline.h"
 #include "util.h"
 
 #include <shlwapi.h>
@@ -804,6 +805,12 @@ bool TryParentDirectory(std::wstring& directory) {
 bool EnsureMedicatMd5Manifest(const std::wstring& installerRoot, const std::wstring& tempDir,
                               std::wstring& manifestPath, std::wstring& error) {
     std::vector<std::wstring> candidates;
+
+    const std::wstring offlineManifest = ResolveOfflineMd5Manifest();
+    if (!offlineManifest.empty()) {
+        candidates.push_back(offlineManifest);
+    }
+
     AppendManifestCandidates(tempDir, candidates);
 
     std::wstring walk = installerRoot;

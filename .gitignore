@@ -40,8 +40,11 @@ medicat_extract_list_*.txt
 ventoy_stdout_*.txt
 ventoy_stderr_*.txt
 
-# Installer output beside exe
-failed_files.txt
+# Offline cache (large downloads — populate with tools/populate_offline.py)
+offline/ventoy/
+offline/*.7z
+offline/MedicatFiles.md5
+
 
 # OS Files
 .DS_Store
