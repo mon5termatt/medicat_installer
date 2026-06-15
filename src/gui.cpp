@@ -1024,11 +1024,6 @@ void Gui::OnCreate(HWND hwnd) {
 
     wchar_t versionText[32]{};
     swprintf_s(versionText, L"v%hs", INSTALLER_VERSION);
-    versionLabel_ = CreateWindowW(
-        L"STATIC", versionText,
-        WS_CHILD | WS_VISIBLE | SS_RIGHT,
-        kMargin, 0, kContentWidth, kVersionLabelHeight, hwnd, nullptr, instance_, nullptr);
-
     driveLabel_ = CreateWindowW(
         L"STATIC", i18n::Tr(L"ui.drive_label").c_str(),
         WS_CHILD | WS_VISIBLE | SS_LEFT | SS_LEFTNOWORDWRAP,
@@ -1124,6 +1119,11 @@ void Gui::OnCreate(HWND hwnd) {
         kMargin, kCurrentFileYCollapsed, kContentWidth, kCurrentFileHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCurrentFileLabelId)), instance_, nullptr);
 
+    versionLabel_ = CreateWindowW(
+        L"STATIC", versionText,
+        WS_CHILD | WS_VISIBLE | SS_RIGHT,
+        kMargin, 0, kContentWidth, kVersionLabelHeight, hwnd, nullptr, instance_, nullptr);
+
     for (HWND child :
          {languageCombo_, titleLabel_, versionLabel_, driveLabel_, driveCombo_, showAllDrivesCheck_,
           formatCheck_, skipVentoyCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_,
@@ -1151,7 +1151,6 @@ void Gui::OnCreate(HWND hwnd) {
     UpdateAdvancedControls();
     LayoutHeader();
     LayoutVersionLabel();
-    RefreshDrives();
     RefreshTranslatedUi();
 }
 
@@ -1184,9 +1183,9 @@ void Gui::OnCommand(WPARAM wp) {
 }
 
 void Gui::ApplyLanguageSelection(const std::wstring& languageCode) {
-    const int selected = LanguageIndexForCode(languageCode);
     i18n::Load(languageCode);
     if (languageCombo_ && IsWindow(languageCombo_)) {
+        const int selected = LanguageIndexForCode(languageCode);
         SendMessageW(languageCombo_, CB_SETCURSEL, selected, 0);
     }
     RefreshTranslatedUi();
@@ -1247,13 +1246,10 @@ void Gui::RefreshTranslatedUi() {
         SetWindowTextW(versionLabel_, versionText);
     }
 
-    for (HWND child : {titleLabel_, versionLabel_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_,
+    for (HWND child : {titleLabel_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_,
                        skipVentoyCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_,
-                       installBtn_, verifyFilesBtn_, openLogBtn_, progressBar_, currentFileLabel_, languageCombo_}) {
+                       installBtn_, verifyFilesBtn_, openLogBtn_, progressBar_, currentFileLabel_, languageCombo_, versionLabel_}) {
         refreshControl(child);
-    }
-    if (hwnd_ && IsWindow(hwnd_)) {
-        RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ERASE);
     }
 }
 
