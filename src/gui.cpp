@@ -311,6 +311,8 @@ LRESULT CALLBACK FlatCheckboxProc(const HWND hwnd, const UINT msg, const WPARAM 
         return DefWindowProcW(hwnd, msg, wp, lp);
     }
 
+    WNDPROC origState{ state->original };
+
     switch (msg) {
         case BM_GETCHECK:
         case BM_SETCHECK: {
@@ -353,12 +355,13 @@ LRESULT CALLBACK FlatCheckboxProc(const HWND hwnd, const UINT msg, const WPARAM 
         case WM_NCDESTROY:
             RemovePropW(hwnd, L"MedicatFlatCheck");
             delete state;
+            state = nullptr;
             break;
         default:
             break;
     }
 
-    return CallWindowProcW(state->original, hwnd, msg, wp, lp);
+    return CallWindowProcW(origState, hwnd, msg, wp, lp);
 }
 
 void SubclassFlatCheckbox(const HWND hwnd) {
