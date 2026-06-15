@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 echo Regenerating i18n...
-python "..\tools\i18n_codegen.py"
+python "tools\i18n_codegen.py"
 if errorlevel 1 goto fail
 
 if not exist "build\CMakeCache.txt" (

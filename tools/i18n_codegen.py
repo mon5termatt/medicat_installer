@@ -54,7 +54,7 @@ def emit_language(lang: str, rows: list[tuple[str, str]]) -> str:
 def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
     src = repo_root / "i18n" / "translations.json"
-    out = repo_root / "cpp" / "src" / "i18n_generated.h"
+    out = repo_root / "src" / "i18n_generated.h"
 
     if not src.exists():
         print(f"Missing translation source: {src}", file=sys.stderr)
