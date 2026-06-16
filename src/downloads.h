@@ -24,6 +24,7 @@ constexpr wchar_t kDownloadGoogleDriveUrl[] =
     L"https://drive.google.com/drive/folders/0B80MkZEQZejCSDZsY2NKbVJNWjg?resourcekey=0-wMGHCpg8SwR13oOYDfjPuA";
 constexpr wchar_t kDownloadMegaUrl[] = L"https://mega.nz/folder/jg1DWbaK#Qo6XsYzjx-HyIpxj8xQTiQ";
 constexpr wchar_t kDownloadAllUrl[] = L"http://medicatusb.com/#downloads";
+constexpr wchar_t kManualInstallDocUrl[] = L"https://medicatusb.com/docs/medicat/installation/manual-install/";
 
 struct AlternativeDownloadOption {
     const wchar_t* labelKey;

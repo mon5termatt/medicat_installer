@@ -72,7 +72,6 @@ private:
     void ResizeFileLogWindow(HWND hwnd);
     std::wstring FormatLogLine(size_t index, const std::wstring& path) const;
     void UpdateAdvancedControls();
-    void LayoutVersionLabel();
     void LayoutHeader();
     void LayoutMainContent();
     void UpdateArchivePanel();
@@ -106,6 +105,7 @@ private:
     HWND installBtn_ = nullptr;
     HWND verifyFilesBtn_ = nullptr;
     HWND openLogBtn_ = nullptr;
+    HWND manualInstallBtn_ = nullptr;
     HWND progressBar_ = nullptr;
     HWND currentFileLabel_ = nullptr;
     HWND archiveMissingLabel_ = nullptr;

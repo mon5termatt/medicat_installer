@@ -42,44 +42,109 @@ constexpr int kLanguageComboX = kMargin + kContentWidth - kLanguageComboWidth - 
 constexpr int kLanguageComboY = kHeaderTitleY;
 constexpr int kHeaderTitleWidth = kLanguageComboX - kHeaderTitleX - 12;
 constexpr int kVersionLabelHeight = 18;
-constexpr int kVersionBottomMargin = 10;
+constexpr int kVersionLabelGap = 4;
+constexpr int kVersionLabelY = kLanguageComboY - kVersionLabelHeight - kVersionLabelGap;
+constexpr int kVersionLabelWidth = kContentWidth - (kLanguageComboX - kMargin);
 constexpr int kContentTop = kHeaderHeight + 10;
 
 constexpr int kCheckboxHeight = 24;
 constexpr int kSectionGap = 12;
 constexpr int kInstallBtnHeight = 44;
 constexpr int kInstallBtnWidth = 252;
-constexpr int kVerifyBtnWidth = kContentWidth - kInstallBtnWidth - 10;
-constexpr int kVerifyBtnX = kMargin + kInstallBtnWidth + 10;
+constexpr int kActionBtnGap = 10;
+constexpr int kVerifyBtnWidth = kContentWidth - kInstallBtnWidth - kActionBtnGap;
+constexpr int kOpenLogBtnWidth = 150;
+constexpr int kProgressBarWidth = kContentWidth - kOpenLogBtnWidth - kActionBtnGap;
 constexpr int kProgressHeight = 28;
 constexpr int kOpenLogBtnHeight = 32;
+constexpr int kManualInstallBtnHeight = 32;
+constexpr int kManualInstallGap = 10;
 constexpr int kActionRowGap = 12;
 constexpr int kCurrentFileHeight = 20;
-constexpr int kBottomChrome = kVersionBottomMargin + kVersionLabelHeight + 8;
+constexpr int kCheckboxRowHeight = kCheckboxHeight + 8;
+constexpr int kProgressRowHeight = std::max(kProgressHeight, kOpenLogBtnHeight);
+constexpr int kBottomChrome = 28;
+constexpr int kArchiveLabelHeight = 36;
+constexpr int kDownloadBtnHeight = 28;
+constexpr int kDownloadBtnGap = 8;
+constexpr int kArchivePanelHeight = kArchiveLabelHeight + kDownloadBtnHeight + kDownloadBtnGap + kDownloadBtnHeight + 10;
 
-constexpr int kDriveComboY = kContentTop + 22;
-constexpr int kShowAllDrivesY = kDriveComboY + 32;
-constexpr int kFormatY = kShowAllDrivesY + 28;
-constexpr int kSkipVentoyY = kFormatY + 30;
-constexpr int kAdvancedY = kSkipVentoyY + 30;
-constexpr int kPinVentoyY = kAdvancedY + 28;
-constexpr int kVentoyComboY = kPinVentoyY - 2;
-constexpr int kVentoySecureBootY = kPinVentoyY + 28;
-constexpr int kGptY = kVentoySecureBootY + 30;
-constexpr int kOptionsBottomCollapsed = kAdvancedY + kCheckboxHeight;
-constexpr int kOptionsBottomExpanded = kGptY + kCheckboxHeight;
+struct MainContentLayout {
+    int contentTop = 0;
+    int driveComboY = 0;
+    int showAllDrivesY = 0;
+    int formatY = 0;
+    int skipVentoyY = 0;
+    int advancedY = 0;
+    int pinVentoyY = 0;
+    int ventoySecureBootY = 0;
+    int gptY = 0;
+    int installY = 0;
+    int progressY = 0;
+    int openLogY = 0;
+    int currentFileY = 0;
+    int manualInstallY = 0;
+    int requiredClientHeight = 0;
+};
 
-constexpr int kInstallYCollapsed = kOptionsBottomCollapsed + kSectionGap;
-constexpr int kInstallYExpanded = kOptionsBottomExpanded + kSectionGap;
-constexpr int kProgressYCollapsed = kInstallYCollapsed + kInstallBtnHeight + kActionRowGap;
-constexpr int kProgressYExpanded = kInstallYExpanded + kInstallBtnHeight + kActionRowGap;
-constexpr int kOpenLogYCollapsed = kProgressYCollapsed + (kProgressHeight - kOpenLogBtnHeight) / 2;
-constexpr int kOpenLogYExpanded = kProgressYExpanded + (kProgressHeight - kOpenLogBtnHeight) / 2;
-constexpr int kCurrentFileYCollapsed = kProgressYCollapsed + kOpenLogBtnHeight + 8;
-constexpr int kCurrentFileYExpanded = kProgressYExpanded + kOpenLogBtnHeight + 8;
+MainContentLayout ComputeMainContentLayout(const bool expanded, const bool archiveMissing) {
+    MainContentLayout layout{};
+    layout.contentTop = archiveMissing ? (kContentTop + kArchivePanelHeight) : kContentTop;
+    layout.driveComboY = layout.contentTop + 22;
+    layout.showAllDrivesY = layout.driveComboY + 32;
+    layout.formatY = layout.showAllDrivesY + 28;
+    layout.skipVentoyY = layout.formatY + 30;
+    layout.advancedY = layout.skipVentoyY + 30;
+    layout.pinVentoyY = layout.advancedY + 28;
+    layout.ventoySecureBootY = layout.pinVentoyY + 28;
+    layout.gptY = layout.ventoySecureBootY + 30;
 
-constexpr int kWindowHeightCollapsed = kCurrentFileYCollapsed + kCurrentFileHeight + kBottomChrome + 16;
-constexpr int kWindowHeightExpanded = kCurrentFileYExpanded + kCurrentFileHeight + kBottomChrome + 16;
+    const int optionsBottom =
+        expanded ? (layout.gptY + kCheckboxRowHeight) : (layout.advancedY + kCheckboxRowHeight);
+    layout.installY = optionsBottom + kSectionGap;
+    layout.progressY = layout.installY + kInstallBtnHeight + kActionRowGap;
+    layout.openLogY = layout.progressY + (kProgressHeight - kOpenLogBtnHeight) / 2;
+    layout.currentFileY = layout.progressY + kProgressRowHeight + 8;
+    layout.manualInstallY = layout.currentFileY + kCurrentFileHeight + kManualInstallGap;
+    layout.requiredClientHeight = layout.manualInstallY + kManualInstallBtnHeight + kBottomChrome;
+    return layout;
+}
+
+int OuterWindowHeightForClient(HWND hwnd, const int clientWidth, const int clientHeight) {
+    RECT frame{0, 0, clientWidth, clientHeight};
+    const DWORD style = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_STYLE));
+    const DWORD exStyle = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_EXSTYLE));
+    AdjustWindowRectEx(&frame, style, FALSE, exStyle);
+    return frame.bottom - frame.top;
+}
+
+int EstimateInitialOuterHeight(const bool archiveMissing) {
+    const auto layout = ComputeMainContentLayout(false, archiveMissing);
+    RECT frame{0, 0, kContentWidth + 2 * kMargin, layout.requiredClientHeight};
+    AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE, 0);
+    return frame.bottom - frame.top;
+}
+
+int EstimateInitialOuterWidth() {
+    RECT frame{0, 0, kContentWidth + 2 * kMargin, 100};
+    AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE, 0);
+    return frame.right - frame.left;
+}
+
+int ContentLeft(const int clientWidth) {
+    if (clientWidth <= kContentWidth + 2 * kMargin) {
+        return kMargin;
+    }
+    return (clientWidth - kContentWidth) / 2;
+}
+
+int OuterWindowWidthForClient(HWND hwnd, const int clientWidth) {
+    RECT frame{0, 0, clientWidth, 100};
+    const DWORD style = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_STYLE));
+    const DWORD exStyle = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_EXSTYLE));
+    AdjustWindowRectEx(&frame, style, FALSE, exStyle);
+    return frame.right - frame.left;
+}
 
 constexpr int kDriveComboId = 1001;
 constexpr int kLanguageComboId = 1018;
@@ -102,18 +167,15 @@ constexpr int kDownloadMirror1BtnId = 1020;
 constexpr int kDownloadMirror2BtnId = 1021;
 constexpr int kAltDownloadComboId = 1022;
 constexpr int kAltDownloadOpenBtnId = 1023;
+constexpr int kManualInstallBtnId = 1024;
 constexpr UINT_PTR kUiRefreshTimerId = 1;
 constexpr UINT_PTR kArchiveCheckTimerId = 2;
 constexpr UINT kUiRefreshIntervalMs = 250;
 constexpr UINT kArchiveCheckIntervalMs = 3000;
-constexpr int kArchiveLabelHeight = 36;
-constexpr int kDownloadBtnHeight = 28;
-constexpr int kDownloadBtnGap = 8;
 constexpr int kMirrorBtnWidth = (kContentWidth - kDownloadBtnGap) / 2;
 constexpr int kAltComboWidth = 360;
 constexpr int kAltOpenBtnWidth = kContentWidth - kAltComboWidth - kDownloadBtnGap;
 constexpr int kAltOpenBtnX = kMargin + kAltComboWidth + kDownloadBtnGap;
-constexpr int kArchivePanelHeight = kArchiveLabelHeight + kDownloadBtnHeight + kDownloadBtnGap + kDownloadBtnHeight + 10;
 constexpr wchar_t kFileLogWindowClass[] = L"MedicatFileLogWindow";
 
 struct LanguageOption {
@@ -458,7 +520,7 @@ bool Gui::Create(HINSTANCE instance) {
     hwnd_ = CreateWindowExW(
         0, cls, i18n::Tr(L"ui.title_label").c_str(),
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        CW_USEDEFAULT, CW_USEDEFAULT, kWindowWidth, kWindowHeightCollapsed,
+        CW_USEDEFAULT, CW_USEDEFAULT, EstimateInitialOuterWidth(), EstimateInitialOuterHeight(false),
         nullptr, nullptr, instance, this);
 
     return hwnd_ != nullptr;
@@ -956,29 +1018,30 @@ void Gui::PopulateVentoyVersionCombo() {
     }
 }
 
-void Gui::LayoutVersionLabel() {
-    if (!versionLabel_) {
-        return;
-    }
-
-    RECT rc{};
-    GetClientRect(hwnd_, &rc);
-    const int y = rc.bottom - kVersionBottomMargin - kVersionLabelHeight;
-    SetWindowPos(versionLabel_, nullptr, kMargin, y, rc.right - 2 * kMargin, kVersionLabelHeight,
-                 SWP_NOZORDER | SWP_NOACTIVATE);
-}
-
 void Gui::LayoutHeader() {
+    RECT clientRect{};
+    GetClientRect(hwnd_, &clientRect);
+    const int clientWidth = clientRect.right - clientRect.left;
+    const int contentLeft = ContentLeft(clientWidth);
+    const int languageComboX = contentLeft + kContentWidth - kLanguageComboWidth - kLanguageComboInset;
+    const int headerLogoX = contentLeft;
+    const int headerTitleX = headerLogoX + kLogoMaxSize + 10;
+    const int headerTitleWidth = languageComboX - headerTitleX - 12;
+
     if (logoStatic_ && IsWindow(logoStatic_)) {
-        SetWindowPos(logoStatic_, nullptr, kHeaderLogoX, kHeaderLogoY, kLogoMaxSize, kLogoMaxSize,
+        SetWindowPos(logoStatic_, nullptr, headerLogoX, kHeaderLogoY, kLogoMaxSize, kLogoMaxSize,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (titleLabel_ && IsWindow(titleLabel_)) {
-        SetWindowPos(titleLabel_, nullptr, kHeaderTitleX, kHeaderTitleY, kHeaderTitleWidth, 28,
+        SetWindowPos(titleLabel_, nullptr, headerTitleX, kHeaderTitleY, headerTitleWidth, 28,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (versionLabel_ && IsWindow(versionLabel_)) {
+        SetWindowPos(versionLabel_, nullptr, languageComboX, kVersionLabelY, kVersionLabelWidth, kVersionLabelHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (languageCombo_ && IsWindow(languageCombo_)) {
-        SetWindowPos(languageCombo_, nullptr, kLanguageComboX, kLanguageComboY, kLanguageComboWidth,
+        SetWindowPos(languageCombo_, nullptr, languageComboX, kLanguageComboY, kLanguageComboWidth,
                      kLanguageComboHeight, SWP_NOZORDER | SWP_NOACTIVATE);
     }
 }
@@ -1059,38 +1122,30 @@ void Gui::UpdateArchivePanel() {
 }
 
 void Gui::LayoutMainContent() {
-    const int contentTop = archiveMissing_ ? (kContentTop + kArchivePanelHeight) : kContentTop;
-    const int driveComboY = contentTop + 22;
-    const int showAllDrivesY = driveComboY + 32;
-    const int formatY = showAllDrivesY + 28;
-    const int skipVentoyY = formatY + 30;
-    const int advancedY = skipVentoyY + 30;
-    const int pinVentoyY = advancedY + 28;
-    const int ventoySecureBootY = pinVentoyY + 28;
-    const int gptY = ventoySecureBootY + 30;
-    const int optionsBottomCollapsed = advancedY + kCheckboxHeight;
-    const int optionsBottomExpanded = gptY + kCheckboxHeight;
-
     const bool expanded = AdvancedChecked();
-    const int installY = expanded ? (optionsBottomExpanded + kSectionGap) : (optionsBottomCollapsed + kSectionGap);
-    const int progressY = installY + kInstallBtnHeight + kActionRowGap;
-    const int openLogY = progressY + (kProgressHeight - kOpenLogBtnHeight) / 2;
-    const int currentFileY = progressY + kOpenLogBtnHeight + 8;
-    const int archiveExtra = archiveMissing_ ? kArchivePanelHeight : 0;
-    const int targetH = (expanded ? kWindowHeightExpanded : kWindowHeightCollapsed) + archiveExtra;
+    const MainContentLayout layout = ComputeMainContentLayout(expanded, archiveMissing_);
+
+    RECT clientRect{};
+    GetClientRect(hwnd_, &clientRect);
+    const int clientWidth = clientRect.right - clientRect.left;
+    const int contentLeft = ContentLeft(clientWidth);
+    const int verifyBtnX = contentLeft + kInstallBtnWidth + kActionBtnGap;
+    const int progressBarWidth = kContentWidth - kOpenLogBtnWidth - kActionBtnGap;
+    const int openLogBtnX = contentLeft + progressBarWidth + kActionBtnGap;
+    const int mirror2X = contentLeft + kMirrorBtnWidth + kDownloadBtnGap;
+    const int altOpenBtnX = contentLeft + kAltComboWidth + kDownloadBtnGap;
 
     if (archiveMissing_) {
         if (archiveMissingLabel_ && IsWindow(archiveMissingLabel_)) {
-            SetWindowPos(archiveMissingLabel_, nullptr, kMargin, kContentTop, kContentWidth, kArchiveLabelHeight,
+            SetWindowPos(archiveMissingLabel_, nullptr, contentLeft, kContentTop, kContentWidth, kArchiveLabelHeight,
                          SWP_NOZORDER | SWP_NOACTIVATE);
         }
 
         const int row1Y = kContentTop + kArchiveLabelHeight;
         const int row2Y = row1Y + kDownloadBtnHeight + kDownloadBtnGap;
-        const int mirror2X = kMargin + kMirrorBtnWidth + kDownloadBtnGap;
 
         if (downloadMirror1Btn_ && IsWindow(downloadMirror1Btn_)) {
-            SetWindowPos(downloadMirror1Btn_, nullptr, kMargin, row1Y, kMirrorBtnWidth, kDownloadBtnHeight,
+            SetWindowPos(downloadMirror1Btn_, nullptr, contentLeft, row1Y, kMirrorBtnWidth, kDownloadBtnHeight,
                          SWP_NOZORDER | SWP_NOACTIVATE);
         }
         if (downloadMirror2Btn_ && IsWindow(downloadMirror2Btn_)) {
@@ -1098,77 +1153,99 @@ void Gui::LayoutMainContent() {
                          SWP_NOZORDER | SWP_NOACTIVATE);
         }
         if (altDownloadCombo_ && IsWindow(altDownloadCombo_)) {
-            SetWindowPos(altDownloadCombo_, nullptr, kMargin, row2Y, kAltComboWidth, 200, SWP_NOZORDER | SWP_NOACTIVATE);
+            SetWindowPos(altDownloadCombo_, nullptr, contentLeft, row2Y, kAltComboWidth, 200, SWP_NOZORDER | SWP_NOACTIVATE);
         }
         if (altDownloadOpenBtn_ && IsWindow(altDownloadOpenBtn_)) {
-            SetWindowPos(altDownloadOpenBtn_, nullptr, kAltOpenBtnX, row2Y, kAltOpenBtnWidth, kDownloadBtnHeight,
+            SetWindowPos(altDownloadOpenBtn_, nullptr, altOpenBtnX, row2Y, kAltOpenBtnWidth, kDownloadBtnHeight,
                          SWP_NOZORDER | SWP_NOACTIVATE);
         }
     }
 
     if (driveLabel_ && IsWindow(driveLabel_)) {
-        SetWindowPos(driveLabel_, nullptr, kMargin, contentTop, kContentWidth, 24, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(driveLabel_, nullptr, contentLeft, layout.contentTop, kContentWidth, 24, SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (driveCombo_ && IsWindow(driveCombo_)) {
-        SetWindowPos(driveCombo_, nullptr, kMargin, driveComboY, kContentWidth, 300, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(driveCombo_, nullptr, contentLeft, layout.driveComboY, kContentWidth, 300, SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (showAllDrivesCheck_ && IsWindow(showAllDrivesCheck_)) {
-        SetWindowPos(showAllDrivesCheck_, nullptr, kMargin, showAllDrivesY, kContentWidth, kCheckboxHeight + 8,
+        SetWindowPos(showAllDrivesCheck_, nullptr, contentLeft, layout.showAllDrivesY, kContentWidth, kCheckboxRowHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (formatCheck_ && IsWindow(formatCheck_)) {
-        SetWindowPos(formatCheck_, nullptr, kMargin, formatY, kContentWidth, kCheckboxHeight + 8, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(formatCheck_, nullptr, contentLeft, layout.formatY, kContentWidth, kCheckboxRowHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (skipVentoyCheck_ && IsWindow(skipVentoyCheck_)) {
-        SetWindowPos(skipVentoyCheck_, nullptr, kMargin, skipVentoyY, kContentWidth, kCheckboxHeight + 8,
+        SetWindowPos(skipVentoyCheck_, nullptr, contentLeft, layout.skipVentoyY, kContentWidth, kCheckboxRowHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (advancedCheck_ && IsWindow(advancedCheck_)) {
-        SetWindowPos(advancedCheck_, nullptr, kMargin, advancedY, 260, kCheckboxHeight + 8, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(advancedCheck_, nullptr, contentLeft, layout.advancedY, 260, kCheckboxRowHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (pinVentoyCheck_ && IsWindow(pinVentoyCheck_)) {
-        SetWindowPos(pinVentoyCheck_, nullptr, kMargin + 20, pinVentoyY, 260, kCheckboxHeight + 8,
+        SetWindowPos(pinVentoyCheck_, nullptr, contentLeft + 20, layout.pinVentoyY, 260, kCheckboxRowHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (ventoyVersionCombo_ && IsWindow(ventoyVersionCombo_)) {
-        SetWindowPos(ventoyVersionCombo_, nullptr, kMargin + 280, pinVentoyY - 2, 240, 300,
+        SetWindowPos(ventoyVersionCombo_, nullptr, contentLeft + 280, layout.pinVentoyY - 2, 240, 300,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (ventoySecureBootCheck_ && IsWindow(ventoySecureBootCheck_)) {
-        SetWindowPos(ventoySecureBootCheck_, nullptr, kMargin + 20, ventoySecureBootY, kContentWidth - 20,
-                     kCheckboxHeight + 8, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(ventoySecureBootCheck_, nullptr, contentLeft + 20, layout.ventoySecureBootY, kContentWidth - 20,
+                     kCheckboxRowHeight, SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (ventoyGptCheck_ && IsWindow(ventoyGptCheck_)) {
-        SetWindowPos(ventoyGptCheck_, nullptr, kMargin + 20, gptY, kContentWidth - 20, kCheckboxHeight + 8,
+        SetWindowPos(ventoyGptCheck_, nullptr, contentLeft + 20, layout.gptY, kContentWidth - 20, kCheckboxRowHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (installBtn_ && IsWindow(installBtn_)) {
-        SetWindowPos(installBtn_, nullptr, kMargin, installY, kInstallBtnWidth, kInstallBtnHeight,
+        SetWindowPos(installBtn_, nullptr, contentLeft, layout.installY, kInstallBtnWidth, kInstallBtnHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
         EnableWindow(installBtn_, !archiveMissing_);
     }
     if (verifyFilesBtn_ && IsWindow(verifyFilesBtn_)) {
-        SetWindowPos(verifyFilesBtn_, nullptr, kVerifyBtnX, installY, kVerifyBtnWidth, kInstallBtnHeight,
+        SetWindowPos(verifyFilesBtn_, nullptr, verifyBtnX, layout.installY, kVerifyBtnWidth, kInstallBtnHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (progressBar_ && IsWindow(progressBar_)) {
-        SetWindowPos(progressBar_, nullptr, kMargin, progressY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(progressBar_, nullptr, contentLeft, layout.progressY, progressBarWidth, kProgressHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (openLogBtn_ && IsWindow(openLogBtn_)) {
-        SetWindowPos(openLogBtn_, nullptr, 390, openLogY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(openLogBtn_, nullptr, openLogBtnX, layout.openLogY, kOpenLogBtnWidth, kOpenLogBtnHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (currentFileLabel_ && IsWindow(currentFileLabel_)) {
-        SetWindowPos(currentFileLabel_, nullptr, kMargin, currentFileY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(currentFileLabel_, nullptr, contentLeft, layout.currentFileY, kContentWidth, kCurrentFileHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
     }
+    if (manualInstallBtn_ && IsWindow(manualInstallBtn_)) {
+        SetWindowPos(manualInstallBtn_, nullptr, contentLeft, layout.manualInstallY, kContentWidth, kManualInstallBtnHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
+    int requiredClientHeight = layout.requiredClientHeight;
+    if (manualInstallBtn_ && IsWindow(manualInstallBtn_)) {
+        RECT btnRect{};
+        GetWindowRect(manualInstallBtn_, &btnRect);
+        POINT bottomRight{btnRect.right, btnRect.bottom};
+        ScreenToClient(hwnd_, &bottomRight);
+        requiredClientHeight = std::max(requiredClientHeight, static_cast<int>(bottomRight.y) + kBottomChrome);
+    }
+
+    const int targetClientWidth = kContentWidth + 2 * kMargin;
+    const int targetOuterW = OuterWindowWidthForClient(hwnd_, targetClientWidth);
+    const int targetOuterH = OuterWindowHeightForClient(hwnd_, targetClientWidth, requiredClientHeight);
 
     RECT wr{};
     GetWindowRect(hwnd_, &wr);
-    if ((wr.bottom - wr.top) != targetH) {
-        SetWindowPos(hwnd_, nullptr, 0, 0, kWindowWidth, targetH, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    if ((wr.right - wr.left) != targetOuterW || (wr.bottom - wr.top) != targetOuterH) {
+        SetWindowPos(hwnd_, nullptr, 0, 0, targetOuterW, targetOuterH, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
         InvalidateRect(hwnd_, nullptr, TRUE);
     }
 
-    LayoutVersionLabel();
+    LayoutHeader();
 }
 
 LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -1215,12 +1292,14 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         case WM_SIZE:
             self->LayoutHeader();
-            self->LayoutVersionLabel();
             return 0;
         case WM_PAINT: {
             PAINTSTRUCT ps{};
             const HDC hdc = BeginPaint(hwnd, &ps);
-            RECT logoRect{kHeaderLogoX, kHeaderLogoY, kHeaderLogoX + kLogoMaxSize,
+            RECT clientRect{};
+            GetClientRect(hwnd, &clientRect);
+            const int contentLeft = ContentLeft(clientRect.right - clientRect.left);
+            RECT logoRect{contentLeft, kHeaderLogoY, contentLeft + kLogoMaxSize,
                           kHeaderLogoY + kLogoMaxSize};
             theme::PaintLogo(hdc, self->instance_, logoRect, kLogoMaxSize);
             EndPaint(hwnd, &ps);
@@ -1359,82 +1438,83 @@ void Gui::OnCreate(HWND hwnd) {
 
     wchar_t versionText[32]{};
     swprintf_s(versionText, L"v%hs", INSTALLER_VERSION);
+    const MainContentLayout initialLayout = ComputeMainContentLayout(false, false);
     driveLabel_ = CreateWindowW(
         L"STATIC", i18n::Tr(L"ui.drive_label").c_str(),
         WS_CHILD | WS_VISIBLE | SS_LEFT | SS_LEFTNOWORDWRAP,
-        kMargin, kContentTop, kContentWidth, 24, hwnd, nullptr, instance_, nullptr);
+        kMargin, initialLayout.contentTop, kContentWidth, 24, hwnd, nullptr, instance_, nullptr);
     driveCombo_ = CreateWindowW(
         WC_COMBOBOXW, nullptr,
         CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL,
-        kMargin, kDriveComboY, kContentWidth, 300, hwnd,
+        kMargin, initialLayout.driveComboY, kContentWidth, 300, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kDriveComboId)), instance_, nullptr);
 
     showAllDrivesCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.show_all_drives").c_str(),
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | BS_MULTILINE,
-        kMargin, kShowAllDrivesY, kContentWidth, kCheckboxHeight + 8, hwnd,
+        kMargin, initialLayout.showAllDrivesY, kContentWidth, kCheckboxRowHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kShowAllDrivesCheckId)), instance_, nullptr);
 
     formatCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.format_checkbox").c_str(),
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | BS_MULTILINE,
-        kMargin, kFormatY, kContentWidth, kCheckboxHeight + 8, hwnd,
+        kMargin, initialLayout.formatY, kContentWidth, kCheckboxRowHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFormatCheckId)), instance_, nullptr);
     SendMessageW(formatCheck_, BM_SETCHECK, BST_CHECKED, 0);
 
     skipVentoyCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.skip_ventoy_checkbox").c_str(),
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | BS_MULTILINE,
-        kMargin, kSkipVentoyY, kContentWidth, kCheckboxHeight + 8, hwnd,
+        kMargin, initialLayout.skipVentoyY, kContentWidth, kCheckboxRowHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSkipVentoyCheckId)), instance_, nullptr);
 
     advancedCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.advanced_options").c_str(),
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | BS_MULTILINE,
-        kMargin, kAdvancedY, 260, kCheckboxHeight + 8, hwnd,
+        kMargin, initialLayout.advancedY, 260, kCheckboxRowHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kAdvancedCheckId)), instance_, nullptr);
 
     pinVentoyCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.pin_ventoy_version").c_str(),
         WS_CHILD | BS_AUTOCHECKBOX | BS_MULTILINE,
-        kMargin + 20, kPinVentoyY, 260, kCheckboxHeight + 8, hwnd,
+        kMargin + 20, initialLayout.pinVentoyY, 260, kCheckboxRowHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kPinVentoyCheckId)), instance_, nullptr);
 
     ventoyVersionCombo_ = CreateWindowW(
         WC_COMBOBOXW, nullptr,
         CBS_DROPDOWNLIST | WS_CHILD | WS_VSCROLL,
-        270, kVentoyComboY, 270, 300, hwnd,
+        270, initialLayout.pinVentoyY - 2, 270, 300, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVentoyVersionEditId)), instance_, nullptr);
 
     ventoySecureBootCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.ventoy_secure_boot").c_str(),
         WS_CHILD | BS_AUTOCHECKBOX | BS_MULTILINE,
-        kMargin + 20, kVentoySecureBootY, kContentWidth - 20, kCheckboxHeight + 8, hwnd,
+        kMargin + 20, initialLayout.ventoySecureBootY, kContentWidth - 20, kCheckboxRowHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVentoySecureBootCheckId)), instance_, nullptr);
     SendMessageW(ventoySecureBootCheck_, BM_SETCHECK, BST_CHECKED, 0);
 
     ventoyGptCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.ventoy_gpt_partition").c_str(),
         WS_CHILD | BS_AUTOCHECKBOX | BS_MULTILINE,
-        kMargin + 20, kGptY, kContentWidth - 20, kCheckboxHeight + 8, hwnd,
+        kMargin + 20, initialLayout.gptY, kContentWidth - 20, kCheckboxRowHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVentoyGptCheckId)), instance_, nullptr);
 
     installBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.install_button").c_str(),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        kMargin, kInstallYCollapsed, kInstallBtnWidth, kInstallBtnHeight, hwnd,
+        kMargin, initialLayout.installY, kInstallBtnWidth, kInstallBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kInstallBtnId)), instance_, nullptr);
 
     verifyFilesBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.check_files_button").c_str(),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        kVerifyBtnX, kInstallYCollapsed, kVerifyBtnWidth, kInstallBtnHeight, hwnd,
+        kMargin + kInstallBtnWidth + kActionBtnGap, initialLayout.installY, kVerifyBtnWidth, kInstallBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVerifyFilesBtnId)), instance_, nullptr);
 
     progressBar_ = CreateWindowW(
         PROGRESS_CLASSW, nullptr,
         WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
-        kMargin, kProgressYCollapsed, 360, kProgressHeight, hwnd,
+        kMargin, initialLayout.progressY, kProgressBarWidth, kProgressHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kProgressId)), instance_, nullptr);
     SendMessageW(progressBar_, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
     SetPropW(progressBar_, L"MedicatGui", this);
@@ -1445,25 +1525,31 @@ void Gui::OnCreate(HWND hwnd) {
     openLogBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.open_file_log_button").c_str(),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        390, kOpenLogYCollapsed, 150, kOpenLogBtnHeight, hwnd,
+        kMargin + kProgressBarWidth + kActionBtnGap, initialLayout.openLogY, kOpenLogBtnWidth, kOpenLogBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kOpenLogBtnId)), instance_, nullptr);
 
     currentFileLabel_ = CreateWindowW(
         L"STATIC", L"",
         WS_CHILD | WS_VISIBLE | SS_ENDELLIPSIS,
-        kMargin, kCurrentFileYCollapsed, kContentWidth, kCurrentFileHeight, hwnd,
+        kMargin, initialLayout.currentFileY, kContentWidth, kCurrentFileHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCurrentFileLabelId)), instance_, nullptr);
+
+    manualInstallBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.manual_install_button").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        kMargin, initialLayout.manualInstallY, kContentWidth, kManualInstallBtnHeight, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kManualInstallBtnId)), instance_, nullptr);
 
     versionLabel_ = CreateWindowW(
         L"STATIC", versionText,
-        WS_CHILD | WS_VISIBLE | SS_RIGHT,
-        kMargin, 0, kContentWidth, kVersionLabelHeight, hwnd, nullptr, instance_, nullptr);
+        WS_CHILD | WS_VISIBLE | SS_RIGHT | SS_NOPREFIX,
+        kLanguageComboX, kVersionLabelY, kVersionLabelWidth, kVersionLabelHeight, hwnd, nullptr, instance_, nullptr);
 
     for (HWND child :
          {languageCombo_, titleLabel_, versionLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_,
           altDownloadCombo_, altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_, skipVentoyCheck_, advancedCheck_,
           pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_, verifyFilesBtn_,
-          openLogBtn_, progressBar_, currentFileLabel_}) {
+          openLogBtn_, manualInstallBtn_, progressBar_, currentFileLabel_}) {
         if (child && IsWindow(child)) {
             SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
         }
@@ -1477,6 +1563,7 @@ void Gui::OnCreate(HWND hwnd) {
     SubclassGlowButton(installBtn_, true);
     SubclassGlowButton(verifyFilesBtn_, false);
     SubclassGlowButton(openLogBtn_, false);
+    SubclassGlowButton(manualInstallBtn_, false);
     SubclassGlowButton(downloadMirror1Btn_, true);
     SubclassGlowButton(downloadMirror2Btn_, true);
     SubclassGlowButton(altDownloadOpenBtn_, false);
@@ -1490,7 +1577,6 @@ void Gui::OnCreate(HWND hwnd) {
     PopulateAlternativeDownloadCombo();
     UpdateAdvancedControls();
     LayoutHeader();
-    LayoutVersionLabel();
     UpdateArchivePanel();
     SetTimer(hwnd_, kArchiveCheckTimerId, kArchiveCheckIntervalMs, nullptr);
     RefreshTranslatedUi();
@@ -1521,6 +1607,10 @@ void Gui::OnCommand(WPARAM wp) {
     }
     if (id == kOpenLogBtnId) {
         OpenFileLogWindow();
+        return;
+    }
+    if (id == kManualInstallBtnId) {
+        OpenBrowserUrl(kManualInstallDocUrl);
         return;
     }
     if (id == kDownloadMirror1BtnId) {
@@ -1591,6 +1681,9 @@ void Gui::RefreshTranslatedUi() {
     if (openLogBtn_ && IsWindow(openLogBtn_)) {
         SetWindowTextW(openLogBtn_, i18n::Tr(L"ui.open_file_log_button").c_str());
     }
+    if (manualInstallBtn_ && IsWindow(manualInstallBtn_)) {
+        SetWindowTextW(manualInstallBtn_, i18n::Tr(L"ui.manual_install_button").c_str());
+    }
     if (archiveMissingLabel_ && IsWindow(archiveMissingLabel_)) {
         SetWindowTextW(archiveMissingLabel_, i18n::Tr(L"ui.archive_missing", kMediCatArchiveFileName).c_str());
     }
@@ -1616,8 +1709,8 @@ void Gui::RefreshTranslatedUi() {
     for (HWND child : {titleLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_, altDownloadCombo_,
                        altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_,
                        skipVentoyCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_,
-                       installBtn_, verifyFilesBtn_, openLogBtn_, progressBar_, currentFileLabel_, languageCombo_,
-                       versionLabel_}) {
+                       installBtn_, verifyFilesBtn_, openLogBtn_, manualInstallBtn_, progressBar_, currentFileLabel_,
+                       languageCombo_, versionLabel_}) {
         refreshControl(child);
     }
 }
