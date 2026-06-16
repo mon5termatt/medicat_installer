@@ -189,6 +189,7 @@ constexpr LanguageOption kLanguageOptions[] = {
     {L"fr", L"Français"},
     {L"pl", L"Polski"},
     {L"tr", L"Türkçe"},
+    {L"cat", L"Cat"},
 };
 
 int LanguageIndexForCode(const std::wstring& code) {
