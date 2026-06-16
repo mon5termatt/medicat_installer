@@ -30,4 +30,14 @@ ExtractResult Extract7zArchive(
     ProgressCallback onProgress,
     const std::wstring& logFilePath = L"");
 
+// Selectively extract only specific archive entries into destinationRoot.
+// `relativePaths` should match archive entry paths (e.g. "Ventoy/..." or "EFI\\...").
+ExtractResult Extract7zArchiveSelective(
+    const std::wstring& sevenZipExe,
+    const std::wstring& archivePath,
+    const std::wstring& destinationRoot,
+    const std::vector<std::wstring>& relativePaths,
+    ProgressCallback onProgress,
+    const std::wstring& logFilePath = L"");
+
 }  // namespace medicat

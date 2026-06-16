@@ -105,6 +105,24 @@ std::string WideToUtf8(const std::wstring& text) {
     return out;
 }
 
+bool WriteUtf8ListFile(const std::wstring& path, const std::vector<std::wstring>& lines) {
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS,
+                              FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+    std::string out;
+    out.reserve(lines.size() * 64);
+    for (const auto& line : lines) {
+        out += WideToUtf8(line);
+        out += "\r\n";
+    }
+    DWORD written = 0;
+    const BOOL ok = out.empty() ? TRUE : WriteFile(file, out.data(), static_cast<DWORD>(out.size()), &written, nullptr);
+    CloseHandle(file);
+    return ok != FALSE;
+}
+
 class RawLogTee {
 public:
     bool Open(const std::wstring& path, const std::wstring& commandLine) {
@@ -428,6 +446,197 @@ ExtractResult Extract7zArchive(
         done.file = lastFile;
         done.bytesWritten = totalUncompressedBytes;
         done.totalBytes = totalUncompressedBytes;
+        onProgress(done);
+    }
+
+    if (!result.success) {
+        std::wostringstream err;
+        err << L"7za exited with code " << exitCode;
+        if (!stderrText.empty()) {
+            err << L": " << stderrText.substr(0, 500);
+        }
+        result.error = err.str();
+    }
+
+    return result;
+}
+
+ExtractResult Extract7zArchiveSelective(
+    const std::wstring& sevenZipExe,
+    const std::wstring& archivePath,
+    const std::wstring& destinationRoot,
+    const std::vector<std::wstring>& relativePaths,
+    ProgressCallback onProgress,
+    const std::wstring& logFilePath) {
+    ExtractResult result;
+    if (relativePaths.empty()) {
+        result.success = true;
+        result.exitCode = 0;
+        return result;
+    }
+
+    std::wstring dest = destinationRoot;
+    if (dest.size() == 2 && dest[1] == L':') {
+        dest += L'\\';
+    }
+    CreateDirectoryW(dest.c_str(), nullptr);
+
+    const std::wstring listPath = JoinPath(GetMedicatTempDir(), L"reextract_list.txt");
+    if (!WriteUtf8ListFile(listPath, relativePaths)) {
+        result.error = L"Failed to write re-extract list file";
+        return result;
+    }
+
+    std::wstring cmd = L"\"" + sevenZipExe + L"\" x -bsp1 -bso1 -bse1 -bb1 -o\"" + dest + L"\" \"" +
+                       archivePath + L"\" -aoa -y @\"" + listPath + L"\"";
+
+    // For selective re-extract we don't have accurate size/free-space baselines; rely on 7z percent parsing.
+    const uint64_t totalUncompressedBytes = 0;
+
+    RawLogTee logTee;
+    const bool logging = !logFilePath.empty() && logTee.Open(logFilePath, cmd);
+
+    SECURITY_ATTRIBUTES sa{};
+    sa.nLength = sizeof(sa);
+    sa.bInheritHandle = TRUE;
+
+    HANDLE stdoutRead = nullptr;
+    HANDLE stdoutWrite = nullptr;
+    if (!CreatePipe(&stdoutRead, &stdoutWrite, &sa, 0)) {
+        result.error = L"Failed to create stdout pipe";
+        return result;
+    }
+    SetHandleInformation(stdoutRead, HANDLE_FLAG_INHERIT, 0);
+
+    HANDLE stderrRead = nullptr;
+    HANDLE stderrWrite = nullptr;
+    if (!CreatePipe(&stderrRead, &stderrWrite, &sa, 0)) {
+        CloseHandle(stdoutRead);
+        CloseHandle(stdoutWrite);
+        result.error = L"Failed to create stderr pipe";
+        return result;
+    }
+    SetHandleInformation(stderrRead, HANDLE_FLAG_INHERIT, 0);
+
+    STARTUPINFOW si{};
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+    si.hStdOutput = stdoutWrite;
+    si.hStdError = stderrWrite;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.wShowWindow = SW_HIDE;
+
+    PROCESS_INFORMATION pi{};
+    std::vector<wchar_t> cmdLine(cmd.begin(), cmd.end());
+    cmdLine.push_back(L'\0');
+
+    if (!CreateProcessW(nullptr, cmdLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr,
+                        nullptr, &si, &pi)) {
+        CloseHandle(stdoutRead);
+        CloseHandle(stdoutWrite);
+        CloseHandle(stderrRead);
+        CloseHandle(stderrWrite);
+        result.error = L"Failed to start 7za.exe";
+        return result;
+    }
+
+    CloseHandle(stdoutWrite);
+    CloseHandle(stderrWrite);
+
+    std::atomic<bool> running{true};
+    std::wstring lastFile;
+    int lastPercent = -1;
+    std::wstring stderrText;
+
+    std::thread stderrThread([&] {
+        char buf[4096];
+        DWORD n = 0;
+        while (running.load()) {
+            if (!ReadFile(stderrRead, buf, sizeof(buf), &n, nullptr) || n == 0) {
+                break;
+            }
+            if (logging) {
+                logTee.WriteStderr(buf, n);
+            }
+            const int wlen = MultiByteToWideChar(CP_UTF8, 0, buf, static_cast<int>(n), nullptr, 0);
+            std::wstring chunk(static_cast<size_t>(wlen), L'\0');
+            MultiByteToWideChar(CP_UTF8, 0, buf, static_cast<int>(n), chunk.data(), wlen);
+            stderrText += chunk;
+        }
+    });
+
+    RawLogTee* logPtr = logging ? &logTee : nullptr;
+    auto lastPoll = std::chrono::steady_clock::now();
+    std::wstring lineBuffer;
+
+    while (true) {
+        DWORD avail = 0;
+        if (!PeekNamedPipe(stdoutRead, nullptr, 0, nullptr, &avail, nullptr)) {
+            break;
+        }
+
+        if (avail > 0) {
+            std::string chunk(avail, '\0');
+            DWORD read = 0;
+            if (ReadFile(stdoutRead, chunk.data(), avail, &read, nullptr) && read > 0) {
+                chunk.resize(read);
+                if (logging) {
+                    logTee.WriteStdout(chunk.data(), chunk.size());
+                }
+                ProcessStdoutChunk(chunk, lineBuffer, lastFile, lastPercent, totalUncompressedBytes, onProgress);
+            }
+        }
+
+        const auto now = std::chrono::steady_clock::now();
+        if (onProgress && std::chrono::duration_cast<std::chrono::milliseconds>(now - lastPoll).count() >= 500) {
+            lastPoll = now;
+            ExtractProgress progress;
+            progress.bytesWritten = 0;
+            progress.totalBytes = 0;
+            progress.file.clear();
+            progress.percent = lastPercent >= 0 ? lastPercent : 0;
+            onProgress(progress);
+        }
+
+        DWORD exitCode = STILL_ACTIVE;
+        if (!GetExitCodeProcess(pi.hProcess, &exitCode) || exitCode != STILL_ACTIVE) {
+            break;
+        }
+        if (avail == 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+    }
+
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD exitCode = 1;
+    GetExitCodeProcess(pi.hProcess, &exitCode);
+
+    DrainStdout(stdoutRead, lineBuffer, lastFile, lastPercent, totalUncompressedBytes, onProgress, logPtr);
+
+    running = false;
+    if (stderrThread.joinable()) {
+        stderrThread.join();
+    }
+
+    if (logging) {
+        logTee.Flush();
+        logTee.Close();
+    }
+
+    CloseHandle(stdoutRead);
+    CloseHandle(stderrRead);
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+
+    result.exitCode = static_cast<int>(exitCode);
+    result.success = (exitCode == 0);
+
+    if (onProgress) {
+        ExtractProgress done;
+        done.percent = result.success ? 100 : (lastPercent >= 0 ? lastPercent : 0);
+        done.file = lastFile;
+        done.bytesWritten = 0;
+        done.totalBytes = 0;
         onProgress(done);
     }
 

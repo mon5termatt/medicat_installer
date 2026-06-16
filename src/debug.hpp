@@ -16,7 +16,7 @@ struct DebugReportContext {
     std::wstring md5ManifestPath;
     std::wstring archivePath;
     bool formatChecked = false;
-    bool skipVentoyChecked = false;
+    bool runVentoyChecked = false;
     bool ventoySecureBoot = false;
     bool ventoyGpt = false;
     std::wstring pinnedVentoyVersion;

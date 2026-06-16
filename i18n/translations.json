@@ -7,7 +7,8 @@
       "show_hard_drives": "Show hard drives",
       "show_all_drives": "Show all drives",
       "format_checkbox": "Format drive before installation",
-      "skip_ventoy_checkbox": "Skip Ventoy install/upgrade",
+      "install_ventoy_checkbox": "Install Ventoy",
+      "update_ventoy_checkbox": "Update Ventoy?",
       "install_button": "Install MediCat",
       "cancel_button": "Cancel",
       "check_files_button": "Check USB Files",
@@ -22,8 +23,21 @@
       "ventoy_gpt_partition": "Use GPT partition style (default: MBR)",
       "ventoy_version_hint": "e.g. 1.0.99 (leave blank = latest)",
       "open_file_log_button": "Open File Log",
+      "manual_install_button": "Having issues? Try a manual install",
       "file_log_title": "Extraction File Log",
-      "language_label": "Language:"
+      "re_extract_window_title": "Verification Failed",
+      "re_extract_summary": "{0} file(s) failed verification.",
+      "re_extract_button": "Re-extract failed files",
+      "re_extract_close_button": "Close",
+      "language_label": "Language:",
+      "archive_missing": "{0} not found. Download the archive:",
+      "alt_download_label": "Other download methods:",
+      "alt_download_open": "Open",
+      "download_torrent": "Torrent",
+      "download_magnet": "Magnet",
+      "download_google_drive": "Google Drive",
+      "download_mega": "Mega",
+      "download_all": "All Downloads"
     },
     "status": {
       "status_ready": "Ready to install MediCat",
@@ -55,7 +69,11 @@
       "bin_download_complete": "All bin files downloaded successfully",
       "bin_download_errors": "Bin files download completed with errors",
       "bin_download_failed": "Bin files download failed",
-      "installing_module": "Loading extraction libraries from lib/..."
+      "downloading_archive_mirror": "Downloading from {0}...",
+      "resuming_archive_mirror": "Resuming download from {0}...",
+      "download_archive_complete": "Archive download complete",
+      "ventoy_found": "Found Ventoy on {0}",
+      "ventoy_not_on_drive": "Ventoy not detected on {0}"
     },
     "messages": {
       "no_internet": "No internet connection detected. Please check your connection and try again.",
@@ -74,6 +92,7 @@
       "verification_failed": "File verification found {0} file(s) that failed verification.\n\nWould you like to attempt to re-extract the missing files from the archive?",
       "re_extract_complete": "Re-extraction completed. You may want to run file verification again to confirm.",
       "re_extract_failed": "Re-extraction completed with errors.\n\nExtracted: {0}/{1}\nFailed: {2}\n\nCheck the log for details.",
+      "verify_still_failed_after_reextract": "Verification still found {0} file(s) that do not match after re-extraction.\n\nCheck your antivirus, firewall, or other security software. They can block, quarantine, or delete files while extracting to a USB drive.\n\nLogs are saved beside this installer (medicat_installer.log, check.log, reextract.log). A future update will let you upload logs with a support keyword for Discord help.",
       "download_failed": "Failed to download the verification file. Please check your internet connection.",
       "verification_error": "An error occurred during file verification: {0}",
       "md5_manifest_missing": "The bundled MD5 verification manifest could not be loaded. Reinstall MedicatInstaller.exe or check medicat_installer.log for details.",
@@ -86,7 +105,8 @@
       "no_drive_for_check": "Please select a USB drive first.",
       "usb_too_small": "USB drive does not have enough free space for MediCat.",
       "drive_under_minimum": "Drive {0} is too small. MediCat requires at least 30 GB total capacity.",
-      "drive_lost_after_ventoy": "The USB drive could not be found after Ventoy installation. It may have failed to remount — please check Disk Management and try again."
+      "drive_lost_after_ventoy": "The USB drive could not be found after Ventoy installation. It may have failed to remount — please check Disk Management and try again.",
+      "archive_download_failed": "Archive download failed: {0}"
     },
     "ventoy_warning": {
       "title": "Ventoy Installation Warning",
@@ -123,6 +143,7 @@
       "verification_failed": "Verification Failed - Re-extract Files?",
       "re_extraction_complete": "Re-extraction Complete",
       "re_extraction_failed": "Re-extraction Complete with Errors",
+      "verify_still_failed_after_reextract": "Verification Still Failed",
       "download_failed": "Download Failed",
       "verification_error": "Verification Error",
       "re_extraction_error": "Re-extraction Error",
@@ -183,7 +204,8 @@
       "show_hard_drives": "Mostrar discos duros",
       "show_all_drives": "Mostrar todas las unidades",
       "format_checkbox": "Formatear unidad antes de la instalación",
-      "skip_ventoy_checkbox": "Omitir instalación/actualización de Ventoy",
+      "install_ventoy_checkbox": "Instalar Ventoy",
+      "update_ventoy_checkbox": "¿Actualizar Ventoy?",
       "install_button": "Instalar MediCat",
       "cancel_button": "Cancelar",
       "check_files_button": "Verificar archivos USB",
@@ -198,8 +220,21 @@
       "ventoy_gpt_partition": "Usar partición GPT (predeterminado: MBR)",
       "ventoy_version_hint": "ej. 1.0.99 (vacío = última)",
       "open_file_log_button": "Abrir registro de archivos",
+      "manual_install_button": "¿Problemas? Pruebe una instalación manual",
       "file_log_title": "Registro de extracción",
-      "language_label": "Idioma:"
+      "re_extract_window_title": "Verificación fallida",
+      "re_extract_summary": "{0} archivo(s) fallaron la verificación.",
+      "re_extract_button": "Re-extraer archivos fallidos",
+      "re_extract_close_button": "Cerrar",
+      "language_label": "Idioma:",
+      "archive_missing": "No se encontró {0}. Descargue el archivo:",
+      "alt_download_label": "Otros métodos de descarga:",
+      "alt_download_open": "Abrir",
+      "download_torrent": "Torrent",
+      "download_magnet": "Magnet",
+      "download_google_drive": "Google Drive",
+      "download_mega": "Mega",
+      "download_all": "Todas las descargas"
     },
     "status": {
       "status_ready": "Listo para instalar MediCat",
@@ -231,7 +266,12 @@
       "bin_download_complete": "Todos los archivos bin descargados exitosamente",
       "bin_download_errors": "Descarga de archivos bin completada con errores",
       "bin_download_failed": "Descarga de archivos bin falló",
-      "installing_module": "Cargando bibliotecas de extracción desde lib/..."
+      "installing_module": "Cargando bibliotecas de extracción desde lib/...",
+      "downloading_archive_mirror": "Descargando desde {0}...",
+      "resuming_archive_mirror": "Reanudando descarga desde {0}...",
+      "download_archive_complete": "Descarga del archivo completada",
+      "ventoy_found": "Ventoy encontrado en {0}",
+      "ventoy_not_on_drive": "Ventoy no detectado en {0}"
     },
     "messages": {
       "no_internet": "No se detectó conexión a internet. Por favor verifique su conexión e intente nuevamente.",
@@ -249,6 +289,7 @@
       "verification_failed": "La verificación de archivos encontró {0} archivo(s) que fallaron la verificación.\n\n¿Desea intentar re-extraer los archivos faltantes del archivo?",
       "re_extract_complete": "Re-extracción completada. Puede querer ejecutar la verificación de archivos nuevamente para confirmar.",
       "re_extract_failed": "Re-extracción completada con errores.\n\nExtraídos: {0}/{1}\nFallaron: {2}\n\nRevise el registro para más detalles.",
+      "verify_still_failed_after_reextract": "La verificación aún encontró {0} archivo(s) que no coinciden después de la re-extracción.\n\nRevise su antivirus, firewall u otro software de seguridad. Pueden bloquear, poner en cuarentena o eliminar archivos al extraer a una unidad USB.\n\nLos registros se guardan junto a este instalador (medicat_installer.log, check.log, reextract.log). Una actualización futura permitirá subir registros con una palabra clave de soporte para ayuda en Discord.",
       "download_failed": "Falló al descargar el archivo de verificación. Por favor verifique su conexión a internet.",
       "verification_error": "Ocurrió un error durante la verificación de archivos: {0}",
       "re_extraction_error": "Ocurrió un error durante la re-extracción: {0}",
@@ -259,6 +300,7 @@
       "selection_cancelled": "La selección del archivo fue cancelada. La re-extracción no puede continuar.",
       "no_drive_for_check": "Por favor seleccione una unidad USB primero.",
       "drive_lost_after_ventoy": "No se pudo encontrar la unidad USB después de la instalación de Ventoy. Puede que no se haya vuelto a montar — verifique el Administrador de discos e intente nuevamente.",
+      "archive_download_failed": "Error al descargar el archivo: {0}",
       "drive_under_minimum": "La unidad {0} es demasiado pequeña. MediCat requiere al menos 30 GB de capacidad total."
     },
     "ventoy_warning": {
@@ -296,6 +338,7 @@
       "verification_failed": "Verificación Falló - ¿Re-extraer Archivos?",
       "re_extraction_complete": "Re-extracción Completa",
       "re_extraction_failed": "Re-extracción Completa con Errores",
+      "verify_still_failed_after_reextract": "Verificación aún fallida",
       "download_failed": "Descarga Falló",
       "verification_error": "Error de Verificación",
       "re_extraction_error": "Error de Re-extracción",
@@ -357,7 +400,8 @@
       "show_hard_drives": "Afficher les disques durs",
       "show_all_drives": "Afficher tous les lecteurs",
       "format_checkbox": "Formatter le lecteur avant l'installation",
-      "skip_ventoy_checkbox": "Ignorer l'installation/mise à jour Ventoy",
+      "install_ventoy_checkbox": "Installer Ventoy",
+      "update_ventoy_checkbox": "Mettre à jour Ventoy ?",
       "install_button": "Installer MediCat",
       "cancel_button": "Annuler",
       "check_files_button": "Vérifier les fichiers USB",
@@ -372,8 +416,21 @@
       "ventoy_gpt_partition": "Utiliser le style de partition GPT (par défaut : MBR)",
       "ventoy_version_hint": "ex. 1.0.99 (vide = dernière)",
       "open_file_log_button": "Ouvrir le journal des fichiers",
+      "manual_install_button": "Des problèmes ? Essayez l'installation manuelle",
       "file_log_title": "Journal d'extraction",
-      "language_label": "Langue :"
+      "re_extract_window_title": "Vérification échouée",
+      "re_extract_summary": "{0} fichier(s) ont échoué la vérification.",
+      "re_extract_button": "Ré-extraire les fichiers échoués",
+      "re_extract_close_button": "Fermer",
+      "language_label": "Langue :",
+      "archive_missing": "{0} introuvable. Téléchargez l'archive :",
+      "alt_download_label": "Autres méthodes de téléchargement :",
+      "alt_download_open": "Ouvrir",
+      "download_torrent": "Torrent",
+      "download_magnet": "Magnet",
+      "download_google_drive": "Google Drive",
+      "download_mega": "Mega",
+      "download_all": "Toutes les téléchargements"
     },
     "status": {
       "status_ready": "Prêt à installer MediCat",
@@ -405,7 +462,12 @@
       "bin_download_complete": "Tous les fichiers bin téléchargés avec succès",
       "bin_download_errors": "Téléchargement des fichiers bin terminé avec des erreurs",
       "bin_download_failed": "Téléchargement des fichiers bin échoué",
-      "installing_module": "Chargement des bibliothèques d'extraction depuis lib/..."
+      "installing_module": "Chargement des bibliothèques d'extraction depuis lib/...",
+      "downloading_archive_mirror": "Téléchargement depuis {0}...",
+      "resuming_archive_mirror": "Reprise du téléchargement depuis {0}...",
+      "download_archive_complete": "Téléchargement de l'archive terminé",
+      "ventoy_found": "Ventoy trouvé sur {0}",
+      "ventoy_not_on_drive": "Ventoy non détecté sur {0}"
     },
     "messages": {
       "no_internet": "Aucune connexion Internet détectée. Veuillez vérifier votre connexion et réessayer.",
@@ -423,6 +485,7 @@
       "verification_failed": "La vérification des fichiers a trouvé {0} fichier(s) qui ont échoué la vérification.\n\nSouhaitez-vous tenter de ré-extraire les fichiers manquants de l'archive?",
       "re_extract_complete": "Ré-extraction terminée. Vous pouvez vouloir exécuter la vérification des fichiers à nouveau pour confirmer.",
       "re_extract_failed": "Ré-extraction terminée avec des erreurs.\n\nExtraits: {0}/{1}\nÉchoués: {2}\n\nConsultez le journal pour plus de détails.",
+      "verify_still_failed_after_reextract": "La vérification a encore trouvé {0} fichier(s) qui ne correspondent pas après la ré-extraction.\n\nVérifiez votre antivirus, pare-feu ou autre logiciel de sécurité. Ils peuvent bloquer, mettre en quarantaine ou supprimer des fichiers lors de l'extraction sur une clé USB.\n\nLes journaux sont enregistrés à côté de cet installateur (medicat_installer.log, check.log, reextract.log). Une future mise à jour permettra d'envoyer les journaux avec un mot-clé de support pour l'aide Discord.",
       "download_failed": "Échec du téléchargement du fichier de vérification. Veuillez vérifier votre connexion Internet.",
       "verification_error": "Une erreur s'est produite lors de la vérification des fichiers: {0}",
       "re_extraction_error": "Une erreur s'est produite lors de la ré-extraction: {0}",
@@ -433,6 +496,7 @@
       "selection_cancelled": "La sélection du fichier d'archive a été annulée. La ré-extraction ne peut pas continuer.",
       "no_drive_for_check": "Veuillez d'abord sélectionner un lecteur USB.",
       "drive_lost_after_ventoy": "Le lecteur USB est introuvable après l'installation de Ventoy. Il a peut-être échoué à se remonter — vérifiez le Gestionnaire de disques et réessayez.",
+      "archive_download_failed": "Échec du téléchargement de l'archive : {0}",
       "drive_under_minimum": "Le lecteur {0} est trop petit. MediCat nécessite au moins 30 Go de capacité totale."
     },
     "ventoy_warning": {
@@ -470,6 +534,7 @@
       "verification_failed": "Vérification Échouée - Ré-extraire les Fichiers?",
       "re_extraction_complete": "Ré-extraction Terminée",
       "re_extraction_failed": "Ré-extraction Terminée avec Erreurs",
+      "verify_still_failed_after_reextract": "Vérification toujours échouée",
       "download_failed": "Échec du Téléchargement",
       "verification_error": "Erreur de Vérification",
       "re_extraction_error": "Erreur de Ré-extraction",
@@ -531,7 +596,8 @@
       "show_hard_drives": "Pokaż dyski twarde",
       "show_all_drives": "Pokaż wszystkie dyski",
       "format_checkbox": "Sformatuj dysk przed instalacją",
-      "skip_ventoy_checkbox": "Pomiń instalację/aktualizację Ventoy",
+      "install_ventoy_checkbox": "Zainstaluj Ventoy",
+      "update_ventoy_checkbox": "Zaktualizować Ventoy?",
       "install_button": "Zainstaluj MediCat",
       "cancel_button": "Anuluj",
       "check_files_button": "Zweryfikuj pliki USB",
@@ -546,8 +612,21 @@
       "ventoy_gpt_partition": "Użyj stylu partycji GPT (domyślnie: MBR)",
       "ventoy_version_hint": "np. 1.0.99 (puste = najnowsza)",
       "open_file_log_button": "Otwórz dziennik plików",
+      "manual_install_button": "Problemy? Wypróbuj instalację ręczną",
       "file_log_title": "Dziennik rozpakowywania",
-      "language_label": "Język:"
+      "re_extract_window_title": "Weryfikacja nie powiodła się",
+      "re_extract_summary": "{0} plików nie przeszło weryfikacji.",
+      "re_extract_button": "Ponownie rozpakuj nieudane pliki",
+      "re_extract_close_button": "Zamknij",
+      "language_label": "Język:",
+      "archive_missing": "Nie znaleziono {0}. Pobierz archiwum:",
+      "alt_download_label": "Inne metody pobierania:",
+      "alt_download_open": "Otwórz",
+      "download_torrent": "Torrent",
+      "download_magnet": "Magnet",
+      "download_google_drive": "Google Drive",
+      "download_mega": "Mega",
+      "download_all": "Wszystkie pobrania"
     },
     "status": {
       "status_ready": "Gotowy do instalacji MediCat",
@@ -579,7 +658,12 @@
       "bin_download_complete": "Wszystkie pliki bin zostały pomyślnie pobrane",
       "bin_download_errors": "Pobieranie plików bin zakończyło się z problemami",
       "bin_download_failed": "Pobieranie plików bin nie powiodło się",
-      "installing_module": "Ładowanie bibliotek rozpakowywania z lib/..."
+      "installing_module": "Ładowanie bibliotek rozpakowywania z lib/...",
+      "downloading_archive_mirror": "Pobieranie z {0}...",
+      "resuming_archive_mirror": "Wznawianie pobierania z {0}...",
+      "download_archive_complete": "Pobieranie archiwum zakończone",
+      "ventoy_found": "Znaleziono Ventoy na {0}",
+      "ventoy_not_on_drive": "Nie wykryto Ventoy na {0}"
     },
     "messages": {
       "no_internet": "Nie wykryto połączenia z Internetem. Sprawdź połączenie i spróbuj ponownie.",
@@ -597,6 +681,7 @@
       "verification_failed": "Weryfikacja plików wykryła {0} plików, które nie przeszły weryfikacji.\n\nCzy chcesz ponownie wyodrębnić brakujące pliki z archiwum?",
       "re_extract_complete": "Ponowne wyodrębnianie zakończone. Możesz ponownie uruchomić weryfikację plików, aby to potwierdzić.",
       "re_extract_failed": "Ponowne wyodrębnianie zakończone z błędami.\n\nWyodrębniono: {0}/{1}\nNiepowodzenie: {2}\n\nSzczegółowe informacje znajdziesz w dzienniku.",
+      "verify_still_failed_after_reextract": "Weryfikacja nadal wykryła {0} plików, które nie pasują po ponownym rozpakowaniu.\n\nSprawdź program antywirusowy, zaporę sieciową lub inne oprogramowanie zabezpieczające. Mogą blokować, kwarantannować lub usuwać pliki podczas rozpakowywania na dysk USB.\n\nDzienniki są zapisywane obok tego instalatora (medicat_installer.log, check.log, reextract.log). W przyszłej aktualizacji będzie można przesłać dzienniki z hasłem wsparcia, aby uzyskać pomoc na Discordzie.",
       "download_failed": "Nie udało się pobrać pliku weryfikacyjnego. Sprawdź połączenie internetowe.",
       "verification_error": "Wystąpił błąd podczas weryfikacji plików: {0}",
       "re_extraction_error": "Wystąpił błąd podczas ponownego rozpakowywania: {0}",
@@ -607,6 +692,7 @@
       "selection_cancelled": "Wybór pliku archiwum został anulowany. Nie można kontynuować ponownego rozpakowywania.",
       "no_drive_for_check": "Najpierw wybierz dysk USB.",
       "drive_lost_after_ventoy": "Nie można znaleźć dysku USB po instalacji Ventoy. Możliwe, że nie został ponownie zamontowany — sprawdź Menedżera dysków i spróbuj ponownie.",
+      "archive_download_failed": "Pobieranie archiwum nie powiodło się: {0}",
       "drive_under_minimum": "Dysk {0} jest za mały. MediCat wymaga co najmniej 30 GB całkowitej pojemności."
     },
     "ventoy_warning": {
@@ -644,6 +730,7 @@
       "verification_failed": "Weryfikacja nie powiodła się — ponownie rozpakować pliki?",
       "re_extraction_complete": "Ponowne rozpakowanie zakończone",
       "re_extraction_failed": "Ponowne rozpakowanie zakończone z błędami",
+      "verify_still_failed_after_reextract": "Weryfikacja nadal nie powiodła się",
       "download_failed": "Pobieranie nie powiodło się",
       "verification_error": "Błąd weryfikacji",
       "re_extraction_error": "Błąd ponownego rozpakowania",
@@ -701,11 +788,20 @@
       "form_title": "MediCat Kurucu v{0} [Yönetici]",
       "title_label": "MediCat USB Kurucu",
       "language_label": "Dil:",
+      "archive_missing": "{0} bulunamadı. Arşivi indirin:",
+      "alt_download_label": "Diğer indirme yöntemleri:",
+      "alt_download_open": "Aç",
+      "download_torrent": "Torrent",
+      "download_magnet": "Magnet",
+      "download_google_drive": "Google Drive",
+      "download_mega": "Mega",
+      "download_all": "Tüm İndirmeler",
       "drive_label": "USB Sürücüsünü Seç:",
       "show_hard_drives": "Sabit diskleri göster",
       "show_all_drives": "Tüm sürücüleri göster",
       "format_checkbox": "Kurulumdan önce sürücüyü biçimlendir",
-      "skip_ventoy_checkbox": "Ventoy kurulumunu/yükseltmesini atla",
+      "install_ventoy_checkbox": "Ventoy kur",
+      "update_ventoy_checkbox": "Ventoy güncellensin mi?",
       "install_button": "MediCat Kur",
       "cancel_button": "İptal",
       "check_files_button": "USB Dosyalarını Kontrol Et",
@@ -720,7 +816,12 @@
       "ventoy_gpt_partition": "GPT bölüm stili kullan (varsayılan: MBR)",
       "ventoy_version_hint": "ör. 1.0.99 (boş = en son)",
       "open_file_log_button": "Dosya Günlüğünü Aç",
-      "file_log_title": "Çıkarma Dosya Günlüğü"
+      "manual_install_button": "Sorun mu yaşıyorsunuz? Manuel kurulumu deneyin",
+      "file_log_title": "Çıkarma Dosya Günlüğü",
+      "re_extract_window_title": "Doğrulama başarısız",
+      "re_extract_summary": "{0} dosya doğrulamadan geçemedi.",
+      "re_extract_button": "Başarısız dosyaları yeniden çıkar",
+      "re_extract_close_button": "Kapat"
     },
     "status": {
       "status_ready": "MediCat kurulumu i?in haz?r",
@@ -752,7 +853,12 @@
       "bin_download_complete": "T?m bin dosyalar? ba?ar?yla indirildi",
       "bin_download_errors": "Bin dosyalar? indirme i?lemi hatalarla tamamland?",
       "bin_download_failed": "Bin dosyalar? indirilemedi",
-      "installing_module": "lib/... dizininden ??karma k?t?phaneleri y?kleniyor"
+      "installing_module": "lib/... dizininden ??karma k?t?phaneleri y?kleniyor",
+      "downloading_archive_mirror": "{0} üzerinden indiriliyor...",
+      "resuming_archive_mirror": "{0} üzerinden indirme sürdürülüyor...",
+      "download_archive_complete": "Ar?iv indirmesi tamamland?",
+      "ventoy_found": "Ventoy bulundu: {0}",
+      "ventoy_not_on_drive": "Ventoy alg?lanmad?: {0}"
     },
     "messages": {
       "no_internet": "?nternet ba?lant?s? alg?lanmad?. L?tfen ba?lant?n?z? kontrol edip tekrar deneyin.",
@@ -771,6 +877,7 @@
       "verification_failed": "Dosya do?rulama {0} dosyay? do?rulayamad?.\n\nEksik dosyalar? ar?ivden yeniden ??karmay? denemek ister misiniz?",
       "re_extract_complete": "Yeniden ??karma tamamland?. Onaylamak i?in dosya do?rulamas?n? tekrar ?al??t?rabilirsiniz.",
       "re_extract_failed": "Yeniden ??karma hatalarla tamamland?.\n\n??kar?lan: {0}/{1}\nBa?ar?s?z: {2}\n\nAyr?nt?lar i?in g?nl??e bak?n.",
+      "verify_still_failed_after_reextract": "Yeniden ??karma sonras? do?rulama h?l? {0} dosyan?n e?le?medi?ini buldu.\n\nAntivir?s, g?venlik duvar? veya ba?ka g?venlik yaz?l?mlar?n? kontrol edin. USB s?r?c?s?ne ??kar?rken dosyalar? engelleyebilir, karantinaya alabilir veya silebilirler.\n\nG?nl?kler bu y?kleyicinin yan?na kaydedilir (medicat_installer.log, check.log, reextract.log). Gelecekte bir g?ncelleme, Discord deste?i i?in bir destek anahtar kelimesiyle g?nl?k y?klemeye izin verecek.",
       "download_failed": "Do?rulama dosyas? indirilemedi. L?tfen internet ba?lant?n?z? kontrol edin.",
       "verification_error": "Dosya do?rulama s?ras?nda bir hata olu?tu: {0}",
       "md5_manifest_missing": "Paketlenmi? MD5 do?rulama manifesti y?klenemedi. MediCatInstaller.exe'yi yeniden y?kleyin veya medicat_installer.log dosyas?na bak?n.",
@@ -783,7 +890,8 @@
       "no_drive_for_check": "?nce bir USB s?r?c?s? se?in.",
       "usb_too_small": "USB s?r?c?s?nde MediCat i?in yeterli bo? alan yok.",
       "drive_under_minimum": "{0} s?r?c?s? ?ok k???k. MediCat en az 30 GB toplam kapasite gerektirir.",
-      "drive_lost_after_ventoy": "Ventoy kurulumu sonras? USB s?r?c?s? bulunamad?. Yeniden ba?lanmam?? olabilir ? Disk Y?netimi'ni kontrol edip tekrar deneyin."
+      "drive_lost_after_ventoy": "Ventoy kurulumu sonras? USB s?r?c?s? bulunamad?. Yeniden ba?lanmam?? olabilir ? Disk Y?netimi'ni kontrol edip tekrar deneyin.",
+      "archive_download_failed": "Ar?iv indirilemedi: {0}"
     },
     "ventoy_warning": {
       "title": "Ventoy Installation Warning",
@@ -820,6 +928,7 @@
       "verification_failed": "Do?rulama Ba?ar?s?z - Dosyalar Yeniden ??kar?ls?n m??",
       "re_extraction_complete": "Yeniden ??karma Tamamland?",
       "re_extraction_failed": "Yeniden ??karma Hatalarla Tamamland?",
+      "verify_still_failed_after_reextract": "Do?rulama H?l? Ba?ar?s?z",
       "download_failed": "?ndirme Ba?ar?s?z",
       "verification_error": "Do?rulama Hatas?",
       "re_extraction_error": "Yeniden ??karma Hatas?",

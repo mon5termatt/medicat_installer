@@ -14,24 +14,38 @@ Native Windows installer for MediCat USB bootable media. **Active development is
 | `pwsh` | PowerShell 7 + WinForms | Legacy alpha |
 | `main` | Batch scripts | Community maintenance |
 
-The C++ installer handles Ventoy install/upgrade, optional NTFS format, `MediCat.USB.v21.12.7z` extraction, and MD5 verification. Tools (`7za.exe`, `7z.exe`, `MedicatFiles.md5`) are **embedded in the exe** and extracted to `%TEMP%\MedicatInstaller\{pid}\` at runtime.
+The C++ installer handles Ventoy install/upgrade, optional NTFS format, `MediCat.USB.v21.12.7z` extraction, MD5 verification, and selective re-extract on verify failure. Tools (`7za.exe`, `7z.exe`, `MedicatFiles.md5`) are **embedded in the exe** and extracted to `%TEMP%\MedicatInstaller\{pid}\` at runtime.
+
+**Docs:** [`README.md`](README.md) · [`FEATURES.md`](FEATURES.md) · [`TODO.md`](TODO.md)
+
+## Repo layout
+
+```
+src/                 # C++ source (namespace medicat)
+i18n/translations.json
+tools/               # i18n_codegen.py, Ventoy version list, offline populate
+res/                 # manifest, icons, bundle.rc.in
+build/               # CMake output (gitignored)
+7za.exe, bin/7z.exe, MedicatFiles.md5   # bundle inputs at repo root
+```
 
 ## Architecture
 
-### Core layout (`cpp/src/`)
+### Core modules (`src/`)
 
 | Module | Role |
 |--------|------|
 | `main.cpp` | Entry, `App::Run()` |
-| `app.cpp` | Install/verify orchestration, worker threads, `PostDone` |
-| `gui.cpp` | Win32 UI, dark theme, file-log window, progress |
+| `app.cpp` | Install/verify orchestration, worker threads, re-extract, `PostDone` |
+| `gui.cpp` | Win32 UI, dark theme, status bar, file-log + re-extract windows |
 | `drives.cpp` | USB/VHD/HDD enumeration, drive identity, capacity checks |
 | `ventoy.cpp` | Download, extract, `VTOYCLI /I` or `/U` |
-| `extract.cpp` | `7za` subprocess, stdout pipe, `extract.log` tee |
+| `extract.cpp` | `7za` subprocess; full + selective (`@list`) extract |
 | `verify.cpp` | Parallel MD5 verify, `check.log`, manifest load |
 | `debug.cpp` | Auto `debug.log` on errors (system + tool diagnostics) |
 | `bundle.cpp` | Extract embedded resources from exe |
-| `download.cpp` | WinHTTP downloads (Ventoy, manifest fallback) |
+| `download.cpp` | WinHTTP downloads (Ventoy, archive mirrors) |
+| `offline.cpp` | Offline Ventoy/archive cache paths |
 | `i18n.cpp` | `i18n::Tr()` — strings from build-generated header |
 | `theme.cpp` | GDI+ dark controls, flat checkboxes, glow buttons |
 | `log.cpp` | `medicat_installer.log` beside exe |
@@ -42,15 +56,19 @@ Long work runs on **detached `std::thread` workers** (`RunInstallThread`, `RunVe
 
 ```cpp
 // Worker posts to UI thread:
-PostExtractProgress(percent, fileLine, resetLog);  // WM_MEDICAT_PROGRESS
-PostDone(success, message, title);                 // WM_MEDICAT_DONE
-
-// Gui handles WM_MEDICAT_PROGRESS:
-//   extractUpdate=true → NotifyExtractProgress → timer batches listbox lines
-//   extractUpdate=false → SetProgress only
+PostProgress(percent);                           // WM_MEDICAT_PROGRESS
+PostExtractProgress(percent, file, resetLog);    // WM_MEDICAT_PROGRESS (extractUpdate)
+PostStatusBar(text);                             // WM_MEDICAT_PROGRESS (statusOnly)
+PostDone(success, message, title);               // WM_MEDICAT_DONE
 ```
 
+**Status bar** — single line below progress bar. Any code updates it via `Gui::SetStatusBar` (UI thread) or `App::PostStatusBar` (workers). Includes Ventoy-on-drive detection (`status.ventoy_found` / `status.ventoy_not_on_drive`).
+
+**File log popup** — optional listbox during extract/verify; status bar shows `status.extracting_file` with percent.
+
 `Gui::SetBusy(true, BusyProgressMode::Verify|FileLog)` enables a 250ms timer that flushes pending file-log lines to the listbox.
+
+**Re-extract prompt** — `WM_MEDICAT_REEXTRACT_PROMPT` opens a dedicated window (`Gui::OpenReExtractPrompt`) with failed-file list + **Re-extract** button; worker blocks on user choice via event.
 
 ### Key design principles
 
@@ -58,6 +76,21 @@ PostDone(success, message, title);                 // WM_MEDICAT_DONE
 2. **Thread-safe UI** — workers post messages; GUI thread owns HWNDs
 3. **Single-file distribution** — bundle 7za/7z/MD5 into exe; no sidecar copies
 4. **Diagnostics on failure** — `debug.log` auto-written in `PostDone(false, …)`
+
+## Ventoy UI & install logic
+
+- **Detect on drive select:** `TestVentoyInstalled(drive)` → `{drive}\ventoy` folder; updates status bar + checkbox mode (`RefreshDriveVentoyControls`)
+- **No Ventoy on drive:** checkbox shows **Install Ventoy** — checked + disabled; format forced on + disabled
+- **Ventoy present:** checkbox shows **Update Ventoy?** — optional; format enabled (defaults unchecked on drive change)
+- **Install thread:** `runVentoy = Gui::RunVentoyChecked()`; `/I` when `format || !ventoyInstalled`; `/U` for in-place upgrade otherwise
+- Advanced: pin Ventoy version, GPT (`/GPT`), Secure Boot (`/NOSB`)
+
+## Verify & re-extract
+
+- Post-install and **Check USB Files** both run `VerifyMedicatFiles`
+- On failure with failures list: re-extract window → `Extract7zArchiveSelective` (`7za … @reextract_list.txt`) → re-verify
+- If still failing: `messages.verify_still_failed_after_reextract` (antivirus/firewall hint)
+- After successful re-verify: show normal verification success message (not “run verify again”)
 
 ## Drive management (`drives.cpp`)
 
@@ -69,10 +102,13 @@ PostDone(success, message, title);                 // WM_MEDICAT_DONE
 
 ## Logging (beside exe)
 
+Plain-text diagnostics only — future support upload is **`.log` / `.txt` only** (see `TODO.md`).
+
 | File | When |
 |------|------|
 | `medicat_installer.log` | Every session |
-| `extract.log` | 7za stdout/stderr during extract |
+| `extract.log` | 7za stdout/stderr during full extract |
+| `reextract.log` | Selective re-extract (`7za @list`) |
 | `check.log` | Per-file MD5 result during verify |
 | `debug.log` | On operation failure only |
 | `failed_files.txt` | Verification failures |
@@ -80,19 +116,18 @@ PostDone(success, message, title);                 // WM_MEDICAT_DONE
 ## i18n
 
 - Source: `i18n/translations.json` (EN, ES, FR, PL, TR)
-- Build codegen: `tools/i18n_codegen.py` → `cpp/src/i18n_generated.h`
+- Build codegen: `tools/i18n_codegen.py` → `src/i18n_generated.h`
 - Usage: `i18n::Tr(L"key")` or `i18n::Tr(L"key", arg1, arg2)`
 - Add keys to **all five languages** in `translations.json`; rebuild regenerates header
 
 ## Build
 
 ```bat
-cd cpp
 cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
-Output: `cpp/build/Release/MedicatInstaller.exe`
+Output: `build/Release/MedicatInstaller.exe`
 
 **Bundle inputs** (repo root): `7za.exe` (or `7z/x64/7za.exe`), `bin/7z.exe`, `MedicatFiles.md5`
 
@@ -109,18 +144,19 @@ Defines: `INSTALLER_VERSION`, `MEDICAT_USB_VERSION` (CMake)
 
 ## When adding features
 
-1. Read `cpp/FEATURES.md` for parity checklist vs PowerShell installer
-2. Wire progress through `PostExtractProgress` / `onFileLog` callbacks
-3. Add i18n keys for user-visible strings
+1. Read [`FEATURES.md`](FEATURES.md) for parity checklist vs PowerShell installer
+2. Wire progress through `PostExtractProgress` / `PostStatusBar` / `onFileLog` callbacks
+3. Add i18n keys for user-visible strings (all five languages)
 4. Log via `log_->Info/Error/Debug` in `app.cpp`; module `onLog` for verify/ventoy
 5. On new failure paths, ensure `PostDone(false, msg)` runs so `debug.log` is generated
-6. Do not commit `cpp/build/`, logs, `Ventoy2Disk/`, or `.7z` archives
+6. Do not commit `build/`, logs, `Ventoy2Disk/`, or `.7z` archives — see README **Contributing**
 
 ## Testing notes
 
 - Requires **Administrator** (UAC manifest on exe)
 - Test USB, VHD, and **Show all drives** (fixed disk) paths
-- Verify: ~29k files / ~28 GB — throughput log warns if OS read cache makes timing misleading
+- Test Ventoy-present vs absent drive: checkbox labels, forced format/install
+- Verify: ~29k files / ~28 GB — re-extract path for selective failures
 - Ventoy may remount drive under a different letter — confirm dialog must pass
 - Release asset uploaded to GitHub tag (e.g. `3520` prerelease) via `gh release upload --clobber`
 
@@ -128,7 +164,7 @@ Defines: `INSTALLER_VERSION`, `MEDICAT_USB_VERSION` (CMake)
 
 - Destructive ops require explicit confirmation (`wipe_confirm`, `ventoy_warning`)
 - MD5 verify reads full file bytes; incomplete reads fail hash
-- Internet required only for Ventoy download (not for verify-only with bundled manifest)
+- Internet required for Ventoy download (not for verify-only with bundled manifest); offline cache supported
 
 ## Legacy reference
 

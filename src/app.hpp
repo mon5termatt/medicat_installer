@@ -21,16 +21,22 @@ private:
         bool success = false;
         std::wstring message;
         std::wstring title;
+        size_t failedFiles = 0;
+        std::vector<std::wstring> failures;
     };
 
     void OnInstall();
     void OnVerify();
     void PostProgress(int percent, bool clearLog = false);
     void PostExtractProgress(int percent, const std::wstring& file = L"", bool resetLog = false);
+    void PostStatusBar(const std::wstring& text);  // Thread-safe; updates Gui::SetStatusBar on the UI thread.
     void PostDone(bool success, const std::wstring& message, const std::wstring& title = L"");
     std::wstring WriteErrorDebugLog(const std::wstring& message, const std::wstring& title);
     VerificationOutcome VerifyDriveFiles(const std::wstring& drive, bool showFileProgress = true);
-    void RunInstallThread(std::wstring drive, bool format, bool skipVentoy, std::wstring pinVersion,
+    bool TryReExtractFailedFiles(const std::wstring& drive, const std::wstring& archive,
+                                 const std::vector<std::wstring>& failureDetails);
+    bool PromptReExtract(const VerificationOutcome& outcome);
+    void RunInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
                           VentoyInstallOptions ventoyInstall, HWND hwnd);
     void RunVerifyThread(std::wstring drive);
 

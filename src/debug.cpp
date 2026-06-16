@@ -398,7 +398,7 @@ std::wstring WriteDebugLog(const DebugReportContext& context) {
     body << "[Installer options]\n";
     AppendLine(body, "Selected drive: ", DescribeDrive(context.selectedDrive));
     AppendLine(body, "Format drive: ", context.formatChecked ? L"yes" : L"no");
-    AppendLine(body, "Skip Ventoy: ", context.skipVentoyChecked ? L"yes" : L"no");
+    AppendLine(body, "Run Ventoy: ", context.runVentoyChecked ? L"yes" : L"no");
     AppendLine(body, "Ventoy GPT: ", context.ventoyGpt ? L"yes" : L"no");
     AppendLine(body, "Ventoy Secure Boot: ", context.ventoySecureBoot ? L"enabled" : L"disabled");
     AppendLine(body, "Pinned Ventoy version: ",

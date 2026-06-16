@@ -1,6 +1,6 @@
-# C++ Installer — Feature Restore Checklist
+# C++ Installer — Feature Checklist
 
-Track parity with the PowerShell installer (`pwsh` branch).  
+Track parity with the PowerShell installer (`pwsh` branch) and C++-specific enhancements.  
 Legend: ✅ done · 🟡 partial · ⬜ not started
 
 ---
@@ -9,17 +9,17 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Win32 GUI (drive picker, install button) | ✅ | `cpp/src/gui.cpp` |
+| Win32 GUI (drive picker, install button) | ✅ | `src/gui.cpp` |
 | Admin elevation (UAC manifest) | ✅ | `requireAdministrator` |
 | USB drive detection | ✅ | Removable drives; hides drives under 30 GiB |
 | VHD/VHDX drive detection | ✅ | `BusTypeFileBackedVirtual` |
 | Skip `C:` drive | ✅ | |
-| Format checkbox (NTFS) | 🟡 | `format.com` only; no GPT/Ventoy format path |
-| Skip Ventoy checkbox | ✅ | Checkbox + full skip path |
+| Format checkbox (NTFS) | 🟡 | `format.com` only; forced on when Ventoy not on drive |
+| Ventoy action checkbox | ✅ | **Install Ventoy** (forced) vs **Update Ventoy?** (optional) based on detection |
 | MediCat `.7z` extraction | ✅ | Bundled `7za.exe`, byte-based progress |
 | Post-extract MD5 verification | ✅ | `MedicatFiles.md5` manifest; missing + hash mismatch |
-| Progress bar + status text | ✅ | Uses `status.extracting_*` keys |
-| Current filename during extract | ✅ | From 7za stdout parser |
+| Progress bar + status bar | ✅ | Single-line status bar below progress; `SetStatusBar` / `PostStatusBar` |
+| File log popup during extract/verify | ✅ | Optional listbox window; status bar shows `status.extracting_file` |
 | Post-install files (icon, CheckFiles.bat) | ⬜ | PS: downloads from GitHub |
 | Install log file | ✅ | `medicat_installer.log` |
 | Raw 7za extract log | ✅ | `extract.log` (pipe tee, full stdout/stderr) |
@@ -30,18 +30,17 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Detect existing Ventoy (`VTOYEFI` / folder) | ✅ | `TestVentoyInstalled` — `{drive}\ventoy` folder |
-| Download latest Ventoy from GitHub | ✅ | GitHub `releases/latest`; optional pin in Advanced |
+| Detect existing Ventoy on selected drive | ✅ | `TestVentoyInstalled` — `{drive}\ventoy` folder; status bar + checkbox mode |
+| Download latest Ventoy from GitHub | ✅ | GitHub releases; optional pin in Advanced |
 | Extract Ventoy zip | ✅ | Bundled `7za.exe` |
-| Fresh install `VTOYCLI /I` | ✅ | When format checked |
-| Non-destructive upgrade `VTOYCLI /U` | ✅ | When format unchecked |
+| Fresh install `VTOYCLI /I` | ✅ | When format checked or Ventoy not detected |
+| Non-destructive upgrade `VTOYCLI /U` | ✅ | Ventoy present + Update Ventoy checked + format off |
 | Ventoy warning dialog | ✅ | `ventoy_warning.*` |
-| Ventoy-not-detected confirm dialog | ✅ | `ventoy_not_detected.*` when upgrade + no folder |
-| GPT / Secure Boot prompts | ✅ | Advanced options: GPT checkbox + Secure Boot (`/GPT` / `/NOSB`) |
 | Wipe confirmation dialog | ✅ | `wipe_confirm.*` before install starts |
 | Drive letter remap after Ventoy | ✅ | Disk-number tracking; confirm after Ventoy + final check before extract |
 | Bundle or download Ventoy2Disk | ✅ | Download to `Ventoy2Disk\` beside exe |
-| Advanced: pin Ventoy version | ✅ | Optional version field under Advanced options |
+| Advanced: pin Ventoy version | ✅ | Optional version combo under Advanced options |
+| GPT / Secure Boot options | ✅ | Advanced: GPT checkbox + Secure Boot (`/GPT` / `/NOSB`) |
 
 ---
 
@@ -49,12 +48,15 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| **Check USB Files** button | ✅ | Standalone MD5 verify on selected drive without re-extract |
-| Download `MedicatFiles.md5` | ✅ | Embedded in exe, extracted to temp at runtime |
+| **Check USB Files** button | ✅ | Standalone MD5 verify on selected drive |
+| Embedded `MedicatFiles.md5` | ✅ | Bundled in exe, extracted to temp at runtime |
 | Verify files via MD5/hash | ✅ | Runs automatically after install extract |
 | Show pass/fail summary | ✅ | Log + `failed_files.txt` on failure |
-| Re-extract missing files | ⬜ | PS: `Start-ReExtractFiles` with file list |
-| Archive picker for re-extract | ⬜ | |
+| Re-extract failed files (selective) | ✅ | `Extract7zArchiveSelective` via `7za @list`; `reextract.log` |
+| Re-extract prompt window | ✅ | Dedicated window with failed-file list + **Re-extract** button |
+| Re-verify after re-extract | ✅ | Normal success message if all pass |
+| Still-failed hint (AV/firewall) | ✅ | `messages.verify_still_failed_after_reextract` |
+| Support log upload (Discord keyword) | ⬜ | See [`TODO.md`](TODO.md) — logs/text only (`.log`, `.txt`) |
 
 ---
 
@@ -62,12 +64,13 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| **Refresh drives** button | ⬜ | PS: `refresh_button` |
-| **Show all drives** checkbox | ✅ | Includes fixed disks (HDD/SSD) ≥ 30 GiB; `C:` still hidden |
+| **Refresh drives** button | ⬜ | PS: `refresh_button` (list refreshes on show-all toggle / language change) |
+| **Show all drives** checkbox | ✅ | Fixed disks (HDD/SSD) ≥ 30 GiB; `C:` still hidden |
 | Default select first VHD | ✅ | |
-| Drive size / free display | ✅ | `ui.drive_format`; volume label shown when set |
+| Drive size / free display | ✅ | `ui.drive_format`; volume label when set |
 | Cancel button | ⬜ | PS had cancel |
-| Internet check before install | ✅ | `TestInternetConnection` when Ventoy enabled |
+| Internet check before install | ✅ | `TestInternetConnection` when Ventoy step runs |
+| Archive download mirrors | ✅ | Missing-archive panel + offline cache paths |
 | Antivirus / MOTD splash | ⬜ | Batch legacy |
 
 ---
@@ -80,7 +83,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Build-time codegen | ✅ | `tools/i18n_codegen.py` |
 | Auto-detect OS language | ✅ | `en` / `es` / `fr` / `pl` / `tr` |
 | In-app language selector | ✅ | Header combo; live UI refresh |
-| All UI strings via i18n | 🟡 | Main window + Ventoy flow wired |
+| All UI strings via i18n | 🟡 | Main window + Ventoy + re-extract wired |
 | Language override setting | ⬜ | Future: CLI flag or ini |
 
 ---
@@ -90,26 +93,23 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Bundle `7za.exe` in exe | ✅ | `bundle.cpp` |
-| Bundle `7z.exe` in exe | ✅ | For Ventoy zip / future use |
+| Bundle `7z.exe` in exe | ✅ | For Ventoy zip |
 | SevenZipSharp / `lib/` | ⬜ | **Not needed** — 7za subprocess only |
 | Self-update / version check | ⬜ | Batch: `curver` |
 
 ---
 
-## Suggested restore order
+## Suggested next work
 
-1. **Ventoy download + install/upgrade** — blocks real USB installs
-2. **Check USB Files + MD5 verify** — high user value, simpler than Ventoy
-3. **Refresh drives + show HDD** — quick UI wins
-4. **Post-install downloads** (icon, CheckFiles.bat)
-5. **Re-extract missing files**
-6. **Internet check + MOTD**
+1. **Support log upload** — keyword + staff lookup; `.log` / `.txt` only ([`TODO.md`](TODO.md))
+2. **Refresh drives** button — explicit UI control
+3. **Post-install downloads** (icon, CheckFiles.bat)
+4. **Internet check + MOTD**
 
 ---
 
 ## Reference
 
-PowerShell implementation: `origin/pwsh` branch  
+PowerShell implementation: `pwsh` branch  
 - `MedicatInstaller.ps1` — main GUI  
-- `MedicatFileChecker.ps1` — file check (if separate)  
-- `Extract-Archive.ps1` — extraction (replaced by `cpp/src/extract.cpp`)
+- `Extract-Archive.ps1` — extraction (replaced by `src/extract.cpp`)
