@@ -51,9 +51,9 @@ offline/MedicatFiles.md5
 Thumbs.db
 desktop.ini
 
-# Cursor rules
-.cursorrules
-.cursor/
+# Cursor rules are included for now.
+# .cursorrules
+# .cursor/
 
 # IDE / local build artifacts
 .vs/
