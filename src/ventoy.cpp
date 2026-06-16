@@ -11,6 +11,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <filesystem>
 
 namespace medicat {
 
@@ -49,34 +50,6 @@ int RunHiddenProcess(const std::wstring& commandLine, const std::wstring& workin
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
     return static_cast<int>(code);
-}
-
-bool RemoveDirectoryTree(const std::wstring& path) {
-    if (path.empty() || path.size() < 3) {
-        return false;
-    }
-    std::wstring pattern = JoinPath(path, L"*");
-    WIN32_FIND_DATAW fd{};
-    const HANDLE find = FindFirstFileW(pattern.c_str(), &fd);
-    if (find == INVALID_HANDLE_VALUE) {
-        return RemoveDirectoryW(path.c_str()) != FALSE;
-    }
-
-    do {
-        const std::wstring name = fd.cFileName;
-        if (name == L"." || name == L"..") {
-            continue;
-        }
-        const std::wstring full = JoinPath(path, name);
-        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            RemoveDirectoryTree(full);
-        } else {
-            SetFileAttributesW(full.c_str(), FILE_ATTRIBUTE_NORMAL);
-            DeleteFileW(full.c_str());
-        }
-    } while (FindNextFileW(find, &fd));
-    FindClose(find);
-    return RemoveDirectoryW(path.c_str()) != FALSE;
 }
 
 std::wstring ReadTextFile(const std::wstring& path) {
@@ -346,7 +319,7 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
         }
 
         if (FileExists(ventoyDir)) {
-            RemoveDirectoryTree(ventoyDir);
+            std::filesystem::remove_all(ventoyDir);
         }
 
         if (!MoveFileW(extractedDir.c_str(), ventoyDir.c_str())) {
