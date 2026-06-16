@@ -1,6 +1,6 @@
-#include "offline.h"
+#include "offline.hpp"
 
-#include "util.h"
+#include "util.hpp"
 
 #include <windows.h>
 

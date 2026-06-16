@@ -1,10 +1,10 @@
-#include "ventoy.h"
+#include "ventoy.hpp"
 
-#include "download.h"
-#include "extract.h"
-#include "offline.h"
-#include "resource.h"
-#include "util.h"
+#include "download.hpp"
+#include "extract.hpp"
+#include "offline.hpp"
+#include "resource.hpp"
+#include "util.hpp"
 
 #include <windows.h>
 

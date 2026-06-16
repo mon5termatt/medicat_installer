@@ -1,4 +1,4 @@
-#include "resource.h"
+#include "resource.hpp"
 
 IDI_APP_ICON ICON "icon.ico"
 IDR_LOGO_PNG RCDATA "icon.png"

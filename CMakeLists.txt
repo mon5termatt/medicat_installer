@@ -59,8 +59,9 @@ set_source_files_properties("${CMAKE_BINARY_DIR}/bundle.rc" PROPERTIES
     OBJECT_DEPENDS "${VENTOY_VERSIONS_GEN};${BUNDLE_MD5}"
 )
 
+#region i18n generation
 set(I18N_JSON "${REPO_ROOT}/i18n/translations.json")
-set(I18N_GEN "${CMAKE_CURRENT_SOURCE_DIR}/src/i18n_generated.h")
+set(I18N_GEN "${CMAKE_CURRENT_SOURCE_DIR}/src/i18n_generated.hpp")
 set(I18N_CODEGEN "${REPO_ROOT}/tools/i18n_codegen.py")
 
 add_custom_command(
@@ -70,6 +71,7 @@ add_custom_command(
     COMMENT "Generating i18n_generated.h"
     WORKING_DIRECTORY "${REPO_ROOT}"
 )
+#endregion
 
 # This function makes it so when a new code file is added, the project
 #   is reconfigured automatically (iirc)

@@ -1,15 +1,15 @@
-#include "app.h"
+#include "app.hpp"
 
-#include "bundle.h"
-#include "debug.h"
-#include "download.h"
-#include "drives.h"
-#include "extract.h"
-#include "i18n.h"
-#include "offline.h"
-#include "util.h"
-#include "ventoy.h"
-#include "verify.h"
+#include "bundle.hpp"
+#include "debug.hpp"
+#include "download.hpp"
+#include "drives.hpp"
+#include "extract.hpp"
+#include "i18n.hpp"
+#include "offline.hpp"
+#include "util.hpp"
+#include "ventoy.hpp"
+#include "verify.hpp"
 
 #include <cwctype>
 #include <functional>

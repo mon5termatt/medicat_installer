@@ -1,12 +1,12 @@
-#include "gui.h"
+#include "gui.hpp"
 
-#include "drives.h"
-#include "i18n.h"
-#include "offline.h"
-#include "resource.h"
-#include "theme.h"
-#include "util.h"
-#include "ventoy.h"
+#include "drives.hpp"
+#include "i18n.hpp"
+#include "offline.hpp"
+#include "resource.hpp"
+#include "theme.hpp"
+#include "util.hpp"
+#include "ventoy.hpp"
 
 #include <commctrl.h>
 #include <uxtheme.h>

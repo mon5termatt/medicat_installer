@@ -1,6 +1,6 @@
-#include "theme.h"
+#include "theme.hpp"
 
-#include "resource.h"
+#include "resource.hpp"
 
 #include <objidl.h>
 #include <algorithm>

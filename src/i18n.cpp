@@ -1,6 +1,6 @@
-#include "i18n.h"
+#include "i18n.hpp"
 
-#include "i18n_generated.h"
+#include "i18n_generated.hpp"
 
 #include <windows.h>
 

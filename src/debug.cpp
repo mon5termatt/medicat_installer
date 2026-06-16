@@ -1,8 +1,8 @@
-#include "debug.h"
+#include "debug.hpp"
 
-#include "drives.h"
-#include "util.h"
-#include "ventoy.h"
+#include "drives.hpp"
+#include "util.hpp"
+#include "ventoy.hpp"
 
 #include <windows.h>
 

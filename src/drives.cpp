@@ -1,7 +1,7 @@
-#include "drives.h"
+#include "drives.hpp"
 
-#include "i18n.h"
-#include "util.h"
+#include "i18n.hpp"
+#include "util.hpp"
 
 #include <windows.h>
 #include <winioctl.h>

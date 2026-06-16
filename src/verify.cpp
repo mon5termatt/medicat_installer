@@ -1,8 +1,8 @@
-#include "verify.h"
+#include "verify.hpp"
 
-#include "download.h"
-#include "offline.h"
-#include "util.h"
+#include "download.hpp"
+#include "offline.hpp"
+#include "util.hpp"
 
 #include <shlwapi.h>
 #include <windows.h>

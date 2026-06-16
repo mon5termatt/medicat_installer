@@ -1,7 +1,7 @@
-#include "extract.h"
+#include "extract.hpp"
 
-#include "drives.h"
-#include "util.h"
+#include "drives.hpp"
+#include "util.hpp"
 
 #include <windows.h>
 

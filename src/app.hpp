@@ -1,8 +1,8 @@
 #pragma once
 
-#include "gui.h"
-#include "log.h"
-#include "ventoy.h"
+#include "gui.hpp"
+#include "log.hpp"
+#include "ventoy.hpp"
 
 #include <atomic>
 #include <memory>

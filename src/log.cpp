@@ -1,4 +1,4 @@
-#include "log.h"
+#include "log.hpp"
 
 #include <windows.h>
 
