@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -13,6 +14,21 @@ namespace medicat {
 constexpr UINT WM_MEDICAT_PROGRESS = WM_APP + 1;
 constexpr UINT WM_MEDICAT_DONE = WM_APP + 2;
 constexpr UINT WM_MEDICAT_VENTOY_VERSIONS = WM_APP + 3;
+constexpr UINT WM_MEDICAT_REEXTRACT_PROMPT = WM_APP + 4;
+
+struct ReExtractPromptState {
+    HANDLE doneEvent = nullptr;
+    std::atomic<bool> wantReExtract{false};
+    std::atomic<bool> completed{false};
+};
+
+struct ReExtractPromptPayload {
+    std::wstring message;
+    std::wstring title;
+    size_t failedFiles = 0;
+    std::vector<std::wstring> failures;
+    std::shared_ptr<ReExtractPromptState> state;
+};
 
 struct ProgressPayload {
     int percent = 0;
@@ -53,6 +69,8 @@ public:
     // Clears the optional detail file-log popup only; does not touch the status bar.
     void ClearFileLog();
     void OpenFileLogWindow();
+    void OpenReExtractPrompt(ReExtractPromptPayload* payload);
+    void FinishReExtractPrompt(bool wantReExtract);
     void ShowDone(bool success, const std::wstring& message, const std::wstring& title = L"");
     std::wstring SelectedDrive() const;
     bool FormatChecked() const;
@@ -70,6 +88,7 @@ private:
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     static LRESULT CALLBACK ProgressBarProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     static LRESULT CALLBACK FileLogWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+    static LRESULT CALLBACK ReExtractWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     void OnCreate(HWND hwnd);
     void OnCommand(WPARAM wp);
     void RefreshDrives();
@@ -124,6 +143,12 @@ private:
     HWND altDownloadOpenBtn_ = nullptr;
     HWND fileLogWindow_ = nullptr;
     HWND fileLogList_ = nullptr;
+    HWND reExtractWindow_ = nullptr;
+    HWND reExtractMessage_ = nullptr;
+    HWND reExtractList_ = nullptr;
+    HWND reExtractBtn_ = nullptr;
+    HWND reExtractCloseBtn_ = nullptr;
+    std::shared_ptr<ReExtractPromptState> activeReExtractPrompt_;
 
     std::mutex uiMutex_;
     int pendingPercent_ = 0;

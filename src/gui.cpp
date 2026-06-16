@@ -168,6 +168,10 @@ constexpr int kDownloadMirror2BtnId = 1021;
 constexpr int kAltDownloadComboId = 1022;
 constexpr int kAltDownloadOpenBtnId = 1023;
 constexpr int kManualInstallBtnId = 1024;
+constexpr int kReExtractMessageId = 1101;
+constexpr int kReExtractListId = 1102;
+constexpr int kReExtractBtnId = 1103;
+constexpr int kReExtractCloseBtnId = 1104;
 constexpr UINT_PTR kUiRefreshTimerId = 1;
 constexpr UINT_PTR kArchiveCheckTimerId = 2;
 constexpr UINT kUiRefreshIntervalMs = 250;
@@ -177,6 +181,7 @@ constexpr int kAltComboWidth = 360;
 constexpr int kAltOpenBtnWidth = kContentWidth - kAltComboWidth - kDownloadBtnGap;
 constexpr int kAltOpenBtnX = kMargin + kAltComboWidth + kDownloadBtnGap;
 constexpr wchar_t kFileLogWindowClass[] = L"MedicatFileLogWindow";
+constexpr wchar_t kReExtractWindowClass[] = L"MedicatReExtractWindow";
 
 struct LanguageOption {
     const wchar_t* code;
@@ -517,6 +522,15 @@ bool Gui::Create(HINSTANCE instance) {
     logWc.hbrBackground = theme::GetBrushes().window;
     logWc.lpszClassName = kFileLogWindowClass;
     RegisterClassExW(&logWc);
+
+    WNDCLASSEXW reExtractWc{};
+    reExtractWc.cbSize = sizeof(reExtractWc);
+    reExtractWc.lpfnWndProc = Gui::ReExtractWndProc;
+    reExtractWc.hInstance = instance;
+    reExtractWc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    reExtractWc.hbrBackground = theme::GetBrushes().window;
+    reExtractWc.lpszClassName = kReExtractWindowClass;
+    RegisterClassExW(&reExtractWc);
 
     hwnd_ = CreateWindowExW(
         0, cls, i18n::Tr(L"ui.title_label").c_str(),
@@ -888,6 +902,174 @@ LRESULT CALLBACK Gui::FileLogWndProc(const HWND hwnd, const UINT msg, const WPAR
         case WM_DESTROY:
             self->fileLogWindow_ = nullptr;
             self->fileLogList_ = nullptr;
+            return 0;
+        default:
+            break;
+    }
+    return DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+void Gui::FinishReExtractPrompt(const bool wantReExtract) {
+    if (!activeReExtractPrompt_) {
+        return;
+    }
+
+    bool expected = false;
+    if (!activeReExtractPrompt_->completed.compare_exchange_strong(expected, true)) {
+        return;
+    }
+
+    activeReExtractPrompt_->wantReExtract = wantReExtract;
+    if (activeReExtractPrompt_->doneEvent) {
+        SetEvent(activeReExtractPrompt_->doneEvent);
+    }
+
+    const HWND window = reExtractWindow_;
+    activeReExtractPrompt_.reset();
+    if (window && IsWindow(window)) {
+        DestroyWindow(window);
+    }
+}
+
+void Gui::OpenReExtractPrompt(ReExtractPromptPayload* payload) {
+    if (!payload || !payload->state || !payload->state->doneEvent) {
+        delete payload;
+        return;
+    }
+
+    if (reExtractWindow_ && IsWindow(reExtractWindow_)) {
+        DestroyWindow(reExtractWindow_);
+    }
+
+    activeReExtractPrompt_ = payload->state;
+
+    RECT mainRc{};
+    GetWindowRect(hwnd_, &mainRc);
+
+    const std::wstring title =
+        payload->title.empty() ? i18n::Tr(L"ui.re_extract_window_title") : payload->title;
+    const std::wstring summary = i18n::Tr(L"ui.re_extract_summary",
+                                          std::to_wstring(payload->failedFiles > 0 ? payload->failedFiles
+                                                                                   : payload->failures.size()));
+
+    reExtractWindow_ = CreateWindowExW(
+        0, kReExtractWindowClass, title.c_str(), WS_OVERLAPPEDWINDOW,
+        mainRc.right + 12, mainRc.top + 40, 560, 420, hwnd_, nullptr, instance_, this);
+    if (!reExtractWindow_) {
+        FinishReExtractPrompt(false);
+        delete payload;
+        return;
+    }
+
+    theme::EnableDarkModeRecursive(reExtractWindow_);
+    const HFONT uiFont = theme::MakeUiFont();
+    const HFONT logFont = theme::MakeLogFont();
+
+    reExtractMessage_ = CreateWindowW(
+        L"STATIC", summary.c_str(), WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
+        16, 16, 520, 48, reExtractWindow_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kReExtractMessageId)), instance_, nullptr);
+
+    reExtractList_ = CreateWindowW(
+        L"LISTBOX", nullptr,
+        WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | WS_HSCROLL | LBS_NOINTEGRALHEIGHT,
+        16, 72, 520, 260, reExtractWindow_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kReExtractListId)), instance_, nullptr);
+
+    reExtractBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.re_extract_button").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        16, 348, 300, 32, reExtractWindow_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kReExtractBtnId)), instance_, nullptr);
+
+    reExtractCloseBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.re_extract_close_button").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        332, 348, 204, 32, reExtractWindow_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kReExtractCloseBtnId)), instance_, nullptr);
+
+    for (HWND child : {reExtractMessage_, reExtractList_, reExtractBtn_, reExtractCloseBtn_}) {
+        if (child && IsWindow(child)) {
+            SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+        }
+    }
+    SendMessageW(reExtractList_, WM_SETFONT, reinterpret_cast<WPARAM>(logFont), TRUE);
+
+    SendMessageW(reExtractList_, LB_RESETCONTENT, 0, 0);
+    for (size_t i = 0; i < payload->failures.size(); ++i) {
+        SendMessageW(reExtractList_, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(payload->failures[i].c_str()));
+    }
+    if (payload->failedFiles > payload->failures.size() && payload->failedFiles > 0) {
+        const std::wstring more = L"... and " +
+                                  std::to_wstring(payload->failedFiles - payload->failures.size()) + L" more";
+        SendMessageW(reExtractList_, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(more.c_str()));
+    }
+    SendMessageW(reExtractList_, LB_SETHORIZONTALEXTENT, 8000, 0);
+
+    SubclassGlowButton(reExtractBtn_, true);
+    SubclassGlowButton(reExtractCloseBtn_, false);
+
+    delete payload;
+
+    ShowWindow(reExtractWindow_, SW_SHOW);
+    SetForegroundWindow(reExtractWindow_);
+    UpdateWindow(reExtractWindow_);
+}
+
+LRESULT CALLBACK Gui::ReExtractWndProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp) {
+    Gui* self = nullptr;
+    if (msg == WM_NCCREATE) {
+        auto* cs = reinterpret_cast<CREATESTRUCTW*>(lp);
+        self = static_cast<Gui*>(cs->lpCreateParams);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+        return TRUE;
+    }
+
+    self = reinterpret_cast<Gui*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    if (!self) {
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    }
+
+    switch (msg) {
+        case WM_COMMAND: {
+            const int id = LOWORD(wp);
+            if (id == kReExtractBtnId) {
+                self->FinishReExtractPrompt(true);
+                return 0;
+            }
+            if (id == kReExtractCloseBtnId) {
+                self->FinishReExtractPrompt(false);
+                return 0;
+            }
+            break;
+        }
+        case WM_ERASEBKGND: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            RECT rc{};
+            GetClientRect(hwnd, &rc);
+            FillRect(hdc, &rc, theme::GetBrushes().window);
+            return 1;
+        }
+        case WM_CTLCOLORLISTBOX:
+        case WM_CTLCOLORSTATIC: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            SetBkMode(hdc, OPAQUE);
+            SetBkColor(hdc, theme::Colors().control);
+            SetTextColor(hdc, theme::Colors().text);
+            return reinterpret_cast<LRESULT>(theme::GetBrushes().control);
+        }
+        case WM_CLOSE:
+            self->FinishReExtractPrompt(false);
+            return 0;
+        case WM_DESTROY:
+            self->reExtractWindow_ = nullptr;
+            self->reExtractMessage_ = nullptr;
+            self->reExtractList_ = nullptr;
+            self->reExtractBtn_ = nullptr;
+            self->reExtractCloseBtn_ = nullptr;
+            if (self->activeReExtractPrompt_ && !self->activeReExtractPrompt_->completed.load()) {
+                self->FinishReExtractPrompt(false);
+            }
             return 0;
         default:
             break;
@@ -1377,10 +1559,20 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             }
             return 0;
         }
+        case WM_MEDICAT_REEXTRACT_PROMPT: {
+            auto* payload = reinterpret_cast<ReExtractPromptPayload*>(lp);
+            if (payload) {
+                self->OpenReExtractPrompt(payload);
+            }
+            return 0;
+        }
         case WM_DESTROY:
             KillTimer(hwnd, kArchiveCheckTimerId);
             if (self->fileLogWindow_ && IsWindow(self->fileLogWindow_)) {
                 DestroyWindow(self->fileLogWindow_);
+            }
+            if (self->reExtractWindow_ && IsWindow(self->reExtractWindow_)) {
+                DestroyWindow(self->reExtractWindow_);
             }
             if (self->logoBitmap_) {
                 DeleteObject(self->logoBitmap_);

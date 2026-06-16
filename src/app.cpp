@@ -13,6 +13,7 @@
 
 #include <cwctype>
 #include <functional>
+#include <memory>
 #include <sstream>
 
 namespace medicat {
@@ -43,6 +44,8 @@ void PostToGui(HWND hwnd, UINT msg, LPARAM payload) {
             delete reinterpret_cast<ProgressPayload*>(payload);
         } else if (msg == WM_MEDICAT_DONE) {
             delete reinterpret_cast<DonePayload*>(payload);
+        } else if (msg == WM_MEDICAT_REEXTRACT_PROMPT) {
+            delete reinterpret_cast<ReExtractPromptPayload*>(payload);
         }
     }
 }
@@ -250,6 +253,8 @@ App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const 
         if (!verify.checkLogPath.empty()) {
             log_->Info(L"Per-file verify log: " + verify.checkLogPath);
         }
+        outcome.failedFiles = verify.failedFiles;
+        outcome.failures = verify.failures;
         outcome.message = i18n::Tr(L"messages.verification_failed", std::to_wstring(verify.failedFiles));
         outcome.title = i18n::Tr(L"titles.verification_failed");
         return outcome;
@@ -266,6 +271,86 @@ App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const 
     }
     outcome.title = i18n::Tr(L"titles.verification_complete");
     return outcome;
+}
+
+namespace {
+
+std::wstring RelativePathFromFailureDetail(const std::wstring& detail) {
+    const size_t pos = detail.find(L" (");
+    if (pos == std::wstring::npos) {
+        return detail;
+    }
+    return detail.substr(0, pos);
+}
+
+}  // namespace
+
+bool App::TryReExtractFailedFiles(const std::wstring& drive, const std::wstring& archive,
+                                  const std::vector<std::wstring>& failureDetails) {
+    if (drive.empty() || archive.empty() || failureDetails.empty()) {
+        return false;
+    }
+
+    std::wstring dest = drive;
+    if (dest.size() == 2 && dest[1] == L':') {
+        dest += L'\\';
+    }
+
+    std::vector<std::wstring> relPaths;
+    relPaths.reserve(failureDetails.size());
+    for (const auto& detail : failureDetails) {
+        const std::wstring rel = RelativePathFromFailureDetail(detail);
+        if (!rel.empty()) {
+            relPaths.push_back(rel);
+        }
+    }
+    if (relPaths.empty()) {
+        return false;
+    }
+
+    log_->Info(i18n::Tr(L"log.re_extraction_started", std::to_wstring(relPaths.size())));
+    PostStatusBar(i18n::Tr(L"status.re_extracting"));
+    PostExtractProgress(0, L"", true);
+
+    const std::wstring extractLogPath = JoinPath(root_, L"reextract.log");
+    log_->Info(L"Writing selective 7za output to " + extractLogPath);
+
+    const ExtractResult extract = Extract7zArchiveSelective(
+        sevenZa_, archive, dest, relPaths,
+        [this](const ExtractProgress& p) { PostExtractProgress(p.percent, p.file, false); }, extractLogPath);
+
+    if (!extract.success) {
+        log_->Error(L"Selective re-extract failed: " + (extract.error.empty() ? L"unknown error" : extract.error));
+        return false;
+    }
+
+    return true;
+}
+
+bool App::PromptReExtract(const VerificationOutcome& outcome) {
+    auto state = std::make_shared<ReExtractPromptState>();
+    state->doneEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (!state->doneEvent) {
+        return false;
+    }
+
+    auto* payload = new ReExtractPromptPayload{};
+    payload->message = outcome.message;
+    payload->title = outcome.title;
+    payload->failedFiles = outcome.failedFiles;
+    payload->failures = outcome.failures;
+    payload->state = state;
+
+    if (!PostMessageW(gui_.Hwnd(), WM_MEDICAT_REEXTRACT_PROMPT, 0, reinterpret_cast<LPARAM>(payload))) {
+        delete payload;
+        CloseHandle(state->doneEvent);
+        return false;
+    }
+
+    WaitForSingleObject(state->doneEvent, INFINITE);
+    const bool wantReExtract = state->wantReExtract.load();
+    CloseHandle(state->doneEvent);
+    return wantReExtract;
 }
 
 void App::OnVerify() {
@@ -307,6 +392,35 @@ void App::RunVerifyThread(std::wstring drive) {
         const VerificationOutcome outcome = VerifyDriveFiles(drive, true);
         if (!outcome.success) {
             log_->Error(outcome.message);
+
+            // Offer selective re-extract when we have failures and the source archive is available.
+            if (outcome.failedFiles > 0 && !outcome.failures.empty()) {
+                const std::wstring archive = ResolveMediCatArchivePath(root_);
+                if (FileExists(archive) && PromptReExtract(outcome)) {
+                    const bool reextractOk = TryReExtractFailedFiles(drive, archive, outcome.failures);
+                    if (!reextractOk) {
+                        PostDone(false, i18n::Tr(L"messages.re_extraction_error", L"selective extract failed"),
+                                 i18n::Tr(L"titles.re_extraction_error"));
+                        return;
+                    }
+
+                    const VerificationOutcome after = VerifyDriveFiles(drive, true);
+                    if (!after.success) {
+                        const size_t stillFailed =
+                            after.failedFiles > 0 ? after.failedFiles : after.failures.size();
+                        PostDone(false,
+                                 i18n::Tr(L"messages.verify_still_failed_after_reextract",
+                                          std::to_wstring(stillFailed)),
+                                 i18n::Tr(L"titles.verify_still_failed_after_reextract"));
+                        return;
+                    }
+
+                    // Verification already succeeded after re-extract; show the normal success summary.
+                    PostDone(true, after.message, after.title);
+                    return;
+                }
+            }
+
             PostDone(false, outcome.message, outcome.title);
             return;
         }
@@ -575,6 +689,30 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
     PostProgress(0);
     const VerificationOutcome outcome = VerifyDriveFiles(drive);
     if (!outcome.success) {
+        if (outcome.failedFiles > 0 && !outcome.failures.empty()) {
+            if (PromptReExtract(outcome)) {
+                const bool reextractOk = TryReExtractFailedFiles(drive, archive, outcome.failures);
+                if (!reextractOk) {
+                    fail(i18n::Tr(L"messages.re_extraction_error", L"selective extract failed"));
+                    return;
+                }
+
+                PostProgress(0);
+                const VerificationOutcome after = VerifyDriveFiles(drive, false);
+                if (!after.success) {
+                    const size_t stillFailed = after.failedFiles > 0 ? after.failedFiles : after.failures.size();
+                    const std::wstring msg =
+                        i18n::Tr(L"messages.verify_still_failed_after_reextract", std::to_wstring(stillFailed));
+                    log_->Error(msg);
+                    PostDone(false, msg, i18n::Tr(L"titles.verify_still_failed_after_reextract"));
+                    return;
+                }
+
+                // Verification already succeeded after re-extract; show the normal success summary.
+                PostDone(true, after.message, after.title);
+                return;
+            }
+        }
         fail(outcome.message);
         return;
     }
