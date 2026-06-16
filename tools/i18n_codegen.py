@@ -92,7 +92,7 @@ def main() -> int:
     chunks.append("}  // namespace medicat::i18n::generated")
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("\n".join(chunks) + "\n", encoding="utf-8")
+    out.write_text("\n".join(chunks) + "\n", encoding="utf-8", newline="\n")
     print(f"Wrote {out} ({len(languages)} languages)")
     return 0
 
