@@ -4,19 +4,19 @@ project(MedicatInstaller VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
+set(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # Pick 7za for target CPU architecture.
 if(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
-    set(BUNDLE_7ZA "${REPO_ROOT}/7z/arm64/7za.exe")
+    set(BUNDLE_7ZA "${REPO_ROOT}/bin/7z/arm64/7za.exe")
 elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    if(EXISTS "${REPO_ROOT}/7z/x64/7za.exe")
-        set(BUNDLE_7ZA "${REPO_ROOT}/7z/x64/7za.exe")
+    if(EXISTS "${REPO_ROOT}/bin/7z/x64/7za.exe")
+        set(BUNDLE_7ZA "${REPO_ROOT}/bin/7z/x64/7za.exe")
     else()
-        set(BUNDLE_7ZA "${REPO_ROOT}/7za.exe")
+        set(BUNDLE_7ZA "${REPO_ROOT}/bin/7z/7za.exe")
     endif()
 else()
-    set(BUNDLE_7ZA "${REPO_ROOT}/7z/x32/7za.exe")
+    set(BUNDLE_7ZA "${REPO_ROOT}/bin/7z/x32/7za.exe")
 endif()
 
 set(BUNDLE_7Z "${REPO_ROOT}/bin/7z.exe")
@@ -71,22 +71,16 @@ add_custom_command(
     WORKING_DIRECTORY "${REPO_ROOT}"
 )
 
+# This function makes it so when a new code file is added, the project
+#   is reconfigured automatically (iirc)
+set_property(
+  DIRECTORY APPEND
+  PROPERTY CMAKE_CONFIGURE_DEPENDS
+  "src/*.cpp"
+)
+file(GLOB_RECURSE SOURCE_FILES "src/*.cpp" "src/*.hpp")
 add_executable(MedicatInstaller WIN32
-    src/main.cpp
-    src/app.cpp
-    src/gui.cpp
-    src/drives.cpp
-    src/extract.cpp
-    src/ventoy.cpp
-    src/download.cpp
-    src/util.cpp
-    src/log.cpp
-    src/bundle.cpp
-    src/i18n.cpp
-    src/theme.cpp
-    src/verify.cpp
-    src/offline.cpp
-    src/debug.cpp
+    ${SOURCE_FILES}
     "${CMAKE_BINARY_DIR}/bundle.rc"
     "${CMAKE_BINARY_DIR}/ventoy_versions.txt"
     "${I18N_GEN}"

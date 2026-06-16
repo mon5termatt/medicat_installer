@@ -348,6 +348,7 @@ void App::OnInstall() {
     if (!ConfirmWipeDrive(gui_.Hwnd(), drive, format, skipVentoy)) {
         log_->Info(L"User cancelled at wipe confirmation");
         installing_ = false;
+        gui_.SetBusy(false);
         return;
     }
 
