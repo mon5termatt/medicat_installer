@@ -1,6 +1,8 @@
 #include "gui.h"
 
 #include "drives.h"
+#include "download.h"
+#include "downloads.h"
 #include "i18n.h"
 #include "offline.h"
 #include "resource.h"
@@ -96,8 +98,22 @@ constexpr int kCurrentFileLabelId = 1012;
 constexpr int kVentoySecureBootCheckId = 1013;
 constexpr int kVentoyGptCheckId = 1014;
 constexpr int kVerifyFilesBtnId = 1015;
+constexpr int kDownloadMirror1BtnId = 1020;
+constexpr int kDownloadMirror2BtnId = 1021;
+constexpr int kAltDownloadComboId = 1022;
+constexpr int kAltDownloadOpenBtnId = 1023;
 constexpr UINT_PTR kUiRefreshTimerId = 1;
+constexpr UINT_PTR kArchiveCheckTimerId = 2;
 constexpr UINT kUiRefreshIntervalMs = 250;
+constexpr UINT kArchiveCheckIntervalMs = 3000;
+constexpr int kArchiveLabelHeight = 36;
+constexpr int kDownloadBtnHeight = 28;
+constexpr int kDownloadBtnGap = 8;
+constexpr int kMirrorBtnWidth = (kContentWidth - kDownloadBtnGap) / 2;
+constexpr int kAltComboWidth = 360;
+constexpr int kAltOpenBtnWidth = kContentWidth - kAltComboWidth - kDownloadBtnGap;
+constexpr int kAltOpenBtnX = kMargin + kAltComboWidth + kDownloadBtnGap;
+constexpr int kArchivePanelHeight = kArchiveLabelHeight + kDownloadBtnHeight + kDownloadBtnGap + kDownloadBtnHeight + 10;
 constexpr wchar_t kFileLogWindowClass[] = L"MedicatFileLogWindow";
 
 struct LanguageOption {
@@ -127,6 +143,20 @@ const wchar_t* LanguageCodeForIndex(const int index) {
         return kLanguageOptions[0].code;
     }
     return kLanguageOptions[index].code;
+}
+
+std::wstring FormatDownloadSizeText(const uint64_t downloaded, const uint64_t total) {
+    if (total > 0) {
+        return FormatProgressBytes(downloaded) + L" / " + FormatProgressBytes(total);
+    }
+    return FormatProgressBytes(downloaded);
+}
+
+int DownloadPercent(const uint64_t downloaded, const uint64_t total) {
+    if (total == 0) {
+        return 0;
+    }
+    return static_cast<int>((downloaded * 100) / total);
 }
 
 struct GlowButtonState {
@@ -449,8 +479,16 @@ void Gui::SetInstallHandler(InstallHandler handler) { onInstall_ = std::move(han
 
 void Gui::SetVerifyHandler(InstallHandler handler) { onVerify_ = std::move(handler); }
 
+void Gui::SetDownloadControlsEnabled(const bool enabled) {
+    for (HWND control : {downloadMirror1Btn_, downloadMirror2Btn_, altDownloadCombo_, altDownloadOpenBtn_}) {
+        if (control && IsWindow(control)) {
+            EnableWindow(control, enabled);
+        }
+    }
+}
+
 void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
-    EnableWindow(installBtn_, !busy);
+    EnableWindow(installBtn_, !busy && !archiveMissing_);
     EnableWindow(verifyFilesBtn_, !busy);
     EnableWindow(driveCombo_, !busy);
     EnableWindow(languageCombo_, !busy);
@@ -458,6 +496,7 @@ void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
     EnableWindow(formatCheck_, !busy);
     EnableWindow(skipVentoyCheck_, !busy);
     EnableWindow(advancedCheck_, !busy);
+    SetDownloadControlsEnabled(!busy);
     UpdateAdvancedControls();
     if (busy) {
         busyProgressMode_ = progressMode;
@@ -533,6 +572,110 @@ void Gui::SetProgress(const int percent, const bool clearLog) {
     progressPercentValue_ = percent;
     progressPercentText_ = std::to_wstring(percent) + L"%";
     InvalidateRect(progressBar_, nullptr, FALSE);
+}
+
+void Gui::SetDownloadProgress(const int percent, const std::wstring& barText, const std::wstring& labelText) {
+    progressPercentValue_ = percent;
+    progressPercentText_ = barText.empty() ? (std::to_wstring(percent) + L"%") : barText;
+    InvalidateRect(progressBar_, nullptr, FALSE);
+    if (currentFileLabel_ && IsWindow(currentFileLabel_)) {
+        SetWindowTextW(currentFileLabel_, labelText.c_str());
+    }
+}
+
+void Gui::StartMirrorDownload(const std::wstring& url, const std::wstring& mirrorName) {
+    if (downloadingArchive_.exchange(true)) {
+        return;
+    }
+
+    const std::wstring destination = JoinPath(GetExeDirectory(), kMediCatArchiveFileName);
+    const std::wstring tempPath = destination + L".part";
+    const uint64_t partialSize = GetFileSizeBytes(tempPath);
+    const bool resuming = partialSize > 0;
+
+    SetBusy(true, BusyProgressMode::Download);
+    SetDownloadProgress(
+        0, FormatProgressBytes(partialSize),
+        i18n::Tr(resuming ? L"status.resuming_archive_mirror" : L"status.downloading_archive_mirror", mirrorName));
+
+    HWND hwnd = hwnd_;
+
+    std::thread([this, hwnd, url, mirrorName, destination, tempPath, resuming, partialSize]() {
+        std::wstring netError;
+        if (!TestInternetConnection(netError)) {
+            downloadingArchive_ = false;
+            auto* payload = new DonePayload{false, i18n::Tr(L"messages.no_internet"), i18n::Tr(L"titles.download_failed")};
+            PostMessageW(hwnd, WM_MEDICAT_DONE, 0, reinterpret_cast<LPARAM>(payload));
+            return;
+        }
+
+        uint64_t lastUiTick = 0;
+        uint64_t lastDownloaded = 0;
+        bool showResuming = resuming;
+        std::wstring error;
+        const bool ok = HttpDownloadFileWithProgress(
+            url, tempPath,
+            [&](const uint64_t downloaded, const uint64_t total) {
+                const uint64_t now = GetTickCount64();
+                if (lastUiTick != 0 && now - lastUiTick < 200) {
+                    return;
+                }
+
+                uint64_t speed = 0;
+                if (lastUiTick != 0 && now > lastUiTick && downloaded >= lastDownloaded) {
+                    const uint64_t deltaBytes = downloaded - lastDownloaded;
+                    const uint64_t deltaMs = now - lastUiTick;
+                    speed = (deltaBytes * 1000) / deltaMs;
+                }
+                lastUiTick = now;
+                lastDownloaded = downloaded;
+
+                if (showResuming && downloaded > partialSize) {
+                    showResuming = false;
+                }
+
+                const int percent = DownloadPercent(downloaded, total);
+                const std::wstring sizeText = FormatDownloadSizeText(downloaded, total);
+                std::wstring statusLine = i18n::Tr(showResuming ? L"status.resuming_archive_mirror"
+                                                                  : L"status.downloading_archive_mirror",
+                                                   mirrorName);
+                const std::wstring speedText = FormatDownloadSpeed(speed);
+                if (!speedText.empty()) {
+                    statusLine += L" · ";
+                    statusLine += speedText;
+                }
+
+                auto* progress = new ProgressPayload{};
+                progress->downloadUpdate = true;
+                progress->percent = percent;
+                progress->statusText = sizeText;
+                progress->file = statusLine;
+                PostMessageW(hwnd, WM_MEDICAT_PROGRESS, 0, reinterpret_cast<LPARAM>(progress));
+            },
+            error);
+
+        if (!ok) {
+            downloadingArchive_ = false;
+            auto* payload =
+                new DonePayload{false, i18n::Tr(L"messages.archive_download_failed", error), i18n::Tr(L"titles.download_failed")};
+            PostMessageW(hwnd, WM_MEDICAT_DONE, 0, reinterpret_cast<LPARAM>(payload));
+            return;
+        }
+
+        DeleteFileW(destination.c_str());
+        if (!MoveFileW(tempPath.c_str(), destination.c_str())) {
+            DeleteFileW(tempPath.c_str());
+            downloadingArchive_ = false;
+            auto* payload = new DonePayload{false, i18n::Tr(L"messages.archive_download_failed", L"Could not save archive file"),
+                                            i18n::Tr(L"titles.download_failed")};
+            PostMessageW(hwnd, WM_MEDICAT_DONE, 0, reinterpret_cast<LPARAM>(payload));
+            return;
+        }
+
+        downloadingArchive_ = false;
+        auto* payload = new DonePayload{true, L"", L""};
+        PostMessageW(hwnd, WM_MEDICAT_DONE, 0, reinterpret_cast<LPARAM>(payload));
+    }).detach();
 }
 
 void Gui::SetCurrentFileLabel(const std::wstring& text) {
@@ -684,7 +827,19 @@ LRESULT CALLBACK Gui::FileLogWndProc(const HWND hwnd, const UINT msg, const WPAR
 }
 
 void Gui::ShowDone(const bool success, const std::wstring& message, const std::wstring& title) {
+    downloadingArchive_ = false;
     SetBusy(false);
+    if (success && message.empty()) {
+        const std::wstring archivePath = JoinPath(GetExeDirectory(), kMediCatArchiveFileName);
+        WIN32_FILE_ATTRIBUTE_DATA info{};
+        uint64_t size = 0;
+        if (GetFileAttributesExW(archivePath.c_str(), GetFileExInfoStandard, &info)) {
+            size = (static_cast<uint64_t>(info.nFileSizeHigh) << 32) | info.nFileSizeLow;
+        }
+        SetDownloadProgress(100, FormatDownloadSizeText(size, size), i18n::Tr(L"status.download_archive_complete"));
+        UpdateArchivePanel();
+        return;
+    }
     if (!success && message.empty()) {
         SetProgress(0);
         return;
@@ -846,22 +1001,168 @@ void Gui::UpdateAdvancedControls() {
         EnsureVentoyVersionsLoaded();
     }
 
-    const int installY = expanded ? kInstallYExpanded : kInstallYCollapsed;
-    const int progressY = expanded ? kProgressYExpanded : kProgressYCollapsed;
-    const int openLogY = expanded ? kOpenLogYExpanded : kOpenLogYCollapsed;
-    const int currentFileY = expanded ? kCurrentFileYExpanded : kCurrentFileYCollapsed;
+    LayoutMainContent();
+}
 
-    SetWindowPos(installBtn_, nullptr, kMargin, installY, kInstallBtnWidth, kInstallBtnHeight,
-                 SWP_NOZORDER | SWP_NOACTIVATE);
-    SetWindowPos(verifyFilesBtn_, nullptr, kVerifyBtnX, installY, kVerifyBtnWidth, kInstallBtnHeight,
-                 SWP_NOZORDER | SWP_NOACTIVATE);
-    SetWindowPos(progressBar_, nullptr, kMargin, progressY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-    SetWindowPos(openLogBtn_, nullptr, 390, openLogY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-    SetWindowPos(currentFileLabel_, nullptr, kMargin, currentFileY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+bool Gui::IsArchiveAvailable() const {
+    const std::wstring beside = JoinPath(GetExeDirectory(), kMediCatArchiveFileName);
+    if (FileExists(beside)) {
+        return true;
+    }
+    return !ResolveOfflineArchivePath(kMediCatArchiveFileName).empty();
+}
+
+void Gui::PopulateAlternativeDownloadCombo() {
+    if (!altDownloadCombo_ || !IsWindow(altDownloadCombo_)) {
+        return;
+    }
+
+    const int previous = static_cast<int>(SendMessageW(altDownloadCombo_, CB_GETCURSEL, 0, 0));
+    SendMessageW(altDownloadCombo_, CB_RESETCONTENT, 0, 0);
+    for (const AlternativeDownloadOption& option : kAlternativeDownloads) {
+        SendMessageW(altDownloadCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(i18n::Tr(option.labelKey).c_str()));
+    }
+
+    const int count = static_cast<int>(std::size(kAlternativeDownloads));
+    SendMessageW(altDownloadCombo_, CB_SETCURSEL, previous >= 0 && previous < count ? previous : 0, 0);
+}
+
+void Gui::OpenSelectedAlternativeDownload() {
+    if (!altDownloadCombo_ || !IsWindow(altDownloadCombo_)) {
+        return;
+    }
+
+    const int selected = static_cast<int>(SendMessageW(altDownloadCombo_, CB_GETCURSEL, 0, 0));
+    if (selected < 0 || selected >= static_cast<int>(std::size(kAlternativeDownloads))) {
+        return;
+    }
+
+    OpenBrowserUrl(kAlternativeDownloads[static_cast<size_t>(selected)].url);
+}
+
+void Gui::UpdateArchivePanel() {
+    const bool missing = !IsArchiveAvailable();
+    if (missing == archiveMissing_) {
+        return;
+    }
+
+    archiveMissing_ = missing;
+    const int show = missing ? SW_SHOW : SW_HIDE;
+    for (HWND control :
+         {archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_, altDownloadCombo_, altDownloadOpenBtn_}) {
+        if (control && IsWindow(control)) {
+            ShowWindow(control, show);
+        }
+    }
+
+    LayoutMainContent();
+}
+
+void Gui::LayoutMainContent() {
+    const int contentTop = archiveMissing_ ? (kContentTop + kArchivePanelHeight) : kContentTop;
+    const int driveComboY = contentTop + 22;
+    const int showAllDrivesY = driveComboY + 32;
+    const int formatY = showAllDrivesY + 28;
+    const int skipVentoyY = formatY + 30;
+    const int advancedY = skipVentoyY + 30;
+    const int pinVentoyY = advancedY + 28;
+    const int ventoySecureBootY = pinVentoyY + 28;
+    const int gptY = ventoySecureBootY + 30;
+    const int optionsBottomCollapsed = advancedY + kCheckboxHeight;
+    const int optionsBottomExpanded = gptY + kCheckboxHeight;
+
+    const bool expanded = AdvancedChecked();
+    const int installY = expanded ? (optionsBottomExpanded + kSectionGap) : (optionsBottomCollapsed + kSectionGap);
+    const int progressY = installY + kInstallBtnHeight + kActionRowGap;
+    const int openLogY = progressY + (kProgressHeight - kOpenLogBtnHeight) / 2;
+    const int currentFileY = progressY + kOpenLogBtnHeight + 8;
+    const int archiveExtra = archiveMissing_ ? kArchivePanelHeight : 0;
+    const int targetH = (expanded ? kWindowHeightExpanded : kWindowHeightCollapsed) + archiveExtra;
+
+    if (archiveMissing_) {
+        if (archiveMissingLabel_ && IsWindow(archiveMissingLabel_)) {
+            SetWindowPos(archiveMissingLabel_, nullptr, kMargin, kContentTop, kContentWidth, kArchiveLabelHeight,
+                         SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+
+        const int row1Y = kContentTop + kArchiveLabelHeight;
+        const int row2Y = row1Y + kDownloadBtnHeight + kDownloadBtnGap;
+        const int mirror2X = kMargin + kMirrorBtnWidth + kDownloadBtnGap;
+
+        if (downloadMirror1Btn_ && IsWindow(downloadMirror1Btn_)) {
+            SetWindowPos(downloadMirror1Btn_, nullptr, kMargin, row1Y, kMirrorBtnWidth, kDownloadBtnHeight,
+                         SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        if (downloadMirror2Btn_ && IsWindow(downloadMirror2Btn_)) {
+            SetWindowPos(downloadMirror2Btn_, nullptr, mirror2X, row1Y, kMirrorBtnWidth, kDownloadBtnHeight,
+                         SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        if (altDownloadCombo_ && IsWindow(altDownloadCombo_)) {
+            SetWindowPos(altDownloadCombo_, nullptr, kMargin, row2Y, kAltComboWidth, 200, SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        if (altDownloadOpenBtn_ && IsWindow(altDownloadOpenBtn_)) {
+            SetWindowPos(altDownloadOpenBtn_, nullptr, kAltOpenBtnX, row2Y, kAltOpenBtnWidth, kDownloadBtnHeight,
+                         SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+    }
+
+    if (driveLabel_ && IsWindow(driveLabel_)) {
+        SetWindowPos(driveLabel_, nullptr, kMargin, contentTop, kContentWidth, 24, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (driveCombo_ && IsWindow(driveCombo_)) {
+        SetWindowPos(driveCombo_, nullptr, kMargin, driveComboY, kContentWidth, 300, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (showAllDrivesCheck_ && IsWindow(showAllDrivesCheck_)) {
+        SetWindowPos(showAllDrivesCheck_, nullptr, kMargin, showAllDrivesY, kContentWidth, kCheckboxHeight + 8,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (formatCheck_ && IsWindow(formatCheck_)) {
+        SetWindowPos(formatCheck_, nullptr, kMargin, formatY, kContentWidth, kCheckboxHeight + 8, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (skipVentoyCheck_ && IsWindow(skipVentoyCheck_)) {
+        SetWindowPos(skipVentoyCheck_, nullptr, kMargin, skipVentoyY, kContentWidth, kCheckboxHeight + 8,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (advancedCheck_ && IsWindow(advancedCheck_)) {
+        SetWindowPos(advancedCheck_, nullptr, kMargin, advancedY, 260, kCheckboxHeight + 8, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (pinVentoyCheck_ && IsWindow(pinVentoyCheck_)) {
+        SetWindowPos(pinVentoyCheck_, nullptr, kMargin + 20, pinVentoyY, 260, kCheckboxHeight + 8,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (ventoyVersionCombo_ && IsWindow(ventoyVersionCombo_)) {
+        SetWindowPos(ventoyVersionCombo_, nullptr, kMargin + 280, pinVentoyY - 2, 240, 300,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (ventoySecureBootCheck_ && IsWindow(ventoySecureBootCheck_)) {
+        SetWindowPos(ventoySecureBootCheck_, nullptr, kMargin + 20, ventoySecureBootY, kContentWidth - 20,
+                     kCheckboxHeight + 8, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (ventoyGptCheck_ && IsWindow(ventoyGptCheck_)) {
+        SetWindowPos(ventoyGptCheck_, nullptr, kMargin + 20, gptY, kContentWidth - 20, kCheckboxHeight + 8,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (installBtn_ && IsWindow(installBtn_)) {
+        SetWindowPos(installBtn_, nullptr, kMargin, installY, kInstallBtnWidth, kInstallBtnHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+        EnableWindow(installBtn_, !archiveMissing_);
+    }
+    if (verifyFilesBtn_ && IsWindow(verifyFilesBtn_)) {
+        SetWindowPos(verifyFilesBtn_, nullptr, kVerifyBtnX, installY, kVerifyBtnWidth, kInstallBtnHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (progressBar_ && IsWindow(progressBar_)) {
+        SetWindowPos(progressBar_, nullptr, kMargin, progressY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (openLogBtn_ && IsWindow(openLogBtn_)) {
+        SetWindowPos(openLogBtn_, nullptr, 390, openLogY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (currentFileLabel_ && IsWindow(currentFileLabel_)) {
+        SetWindowPos(currentFileLabel_, nullptr, kMargin, currentFileY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
 
     RECT wr{};
     GetWindowRect(hwnd_, &wr);
-    const int targetH = expanded ? kWindowHeightExpanded : kWindowHeightCollapsed;
     if ((wr.bottom - wr.top) != targetH) {
         SetWindowPos(hwnd_, nullptr, 0, 0, kWindowWidth, targetH, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
         InvalidateRect(hwnd_, nullptr, TRUE);
@@ -894,7 +1195,9 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_MEDICAT_PROGRESS: {
             auto* payload = reinterpret_cast<ProgressPayload*>(lp);
             if (payload) {
-                if (payload->extractUpdate) {
+                if (payload->downloadUpdate) {
+                    self->SetDownloadProgress(payload->percent, payload->statusText, payload->file);
+                } else if (payload->extractUpdate) {
                     self->NotifyExtractProgress(payload->percent, payload->file, payload->resetLog);
                 } else {
                     self->SetProgress(payload->percent, payload->clearLog);
@@ -906,6 +1209,8 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_TIMER:
             if (wp == kUiRefreshTimerId) {
                 self->FlushInstallUi();
+            } else if (wp == kArchiveCheckTimerId) {
+                self->UpdateArchivePanel();
             }
             return 0;
         case WM_SIZE:
@@ -975,6 +1280,7 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         }
         case WM_DESTROY:
+            KillTimer(hwnd, kArchiveCheckTimerId);
             if (self->fileLogWindow_ && IsWindow(self->fileLogWindow_)) {
                 DestroyWindow(self->fileLogWindow_);
             }
@@ -1024,6 +1330,32 @@ void Gui::OnCreate(HWND hwnd) {
         L"STATIC", i18n::Tr(L"ui.title_label").c_str(),
         WS_CHILD | WS_VISIBLE | SS_LEFT | SS_LEFTNOWORDWRAP,
         kHeaderTitleX, kHeaderTitleY, kHeaderTitleWidth, 28, hwnd, nullptr, instance_, nullptr);
+
+    archiveMissingLabel_ = CreateWindowW(
+        L"STATIC", i18n::Tr(L"ui.archive_missing", kMediCatArchiveFileName).c_str(),
+        WS_CHILD | SS_LEFT | SS_LEFTNOWORDWRAP,
+        kMargin, kContentTop, kContentWidth, kArchiveLabelHeight, hwnd, nullptr, instance_, nullptr);
+
+    const auto createDownloadBtn = [&](const int id, const wchar_t* label, const int width) {
+        return CreateWindowW(
+            L"BUTTON", label, WS_CHILD | BS_PUSHBUTTON | WS_TABSTOP,
+            0, 0, width, kDownloadBtnHeight, hwnd,
+            reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance_, nullptr);
+    };
+
+    downloadMirror1Btn_ = createDownloadBtn(kDownloadMirror1BtnId, kDownloadMirror1Name, kMirrorBtnWidth);
+    downloadMirror2Btn_ = createDownloadBtn(kDownloadMirror2BtnId, kDownloadMirror2Name, kMirrorBtnWidth);
+
+    altDownloadCombo_ = CreateWindowW(
+        WC_COMBOBOXW, nullptr,
+        CBS_DROPDOWNLIST | WS_CHILD | WS_TABSTOP | WS_VSCROLL,
+        0, 0, kAltComboWidth, 200, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kAltDownloadComboId)), instance_, nullptr);
+    SendMessageW(altDownloadCombo_, CB_SETDROPPEDWIDTH, kAltComboWidth + 24, 0);
+    SendMessageW(altDownloadCombo_, CB_SETMINVISIBLE, 5, 0);
+
+    altDownloadOpenBtn_ =
+        createDownloadBtn(kAltDownloadOpenBtnId, i18n::Tr(L"ui.alt_download_open").c_str(), kAltOpenBtnWidth);
 
     wchar_t versionText[32]{};
     swprintf_s(versionText, L"v%hs", INSTALLER_VERSION);
@@ -1128,9 +1460,10 @@ void Gui::OnCreate(HWND hwnd) {
         kMargin, 0, kContentWidth, kVersionLabelHeight, hwnd, nullptr, instance_, nullptr);
 
     for (HWND child :
-         {languageCombo_, titleLabel_, versionLabel_, driveLabel_, driveCombo_, showAllDrivesCheck_,
-          formatCheck_, skipVentoyCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_,
-          ventoyVersionCombo_, installBtn_, verifyFilesBtn_, openLogBtn_, progressBar_, currentFileLabel_}) {
+         {languageCombo_, titleLabel_, versionLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_,
+          altDownloadCombo_, altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_, skipVentoyCheck_, advancedCheck_,
+          pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_, verifyFilesBtn_,
+          openLogBtn_, progressBar_, currentFileLabel_}) {
         if (child && IsWindow(child)) {
             SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
         }
@@ -1144,6 +1477,9 @@ void Gui::OnCreate(HWND hwnd) {
     SubclassGlowButton(installBtn_, true);
     SubclassGlowButton(verifyFilesBtn_, false);
     SubclassGlowButton(openLogBtn_, false);
+    SubclassGlowButton(downloadMirror1Btn_, true);
+    SubclassGlowButton(downloadMirror2Btn_, true);
+    SubclassGlowButton(altDownloadOpenBtn_, false);
 
     for (const HWND checkbox : {formatCheck_, skipVentoyCheck_, showAllDrivesCheck_, advancedCheck_, pinVentoyCheck_,
                                 ventoySecureBootCheck_, ventoyGptCheck_}) {
@@ -1151,9 +1487,12 @@ void Gui::OnCreate(HWND hwnd) {
         InvalidateRect(checkbox, nullptr, TRUE);
     }
 
+    PopulateAlternativeDownloadCombo();
     UpdateAdvancedControls();
     LayoutHeader();
     LayoutVersionLabel();
+    UpdateArchivePanel();
+    SetTimer(hwnd_, kArchiveCheckTimerId, kArchiveCheckIntervalMs, nullptr);
     RefreshTranslatedUi();
 }
 
@@ -1182,6 +1521,18 @@ void Gui::OnCommand(WPARAM wp) {
     }
     if (id == kOpenLogBtnId) {
         OpenFileLogWindow();
+        return;
+    }
+    if (id == kDownloadMirror1BtnId) {
+        StartMirrorDownload(kDownloadMirror1Url, kDownloadMirror1Name);
+        return;
+    }
+    if (id == kDownloadMirror2BtnId) {
+        StartMirrorDownload(kDownloadMirror2Url, kDownloadMirror2Name);
+        return;
+    }
+    if (id == kAltDownloadOpenBtnId) {
+        OpenSelectedAlternativeDownload();
     }
 }
 
@@ -1240,6 +1591,19 @@ void Gui::RefreshTranslatedUi() {
     if (openLogBtn_ && IsWindow(openLogBtn_)) {
         SetWindowTextW(openLogBtn_, i18n::Tr(L"ui.open_file_log_button").c_str());
     }
+    if (archiveMissingLabel_ && IsWindow(archiveMissingLabel_)) {
+        SetWindowTextW(archiveMissingLabel_, i18n::Tr(L"ui.archive_missing", kMediCatArchiveFileName).c_str());
+    }
+    if (downloadMirror1Btn_ && IsWindow(downloadMirror1Btn_)) {
+        SetWindowTextW(downloadMirror1Btn_, kDownloadMirror1Name);
+    }
+    if (downloadMirror2Btn_ && IsWindow(downloadMirror2Btn_)) {
+        SetWindowTextW(downloadMirror2Btn_, kDownloadMirror2Name);
+    }
+    if (altDownloadOpenBtn_ && IsWindow(altDownloadOpenBtn_)) {
+        SetWindowTextW(altDownloadOpenBtn_, i18n::Tr(L"ui.alt_download_open").c_str());
+    }
+    PopulateAlternativeDownloadCombo();
     if (fileLogWindow_ && IsWindow(fileLogWindow_)) {
         SetWindowTextW(fileLogWindow_, i18n::Tr(L"ui.file_log_title").c_str());
     }
@@ -1249,9 +1613,11 @@ void Gui::RefreshTranslatedUi() {
         SetWindowTextW(versionLabel_, versionText);
     }
 
-    for (HWND child : {titleLabel_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_,
+    for (HWND child : {titleLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_, altDownloadCombo_,
+                       altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_,
                        skipVentoyCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_,
-                       installBtn_, verifyFilesBtn_, openLogBtn_, progressBar_, currentFileLabel_, languageCombo_, versionLabel_}) {
+                       installBtn_, verifyFilesBtn_, openLogBtn_, progressBar_, currentFileLabel_, languageCombo_,
+                       versionLabel_}) {
         refreshControl(child);
     }
 }

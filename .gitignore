@@ -26,8 +26,8 @@ download/
 translate/
 
 # C++ build output
-cpp/build/
-cpp/out/
+build/
+out/
 bundle/
 *.obj
 *.pdb
@@ -57,4 +57,4 @@ desktop.ini
 
 # IDE / local build artifacts
 .vs/
-cpp/build-ninja/
+build-ninja/

@@ -1,11 +1,16 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
 #include <string>
 
 namespace medicat {
 
 bool HttpGet(const std::wstring& url, std::wstring& body, std::wstring& error);
 bool HttpDownloadFile(const std::wstring& url, const std::wstring& outputPath, std::wstring& error);
+bool HttpDownloadFileWithProgress(const std::wstring& url, const std::wstring& outputPath,
+                                  const std::function<void(uint64_t downloaded, uint64_t total)>& onProgress,
+                                  std::wstring& error);
 bool TestInternetConnection(std::wstring& error);
 
 }  // namespace medicat

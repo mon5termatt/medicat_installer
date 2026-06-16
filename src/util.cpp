@@ -55,6 +55,17 @@ bool FileExists(const std::wstring& path) {
     return attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY);
 }
 
+uint64_t GetFileSizeBytes(const std::wstring& path) {
+    WIN32_FILE_ATTRIBUTE_DATA info{};
+    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &info)) {
+        return 0;
+    }
+    if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+        return 0;
+    }
+    return (static_cast<uint64_t>(info.nFileSizeHigh) << 32) | info.nFileSizeLow;
+}
+
 std::wstring FormatBytes(uint64_t bytes) {
     const double gb = static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0);
     if (gb >= 1.0) {
@@ -70,6 +81,72 @@ std::wstring FormatBytes(uint64_t bytes) {
     ss.precision(1);
     ss << mb << L" MB";
     return ss.str();
+}
+
+std::wstring FormatProgressBytes(const uint64_t bytes) {
+    const double gb = static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0);
+    if (gb >= 1.0) {
+        std::wostringstream ss;
+        ss.setf(std::ios::fixed);
+        ss.precision(2);
+        ss << gb << L" GB";
+        return ss.str();
+    }
+
+    const double mb = static_cast<double>(bytes) / (1024.0 * 1024.0);
+    if (mb >= 1.0) {
+        std::wostringstream ss;
+        ss.setf(std::ios::fixed);
+        ss.precision(1);
+        ss << mb << L" MB";
+        return ss.str();
+    }
+
+    const double kb = static_cast<double>(bytes) / 1024.0;
+    if (kb >= 1.0) {
+        std::wostringstream ss;
+        ss.setf(std::ios::fixed);
+        ss.precision(0);
+        ss << kb << L" KB";
+        return ss.str();
+    }
+
+    return std::to_wstring(bytes) + L" B";
+}
+
+std::wstring FormatDownloadSpeed(const uint64_t bytesPerSecond) {
+    if (bytesPerSecond == 0) {
+        return L"";
+    }
+
+    const double gbPerSecond = static_cast<double>(bytesPerSecond) / (1024.0 * 1024.0 * 1024.0);
+    if (gbPerSecond >= 1.0) {
+        std::wostringstream ss;
+        ss.setf(std::ios::fixed);
+        ss.precision(2);
+        ss << gbPerSecond << L" GB/s";
+        return ss.str();
+    }
+
+    const double mbPerSecond = static_cast<double>(bytesPerSecond) / (1024.0 * 1024.0);
+    if (mbPerSecond >= 0.1) {
+        std::wostringstream ss;
+        ss.setf(std::ios::fixed);
+        ss.precision(1);
+        ss << mbPerSecond << L" MB/s";
+        return ss.str();
+    }
+
+    const double kbPerSecond = static_cast<double>(bytesPerSecond) / 1024.0;
+    if (kbPerSecond >= 1.0) {
+        std::wostringstream ss;
+        ss.setf(std::ios::fixed);
+        ss.precision(0);
+        ss << kbPerSecond << L" KB/s";
+        return ss.str();
+    }
+
+    return std::to_wstring(bytesPerSecond) + L" B/s";
 }
 
 std::wstring FormatPercent(int percent) {

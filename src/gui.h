@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include <atomic>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -18,7 +19,9 @@ struct ProgressPayload {
     bool clearLog = false;
     bool resetLog = false;
     bool extractUpdate = false;
+    bool downloadUpdate = false;
     std::wstring file;
+    std::wstring statusText;
 };
 
 struct DonePayload {
@@ -27,7 +30,7 @@ struct DonePayload {
     std::wstring title;
 };
 
-enum class BusyProgressMode { FileLog, Verify, None };
+enum class BusyProgressMode { FileLog, Verify, Download, None };
 
 class Gui {
 public:
@@ -39,6 +42,7 @@ public:
     void SetVerifyHandler(InstallHandler handler);
     void SetBusy(bool busy, BusyProgressMode progressMode = BusyProgressMode::FileLog);
     void SetProgress(int percent, bool clearLog = false);
+    void SetDownloadProgress(int percent, const std::wstring& barText, const std::wstring& labelText);
     void SetCurrentFileLabel(const std::wstring& text);
     void NotifyExtractProgress(int percent, const std::wstring& file = L"", bool resetLog = false);
     void ClearFileLog();
@@ -70,11 +74,18 @@ private:
     void UpdateAdvancedControls();
     void LayoutVersionLabel();
     void LayoutHeader();
+    void LayoutMainContent();
+    void UpdateArchivePanel();
+    bool IsArchiveAvailable() const;
     void EnsureVentoyVersionsLoaded();
     void PopulateVentoyVersionCombo();
     void SetVentoyVersions(std::vector<std::wstring> versions);
     void ApplyLanguageSelection(const std::wstring& languageCode);
     void RefreshTranslatedUi();
+    void StartMirrorDownload(const std::wstring& url, const std::wstring& mirrorName);
+    void SetDownloadControlsEnabled(bool enabled);
+    void PopulateAlternativeDownloadCombo();
+    void OpenSelectedAlternativeDownload();
 
     HINSTANCE instance_ = nullptr;
     HWND hwnd_ = nullptr;
@@ -97,6 +108,11 @@ private:
     HWND openLogBtn_ = nullptr;
     HWND progressBar_ = nullptr;
     HWND currentFileLabel_ = nullptr;
+    HWND archiveMissingLabel_ = nullptr;
+    HWND downloadMirror1Btn_ = nullptr;
+    HWND downloadMirror2Btn_ = nullptr;
+    HWND altDownloadCombo_ = nullptr;
+    HWND altDownloadOpenBtn_ = nullptr;
     HWND fileLogWindow_ = nullptr;
     HWND fileLogList_ = nullptr;
 
@@ -114,6 +130,8 @@ private:
     std::vector<std::wstring> ventoyVersions_;
     bool ventoyVersionsLoading_ = false;
     bool ventoyVersionsLoaded_ = false;
+    bool archiveMissing_ = false;
+    std::atomic<bool> downloadingArchive_{false};
     BusyProgressMode busyProgressMode_ = BusyProgressMode::None;
 };
 

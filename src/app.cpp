@@ -123,12 +123,18 @@ int App::Run() {
 }
 
 void App::PostProgress(const int percent, const bool clearLog) {
-    auto* payload = new ProgressPayload{percent, clearLog, false, false, L""};
+    auto* payload = new ProgressPayload{};
+    payload->percent = percent;
+    payload->clearLog = clearLog;
     PostToGui(gui_.Hwnd(), WM_MEDICAT_PROGRESS, reinterpret_cast<LPARAM>(payload));
 }
 
 void App::PostExtractProgress(const int percent, const std::wstring& file, const bool resetLog) {
-    auto* payload = new ProgressPayload{percent, false, resetLog, true, file};
+    auto* payload = new ProgressPayload{};
+    payload->percent = percent;
+    payload->resetLog = resetLog;
+    payload->extractUpdate = true;
+    payload->file = file;
     PostToGui(gui_.Hwnd(), WM_MEDICAT_PROGRESS, reinterpret_cast<LPARAM>(payload));
 }
 
@@ -329,9 +335,6 @@ void App::OnInstall() {
 
     const std::wstring archive = ResolveMediCatArchivePath(root_);
     if (!FileExists(archive)) {
-        MessageBoxW(gui_.Hwnd(),
-                    i18n::Tr(L"messages.file_not_found", kMediCatArchiveName).c_str(),
-                    i18n::Tr(L"titles.file_not_found").c_str(), MB_ICONERROR);
         installing_ = false;
         return;
     }
