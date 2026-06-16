@@ -8,13 +8,13 @@ namespace medicat {
 // From mon5termatt/medicat-website (altDownloads.json + downloads.astro).
 constexpr wchar_t kMediCatArchiveFileName[] = L"MediCat.USB.v21.12.7z";
 
-constexpr wchar_t kDownloadMirror1Name[] = L"files.dog";
+constexpr wchar_t kDownloadMirror1Name[] = L"files.medicatusb.com";
 constexpr wchar_t kDownloadMirror1Url[] =
-    L"https://files.dog/OD%20Rips/MediCat/v21.12/MediCat.USB.v21.12.7z";
-
-constexpr wchar_t kDownloadMirror2Name[] = L"files.medicatusb.com";
-constexpr wchar_t kDownloadMirror2Url[] =
     L"https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z";
+
+constexpr wchar_t kDownloadMirror2Name[] = L"files.dog";
+constexpr wchar_t kDownloadMirror2Url[] =
+    L"https://files.dog/OD%20Rips/MediCat/v21.12/MediCat.USB.v21.12.7z";
 
 constexpr wchar_t kDownloadTorrentUrl[] =
     L"https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_v21.12.torrent";

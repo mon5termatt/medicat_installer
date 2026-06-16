@@ -7,7 +7,8 @@
       "show_hard_drives": "Show hard drives",
       "show_all_drives": "Show all drives",
       "format_checkbox": "Format drive before installation",
-      "skip_ventoy_checkbox": "Skip Ventoy install/upgrade",
+      "install_ventoy_checkbox": "Install Ventoy",
+      "update_ventoy_checkbox": "Update Ventoy?",
       "install_button": "Install MediCat",
       "cancel_button": "Cancel",
       "check_files_button": "Check USB Files",
@@ -66,7 +67,9 @@
       "bin_download_failed": "Bin files download failed",
       "downloading_archive_mirror": "Downloading from {0}...",
       "resuming_archive_mirror": "Resuming download from {0}...",
-      "download_archive_complete": "Archive download complete"
+      "download_archive_complete": "Archive download complete",
+      "ventoy_found": "Found Ventoy on {0}",
+      "ventoy_not_on_drive": "Ventoy not detected on {0}"
     },
     "messages": {
       "no_internet": "No internet connection detected. Please check your connection and try again.",
@@ -195,7 +198,8 @@
       "show_hard_drives": "Mostrar discos duros",
       "show_all_drives": "Mostrar todas las unidades",
       "format_checkbox": "Formatear unidad antes de la instalación",
-      "skip_ventoy_checkbox": "Omitir instalación/actualización de Ventoy",
+      "install_ventoy_checkbox": "Instalar Ventoy",
+      "update_ventoy_checkbox": "¿Actualizar Ventoy?",
       "install_button": "Instalar MediCat",
       "cancel_button": "Cancelar",
       "check_files_button": "Verificar archivos USB",
@@ -255,7 +259,9 @@
       "installing_module": "Cargando bibliotecas de extracción desde lib/...",
       "downloading_archive_mirror": "Descargando desde {0}...",
       "resuming_archive_mirror": "Reanudando descarga desde {0}...",
-      "download_archive_complete": "Descarga del archivo completada"
+      "download_archive_complete": "Descarga del archivo completada",
+      "ventoy_found": "Ventoy encontrado en {0}",
+      "ventoy_not_on_drive": "Ventoy no detectado en {0}"
     },
     "messages": {
       "no_internet": "No se detectó conexión a internet. Por favor verifique su conexión e intente nuevamente.",
@@ -382,7 +388,8 @@
       "show_hard_drives": "Afficher les disques durs",
       "show_all_drives": "Afficher tous les lecteurs",
       "format_checkbox": "Formatter le lecteur avant l'installation",
-      "skip_ventoy_checkbox": "Ignorer l'installation/mise à jour Ventoy",
+      "install_ventoy_checkbox": "Installer Ventoy",
+      "update_ventoy_checkbox": "Mettre à jour Ventoy ?",
       "install_button": "Installer MediCat",
       "cancel_button": "Annuler",
       "check_files_button": "Vérifier les fichiers USB",
@@ -442,7 +449,9 @@
       "installing_module": "Chargement des bibliothèques d'extraction depuis lib/...",
       "downloading_archive_mirror": "Téléchargement depuis {0}...",
       "resuming_archive_mirror": "Reprise du téléchargement depuis {0}...",
-      "download_archive_complete": "Téléchargement de l'archive terminé"
+      "download_archive_complete": "Téléchargement de l'archive terminé",
+      "ventoy_found": "Ventoy trouvé sur {0}",
+      "ventoy_not_on_drive": "Ventoy non détecté sur {0}"
     },
     "messages": {
       "no_internet": "Aucune connexion Internet détectée. Veuillez vérifier votre connexion et réessayer.",
@@ -569,7 +578,8 @@
       "show_hard_drives": "Pokaż dyski twarde",
       "show_all_drives": "Pokaż wszystkie dyski",
       "format_checkbox": "Sformatuj dysk przed instalacją",
-      "skip_ventoy_checkbox": "Pomiń instalację/aktualizację Ventoy",
+      "install_ventoy_checkbox": "Zainstaluj Ventoy",
+      "update_ventoy_checkbox": "Zaktualizować Ventoy?",
       "install_button": "Zainstaluj MediCat",
       "cancel_button": "Anuluj",
       "check_files_button": "Zweryfikuj pliki USB",
@@ -629,7 +639,9 @@
       "installing_module": "Ładowanie bibliotek rozpakowywania z lib/...",
       "downloading_archive_mirror": "Pobieranie z {0}...",
       "resuming_archive_mirror": "Wznawianie pobierania z {0}...",
-      "download_archive_complete": "Pobieranie archiwum zakończone"
+      "download_archive_complete": "Pobieranie archiwum zakończone",
+      "ventoy_found": "Znaleziono Ventoy na {0}",
+      "ventoy_not_on_drive": "Nie wykryto Ventoy na {0}"
     },
     "messages": {
       "no_internet": "Nie wykryto połączenia z Internetem. Sprawdź połączenie i spróbuj ponownie.",
@@ -764,7 +776,8 @@
       "show_hard_drives": "Sabit diskleri göster",
       "show_all_drives": "Tüm sürücüleri göster",
       "format_checkbox": "Kurulumdan önce sürücüyü biçimlendir",
-      "skip_ventoy_checkbox": "Ventoy kurulumunu/yükseltmesini atla",
+      "install_ventoy_checkbox": "Ventoy kur",
+      "update_ventoy_checkbox": "Ventoy güncellensin mi?",
       "install_button": "MediCat Kur",
       "cancel_button": "İptal",
       "check_files_button": "USB Dosyalarını Kontrol Et",
@@ -815,7 +828,9 @@
       "installing_module": "lib/... dizininden ??karma k?t?phaneleri y?kleniyor",
       "downloading_archive_mirror": "{0} üzerinden indiriliyor...",
       "resuming_archive_mirror": "{0} üzerinden indirme sürdürülüyor...",
-      "download_archive_complete": "Ar?iv indirmesi tamamland?"
+      "download_archive_complete": "Ar?iv indirmesi tamamland?",
+      "ventoy_found": "Ventoy bulundu: {0}",
+      "ventoy_not_on_drive": "Ventoy alg?lanmad?: {0}"
     },
     "messages": {
       "no_internet": "?nternet ba?lant?s? alg?lanmad?. L?tfen ba?lant?n?z? kontrol edip tekrar deneyin.",

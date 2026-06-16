@@ -60,7 +60,7 @@ constexpr int kOpenLogBtnHeight = 32;
 constexpr int kManualInstallBtnHeight = 32;
 constexpr int kManualInstallGap = 10;
 constexpr int kActionRowGap = 12;
-constexpr int kCurrentFileHeight = 20;
+constexpr int kStatusBarHeight = 20;
 constexpr int kCheckboxRowHeight = kCheckboxHeight + 8;
 constexpr int kProgressRowHeight = std::max(kProgressHeight, kOpenLogBtnHeight);
 constexpr int kBottomChrome = 28;
@@ -74,7 +74,7 @@ struct MainContentLayout {
     int driveComboY = 0;
     int showAllDrivesY = 0;
     int formatY = 0;
-    int skipVentoyY = 0;
+    int ventoyActionY = 0;
     int advancedY = 0;
     int pinVentoyY = 0;
     int ventoySecureBootY = 0;
@@ -82,7 +82,7 @@ struct MainContentLayout {
     int installY = 0;
     int progressY = 0;
     int openLogY = 0;
-    int currentFileY = 0;
+    int statusBarY = 0;
     int manualInstallY = 0;
     int requiredClientHeight = 0;
 };
@@ -93,8 +93,8 @@ MainContentLayout ComputeMainContentLayout(const bool expanded, const bool archi
     layout.driveComboY = layout.contentTop + 22;
     layout.showAllDrivesY = layout.driveComboY + 32;
     layout.formatY = layout.showAllDrivesY + 28;
-    layout.skipVentoyY = layout.formatY + 30;
-    layout.advancedY = layout.skipVentoyY + 30;
+    layout.ventoyActionY = layout.formatY + 30;
+    layout.advancedY = layout.ventoyActionY + 30;
     layout.pinVentoyY = layout.advancedY + 28;
     layout.ventoySecureBootY = layout.pinVentoyY + 28;
     layout.gptY = layout.ventoySecureBootY + 30;
@@ -104,8 +104,8 @@ MainContentLayout ComputeMainContentLayout(const bool expanded, const bool archi
     layout.installY = optionsBottom + kSectionGap;
     layout.progressY = layout.installY + kInstallBtnHeight + kActionRowGap;
     layout.openLogY = layout.progressY + (kProgressHeight - kOpenLogBtnHeight) / 2;
-    layout.currentFileY = layout.progressY + kProgressRowHeight + 8;
-    layout.manualInstallY = layout.currentFileY + kCurrentFileHeight + kManualInstallGap;
+    layout.statusBarY = layout.progressY + kProgressRowHeight + 8;
+    layout.manualInstallY = layout.statusBarY + kStatusBarHeight + kManualInstallGap;
     layout.requiredClientHeight = layout.manualInstallY + kManualInstallBtnHeight + kBottomChrome;
     return layout;
 }
@@ -150,7 +150,7 @@ constexpr int kDriveComboId = 1001;
 constexpr int kLanguageComboId = 1018;
 constexpr int kShowAllDrivesCheckId = 1016;
 constexpr int kFormatCheckId = 1002;
-constexpr int kSkipVentoyCheckId = 1003;
+constexpr int kVentoyActionCheckId = 1003;
 constexpr int kInstallBtnId = 1004;
 constexpr int kProgressId = 1005;
 constexpr int kStatusId = 1006;
@@ -159,7 +159,7 @@ constexpr int kPinVentoyCheckId = 1008;
 constexpr int kVentoyVersionEditId = 1009;
 constexpr int kOpenLogBtnId = 1010;
 constexpr int kFileLogListId = 1011;
-constexpr int kCurrentFileLabelId = 1012;
+constexpr int kStatusBarId = 1012;
 constexpr int kVentoySecureBootCheckId = 1013;
 constexpr int kVentoyGptCheckId = 1014;
 constexpr int kVerifyFilesBtnId = 1015;
@@ -557,7 +557,7 @@ void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
     EnableWindow(languageCombo_, !busy);
     EnableWindow(showAllDrivesCheck_, !busy);
     EnableWindow(formatCheck_, !busy);
-    EnableWindow(skipVentoyCheck_, !busy);
+    EnableWindow(ventoyActionCheck_, !busy);
     EnableWindow(advancedCheck_, !busy);
     SetDownloadControlsEnabled(!busy);
     UpdateAdvancedControls();
@@ -574,6 +574,7 @@ void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
             FlushInstallUi();
         }
         busyProgressMode_ = BusyProgressMode::None;
+        RefreshDriveVentoyStatus();
     }
 }
 
@@ -614,6 +615,7 @@ void Gui::FlushInstallUi() {
 
     if (reset) {
         ClearFileLog();
+        ClearStatusBar();
     }
 
     progressPercentValue_ = percent;
@@ -621,7 +623,8 @@ void Gui::FlushInstallUi() {
     InvalidateRect(progressBar_, nullptr, FALSE);
 
     if (!newFiles.empty()) {
-        SetWindowTextW(currentFileLabel_, ShortDisplayPath(newFiles.back()).c_str());
+        SetStatusBar(i18n::Tr(L"status.extracting_file", std::to_wstring(percent),
+                              ShortDisplayPath(newFiles.back())));
         if (fileLogList_) {
             BatchAppendDetailLog(newFiles, startIndex);
         }
@@ -641,9 +644,7 @@ void Gui::SetDownloadProgress(const int percent, const std::wstring& barText, co
     progressPercentValue_ = percent;
     progressPercentText_ = barText.empty() ? (std::to_wstring(percent) + L"%") : barText;
     InvalidateRect(progressBar_, nullptr, FALSE);
-    if (currentFileLabel_ && IsWindow(currentFileLabel_)) {
-        SetWindowTextW(currentFileLabel_, labelText.c_str());
-    }
+    SetStatusBar(labelText);
 }
 
 void Gui::StartMirrorDownload(const std::wstring& url, const std::wstring& mirrorName) {
@@ -741,8 +742,14 @@ void Gui::StartMirrorDownload(const std::wstring& url, const std::wstring& mirro
     }).detach();
 }
 
-void Gui::SetCurrentFileLabel(const std::wstring& text) {
-    SetWindowTextW(currentFileLabel_, ShortDisplayPath(text).c_str());
+void Gui::SetStatusBar(const std::wstring& text) {
+    if (statusBar_ && IsWindow(statusBar_)) {
+        SetWindowTextW(statusBar_, text.c_str());
+    }
+}
+
+void Gui::ClearStatusBar() {
+    SetStatusBar(L"");
 }
 
 void Gui::ClearFileLog() {
@@ -751,7 +758,6 @@ void Gui::ClearFileLog() {
         fileLogLines_.clear();
         fileLogDisplayLines_.clear();
     }
-    SetWindowTextW(currentFileLabel_, L"");
     if (fileLogList_) {
         SendMessageW(fileLogList_, LB_RESETCONTENT, 0, 0);
     }
@@ -930,8 +936,18 @@ bool Gui::FormatChecked() const {
     return SendMessageW(formatCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
 }
 
-bool Gui::SkipVentoyChecked() const {
-    return SendMessageW(skipVentoyCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+bool Gui::RunVentoyChecked() const {
+    if (!ventoyOnDrive_) {
+        const std::wstring drive = SelectedDrive();
+        if (!drive.empty()) {
+            return true;
+        }
+    }
+    return SendMessageW(ventoyActionCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+}
+
+bool Gui::VentoyOnSelectedDrive() const {
+    return ventoyOnDrive_;
 }
 
 bool Gui::AdvancedChecked() const {
@@ -1176,8 +1192,8 @@ void Gui::LayoutMainContent() {
         SetWindowPos(formatCheck_, nullptr, contentLeft, layout.formatY, kContentWidth, kCheckboxRowHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
-    if (skipVentoyCheck_ && IsWindow(skipVentoyCheck_)) {
-        SetWindowPos(skipVentoyCheck_, nullptr, contentLeft, layout.skipVentoyY, kContentWidth, kCheckboxRowHeight,
+    if (ventoyActionCheck_ && IsWindow(ventoyActionCheck_)) {
+        SetWindowPos(ventoyActionCheck_, nullptr, contentLeft, layout.ventoyActionY, kContentWidth, kCheckboxRowHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (advancedCheck_ && IsWindow(advancedCheck_)) {
@@ -1217,8 +1233,8 @@ void Gui::LayoutMainContent() {
         SetWindowPos(openLogBtn_, nullptr, openLogBtnX, layout.openLogY, kOpenLogBtnWidth, kOpenLogBtnHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
-    if (currentFileLabel_ && IsWindow(currentFileLabel_)) {
-        SetWindowPos(currentFileLabel_, nullptr, contentLeft, layout.currentFileY, kContentWidth, kCurrentFileHeight,
+    if (statusBar_ && IsWindow(statusBar_)) {
+        SetWindowPos(statusBar_, nullptr, contentLeft, layout.statusBarY, kContentWidth, kStatusBarHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (manualInstallBtn_ && IsWindow(manualInstallBtn_)) {
@@ -1275,6 +1291,8 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (payload) {
                 if (payload->downloadUpdate) {
                     self->SetDownloadProgress(payload->percent, payload->statusText, payload->file);
+                } else if (payload->statusOnly) {
+                    self->SetStatusBar(payload->statusText);
                 } else if (payload->extractUpdate) {
                     self->NotifyExtractProgress(payload->percent, payload->file, payload->resetLog);
                 } else {
@@ -1327,7 +1345,7 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 SetTextColor(hdc, theme::Colors().text);
                 return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
             }
-            if (ctl == self->versionLabel_ || ctl == self->currentFileLabel_) {
+            if (ctl == self->versionLabel_ || ctl == self->statusBar_) {
                 SetTextColor(hdc, theme::Colors().muted);
                 return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
             }
@@ -1463,11 +1481,11 @@ void Gui::OnCreate(HWND hwnd) {
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFormatCheckId)), instance_, nullptr);
     SendMessageW(formatCheck_, BM_SETCHECK, BST_CHECKED, 0);
 
-    skipVentoyCheck_ = CreateWindowW(
-        L"BUTTON", i18n::Tr(L"ui.skip_ventoy_checkbox").c_str(),
+    ventoyActionCheck_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.install_ventoy_checkbox").c_str(),
         WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | BS_MULTILINE,
-        kMargin, initialLayout.skipVentoyY, kContentWidth, kCheckboxRowHeight, hwnd,
-        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSkipVentoyCheckId)), instance_, nullptr);
+        kMargin, initialLayout.ventoyActionY, kContentWidth, kCheckboxRowHeight, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVentoyActionCheckId)), instance_, nullptr);
 
     advancedCheck_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.advanced_options").c_str(),
@@ -1529,11 +1547,12 @@ void Gui::OnCreate(HWND hwnd) {
         kMargin + kProgressBarWidth + kActionBtnGap, initialLayout.openLogY, kOpenLogBtnWidth, kOpenLogBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kOpenLogBtnId)), instance_, nullptr);
 
-    currentFileLabel_ = CreateWindowW(
+    // Single-line status bar: any code may update via SetStatusBar (UI thread) or App::PostStatusBar (workers).
+    statusBar_ = CreateWindowW(
         L"STATIC", L"",
         WS_CHILD | WS_VISIBLE | SS_ENDELLIPSIS,
-        kMargin, initialLayout.currentFileY, kContentWidth, kCurrentFileHeight, hwnd,
-        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCurrentFileLabelId)), instance_, nullptr);
+        kMargin, initialLayout.statusBarY, kContentWidth, kStatusBarHeight, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kStatusBarId)), instance_, nullptr);
 
     manualInstallBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.manual_install_button").c_str(),
@@ -1548,9 +1567,9 @@ void Gui::OnCreate(HWND hwnd) {
 
     for (HWND child :
          {languageCombo_, titleLabel_, versionLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_,
-          altDownloadCombo_, altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_, skipVentoyCheck_, advancedCheck_,
+          altDownloadCombo_, altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_, ventoyActionCheck_, advancedCheck_,
           pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_, verifyFilesBtn_,
-          openLogBtn_, manualInstallBtn_, progressBar_, currentFileLabel_}) {
+          openLogBtn_, manualInstallBtn_, progressBar_, statusBar_}) {
         if (child && IsWindow(child)) {
             SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
         }
@@ -1569,7 +1588,7 @@ void Gui::OnCreate(HWND hwnd) {
     SubclassGlowButton(downloadMirror2Btn_, true);
     SubclassGlowButton(altDownloadOpenBtn_, false);
 
-    for (const HWND checkbox : {formatCheck_, skipVentoyCheck_, showAllDrivesCheck_, advancedCheck_, pinVentoyCheck_,
+    for (const HWND checkbox : {formatCheck_, ventoyActionCheck_, showAllDrivesCheck_, advancedCheck_, pinVentoyCheck_,
                                 ventoySecureBootCheck_, ventoyGptCheck_}) {
         SubclassFlatCheckbox(checkbox);
         InvalidateRect(checkbox, nullptr, TRUE);
@@ -1592,6 +1611,10 @@ void Gui::OnCommand(WPARAM wp) {
     }
     if (id == kShowAllDrivesCheckId) {
         RefreshDrives();
+        return;
+    }
+    if (id == kDriveComboId && HIWORD(wp) == CBN_SELCHANGE) {
+        RefreshDriveVentoyStatus();
         return;
     }
     if (id == kAdvancedCheckId || id == kPinVentoyCheckId) {
@@ -1658,8 +1681,10 @@ void Gui::RefreshTranslatedUi() {
     if (formatCheck_ && IsWindow(formatCheck_)) {
         SetWindowTextW(formatCheck_, i18n::Tr(L"ui.format_checkbox").c_str());
     }
-    if (skipVentoyCheck_ && IsWindow(skipVentoyCheck_)) {
-        SetWindowTextW(skipVentoyCheck_, i18n::Tr(L"ui.skip_ventoy_checkbox").c_str());
+    if (ventoyActionCheck_ && IsWindow(ventoyActionCheck_)) {
+        const wchar_t* labelKey =
+            ventoyOnDrive_ ? L"ui.update_ventoy_checkbox" : L"ui.install_ventoy_checkbox";
+        SetWindowTextW(ventoyActionCheck_, i18n::Tr(labelKey).c_str());
     }
     if (advancedCheck_ && IsWindow(advancedCheck_)) {
         SetWindowTextW(advancedCheck_, i18n::Tr(L"ui.advanced_options").c_str());
@@ -1709,8 +1734,8 @@ void Gui::RefreshTranslatedUi() {
 
     for (HWND child : {titleLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_, altDownloadCombo_,
                        altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_,
-                       skipVentoyCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_,
-                       installBtn_, verifyFilesBtn_, openLogBtn_, manualInstallBtn_, progressBar_, currentFileLabel_,
+                       ventoyActionCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_,
+                       installBtn_, verifyFilesBtn_, openLogBtn_, manualInstallBtn_, progressBar_, statusBar_,
                        languageCombo_, versionLabel_}) {
         refreshControl(child);
     }
@@ -1749,6 +1774,65 @@ void Gui::RefreshDrives() {
     const int def = restoreIdx >= 0 ? restoreIdx : DefaultDriveIndex(drives);
     if (def >= 0) {
         SendMessageW(driveCombo_, CB_SETCURSEL, def, 0);
+    }
+    RefreshDriveVentoyStatus();
+}
+
+void Gui::RefreshDriveVentoyStatus() {
+    if (busyProgressMode_ != BusyProgressMode::None) {
+        return;
+    }
+
+    RefreshDriveVentoyControls();
+
+    const std::wstring drive = SelectedDrive();
+    if (drive.empty()) {
+        SetStatusBar(i18n::Tr(L"status.status_ready"));
+        return;
+    }
+
+    if (ventoyOnDrive_) {
+        SetStatusBar(i18n::Tr(L"status.ventoy_found", drive));
+    } else {
+        SetStatusBar(i18n::Tr(L"status.ventoy_not_on_drive", drive));
+    }
+}
+
+void Gui::RefreshDriveVentoyControls() {
+    const bool interactive = busyProgressMode_ == BusyProgressMode::None;
+    const std::wstring drive = SelectedDrive();
+    const bool driveChanged = drive != lastVentoyControlDrive_;
+    lastVentoyControlDrive_ = drive;
+    ventoyOnDrive_ = !drive.empty() && TestVentoyInstalled(drive);
+
+    if (ventoyActionCheck_ && IsWindow(ventoyActionCheck_)) {
+        if (drive.empty()) {
+            SetWindowTextW(ventoyActionCheck_, i18n::Tr(L"ui.install_ventoy_checkbox").c_str());
+            SendMessageW(ventoyActionCheck_, BM_SETCHECK, BST_UNCHECKED, 0);
+            EnableWindow(ventoyActionCheck_, interactive);
+        } else if (ventoyOnDrive_) {
+            SetWindowTextW(ventoyActionCheck_, i18n::Tr(L"ui.update_ventoy_checkbox").c_str());
+            if (driveChanged) {
+                SendMessageW(ventoyActionCheck_, BM_SETCHECK, BST_UNCHECKED, 0);
+            }
+            EnableWindow(ventoyActionCheck_, interactive);
+        } else {
+            SetWindowTextW(ventoyActionCheck_, i18n::Tr(L"ui.install_ventoy_checkbox").c_str());
+            SendMessageW(ventoyActionCheck_, BM_SETCHECK, BST_CHECKED, 0);
+            EnableWindow(ventoyActionCheck_, FALSE);
+        }
+    }
+
+    if (formatCheck_ && IsWindow(formatCheck_)) {
+        if (drive.empty() || ventoyOnDrive_) {
+            if (ventoyOnDrive_ && driveChanged) {
+                SendMessageW(formatCheck_, BM_SETCHECK, BST_UNCHECKED, 0);
+            }
+            EnableWindow(formatCheck_, interactive);
+        } else {
+            SendMessageW(formatCheck_, BM_SETCHECK, BST_CHECKED, 0);
+            EnableWindow(formatCheck_, FALSE);
+        }
     }
 }
 

@@ -20,6 +20,8 @@ struct ProgressPayload {
     bool resetLog = false;
     bool extractUpdate = false;
     bool downloadUpdate = false;
+    // When true, only statusText is applied to the main-window status bar (see Gui::SetStatusBar).
+    bool statusOnly = false;
     std::wstring file;
     std::wstring statusText;
 };
@@ -43,14 +45,19 @@ public:
     void SetBusy(bool busy, BusyProgressMode progressMode = BusyProgressMode::FileLog);
     void SetProgress(int percent, bool clearLog = false);
     void SetDownloadProgress(int percent, const std::wstring& barText, const std::wstring& labelText);
-    void SetCurrentFileLabel(const std::wstring& text);
+    // Single-line status bar directly below the progress bar. Any UI or worker code may
+    // update it (workers should post WM_MEDICAT_PROGRESS with statusOnly, or use App::PostStatusBar).
+    void SetStatusBar(const std::wstring& text);
+    void ClearStatusBar();
     void NotifyExtractProgress(int percent, const std::wstring& file = L"", bool resetLog = false);
+    // Clears the optional detail file-log popup only; does not touch the status bar.
     void ClearFileLog();
     void OpenFileLogWindow();
     void ShowDone(bool success, const std::wstring& message, const std::wstring& title = L"");
     std::wstring SelectedDrive() const;
     bool FormatChecked() const;
-    bool SkipVentoyChecked() const;
+    bool RunVentoyChecked() const;
+    bool VentoyOnSelectedDrive() const;
     bool AdvancedChecked() const;
     bool PinVentoyVersionChecked() const;
     bool VentoySecureBootChecked() const;
@@ -66,6 +73,8 @@ private:
     void OnCreate(HWND hwnd);
     void OnCommand(WPARAM wp);
     void RefreshDrives();
+    void RefreshDriveVentoyStatus();
+    void RefreshDriveVentoyControls();
     void FlushInstallUi();
     void BatchAppendDetailLog(const std::vector<std::wstring>& files, size_t startIndex);
     void SyncDetailLog();
@@ -96,7 +105,7 @@ private:
     HWND driveCombo_ = nullptr;
     HWND showAllDrivesCheck_ = nullptr;
     HWND formatCheck_ = nullptr;
-    HWND skipVentoyCheck_ = nullptr;
+    HWND ventoyActionCheck_ = nullptr;
     HWND advancedCheck_ = nullptr;
     HWND pinVentoyCheck_ = nullptr;
     HWND ventoySecureBootCheck_ = nullptr;
@@ -107,7 +116,7 @@ private:
     HWND openLogBtn_ = nullptr;
     HWND manualInstallBtn_ = nullptr;
     HWND progressBar_ = nullptr;
-    HWND currentFileLabel_ = nullptr;
+    HWND statusBar_ = nullptr;
     HWND archiveMissingLabel_ = nullptr;
     HWND downloadMirror1Btn_ = nullptr;
     HWND downloadMirror2Btn_ = nullptr;
@@ -131,6 +140,8 @@ private:
     bool ventoyVersionsLoading_ = false;
     bool ventoyVersionsLoaded_ = false;
     bool archiveMissing_ = false;
+    bool ventoyOnDrive_ = false;
+    std::wstring lastVentoyControlDrive_;
     std::atomic<bool> downloadingArchive_{false};
     BusyProgressMode busyProgressMode_ = BusyProgressMode::None;
 };

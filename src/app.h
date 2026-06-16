@@ -27,10 +27,11 @@ private:
     void OnVerify();
     void PostProgress(int percent, bool clearLog = false);
     void PostExtractProgress(int percent, const std::wstring& file = L"", bool resetLog = false);
+    void PostStatusBar(const std::wstring& text);  // Thread-safe; updates Gui::SetStatusBar on the UI thread.
     void PostDone(bool success, const std::wstring& message, const std::wstring& title = L"");
     std::wstring WriteErrorDebugLog(const std::wstring& message, const std::wstring& title);
     VerificationOutcome VerifyDriveFiles(const std::wstring& drive, bool showFileProgress = true);
-    void RunInstallThread(std::wstring drive, bool format, bool skipVentoy, std::wstring pinVersion,
+    void RunInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
                           VentoyInstallOptions ventoyInstall, HWND hwnd);
     void RunVerifyThread(std::wstring drive);
 

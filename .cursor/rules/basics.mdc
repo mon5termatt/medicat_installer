@@ -92,7 +92,7 @@ cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
-Output: `cpp/build/Release/MedicatInstaller.exe`
+Output: `build/Release/MedicatInstaller.exe`
 
 **Bundle inputs** (repo root): `7za.exe` (or `7z/x64/7za.exe`), `bin/7z.exe`, `MedicatFiles.md5`
 

@@ -47,9 +47,9 @@ void PostToGui(HWND hwnd, UINT msg, LPARAM payload) {
     }
 }
 
-std::wstring BuildWipeDetails(const bool format, const bool skipVentoy) {
+std::wstring BuildWipeDetails(const bool format, const bool runVentoy) {
     std::wstring details;
-    if (!skipVentoy) {
+    if (runVentoy) {
         details += i18n::Tr(L"wipe_confirm.detail_ventoy");
         details += L"\n";
     }
@@ -61,8 +61,8 @@ std::wstring BuildWipeDetails(const bool format, const bool skipVentoy) {
     return details;
 }
 
-bool ConfirmWipeDrive(HWND hwnd, const std::wstring& drive, const bool format, const bool skipVentoy) {
-    const std::wstring details = BuildWipeDetails(format, skipVentoy);
+bool ConfirmWipeDrive(HWND hwnd, const std::wstring& drive, const bool format, const bool runVentoy) {
+    const std::wstring details = BuildWipeDetails(format, runVentoy);
     const int result = MessageBoxW(
         hwnd, i18n::Tr(L"wipe_confirm.message", drive, details).c_str(),
         i18n::Tr(L"wipe_confirm.title").c_str(), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2);
@@ -138,6 +138,13 @@ void App::PostExtractProgress(const int percent, const std::wstring& file, const
     PostToGui(gui_.Hwnd(), WM_MEDICAT_PROGRESS, reinterpret_cast<LPARAM>(payload));
 }
 
+void App::PostStatusBar(const std::wstring& text) {
+    auto* payload = new ProgressPayload{};
+    payload->statusOnly = true;
+    payload->statusText = text;
+    PostToGui(gui_.Hwnd(), WM_MEDICAT_PROGRESS, reinterpret_cast<LPARAM>(payload));
+}
+
 void App::PostDone(const bool success, const std::wstring& message, const std::wstring& title) {
     installing_ = false;
     std::wstring displayMessage = message;
@@ -164,7 +171,7 @@ std::wstring App::WriteErrorDebugLog(const std::wstring& message, const std::wst
     context.md5ManifestPath = md5Manifest_;
     context.archivePath = ResolveMediCatArchivePath(root_);
     context.formatChecked = gui_.FormatChecked();
-    context.skipVentoyChecked = gui_.SkipVentoyChecked();
+    context.runVentoyChecked = gui_.RunVentoyChecked();
     context.ventoySecureBoot = gui_.VentoySecureBootChecked();
     context.ventoyGpt = gui_.VentoyGptChecked();
     context.pinnedVentoyVersion = gui_.PinnedVentoyVersion();
@@ -285,7 +292,7 @@ void App::OnVerify() {
     gui_.ClearFileLog();
     gui_.OpenFileLogWindow();
     gui_.SetProgress(0);
-    gui_.SetCurrentFileLabel(i18n::Tr(L"status.verifying_files"));
+    gui_.SetStatusBar(i18n::Tr(L"status.verifying_files"));
     currentOperation_ = L"verify";
     log_->Info(L"File verification started on " + drive);
 
@@ -346,9 +353,9 @@ void App::OnInstall() {
     log_->Info(L"Install started on " + drive);
 
     const bool format = gui_.FormatChecked();
-    const bool skipVentoy = gui_.SkipVentoyChecked();
+    const bool runVentoy = gui_.RunVentoyChecked();
 
-    if (!ConfirmWipeDrive(gui_.Hwnd(), drive, format, skipVentoy)) {
+    if (!ConfirmWipeDrive(gui_.Hwnd(), drive, format, runVentoy)) {
         log_->Info(L"User cancelled at wipe confirmation");
         installing_ = false;
         gui_.SetBusy(false);
@@ -359,7 +366,7 @@ void App::OnInstall() {
     VentoyInstallOptions ventoyInstall;
     ventoyInstall.enableSecureBoot = gui_.VentoySecureBootChecked();
     ventoyInstall.useGpt = gui_.VentoyGptChecked();
-    std::thread worker(&App::RunInstallThread, this, drive, format, skipVentoy, pinVersion, ventoyInstall,
+    std::thread worker(&App::RunInstallThread, this, drive, format, runVentoy, pinVersion, ventoyInstall,
                        gui_.Hwnd());
     worker.detach();
 }
@@ -375,13 +382,6 @@ bool ConfirmVentoy(HWND hwnd, const std::wstring& drive) {
     const int result = MessageBoxW(
         hwnd, i18n::Tr(L"ventoy_warning.message", drive).c_str(),
         i18n::Tr(L"ventoy_warning.title").c_str(), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2);
-    return result == IDYES;
-}
-
-bool ConfirmVentoyMissing(HWND hwnd, const std::wstring& drive) {
-    const int result = MessageBoxW(
-        hwnd, i18n::Tr(L"ventoy_not_detected.message", drive).c_str(),
-        i18n::Tr(L"ventoy_not_detected.title").c_str(), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2);
     return result == IDYES;
 }
 
@@ -427,7 +427,7 @@ bool ReconcileDriveLetter(HWND hwnd, std::wstring& drive, const DriveIdentity& i
 
 }  // namespace
 
-void App::RunInstallThread(std::wstring drive, bool format, bool skipVentoy, std::wstring pinVersion,
+void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
                             VentoyInstallOptions ventoyInstall, HWND hwnd) {
     const std::wstring root = root_;
     const std::wstring archive = ResolveMediCatArchivePath(root);
@@ -451,7 +451,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool skipVentoy, std
 
     std::wstring ventoyExe;
     DriveIdentity driveIdentity;
-    if (!skipVentoy) {
+    if (runVentoy) {
         driveIdentity = GetDriveIdentity(drive);
         if (!driveIdentity.valid) {
             log_->Info(L"Could not read drive identity before Ventoy; letter remapping may be limited");
@@ -479,19 +479,20 @@ void App::RunInstallThread(std::wstring drive, bool format, bool skipVentoy, std
         ventoyExe = ready.ventoyExe;
         log_->Info(L"Ventoy v" + ready.version + L" ready");
 
-        const bool upgrade = !format;
+        PostProgress(0);
+        const bool ventoyInstalled = TestVentoyInstalled(drive);
+        if (ventoyInstalled) {
+            log_->Info(i18n::Tr(L"log.ventoy_detected"));
+        } else {
+            log_->Info(i18n::Tr(L"log.ventoy_not_found"));
+        }
+
+        const bool destructiveVentoyInstall = format || !ventoyInstalled;
+        const bool upgrade = !destructiveVentoyInstall;
         if (upgrade) {
-            PostProgress(0);
-            log_->Info(L"Format disabled - checking for existing Ventoy");
-            if (!TestVentoyInstalled(drive)) {
-                log_->Info(i18n::Tr(L"log.ventoy_not_found"));
-                if (!ConfirmVentoyMissing(hwnd, drive)) {
-                    cancel();
-                    return;
-                }
-            } else {
-                log_->Info(i18n::Tr(L"log.ventoy_detected"));
-            }
+            log_->Info(L"Ventoy detected - using in-place upgrade");
+        } else if (!ventoyInstalled) {
+            log_->Info(L"Ventoy not detected - destructive Ventoy install required");
         } else {
             log_->Info(i18n::Tr(L"log.format_enabled"));
         }
@@ -534,7 +535,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool skipVentoy, std
         }
     }
 
-    if (!skipVentoy) {
+    if (runVentoy) {
         if (!ReconcileDriveLetter(hwnd, drive, driveIdentity, logInfo, cancel, fail,
                                   L"Final check before extract")) {
             return;
