@@ -314,14 +314,9 @@ LRESULT CALLBACK FlatCheckboxProc(const HWND hwnd, const UINT msg, const WPARAM 
     WNDPROC origState{ state->original };
 
     switch (msg) {
+        case BM_SETCHECK:
         case BM_GETCHECK:
-        case BM_SETCHECK: {
-            const LRESULT result = CallWindowProcW(state->original, hwnd, msg, wp, lp);
-            if (msg == BM_SETCHECK) {
-                InvalidateRect(hwnd, nullptr, FALSE);
-            }
-            return result;
-        }
+            return CallWindowProcW(state->original, hwnd, msg, wp, lp);
         case WM_LBUTTONDOWN:
             if (IsWindowEnabled(hwnd)) {
                 ToggleFlatCheckbox(hwnd);
@@ -1148,7 +1143,6 @@ void Gui::OnCreate(HWND hwnd) {
     for (const HWND checkbox : {formatCheck_, skipVentoyCheck_, showAllDrivesCheck_, advancedCheck_, pinVentoyCheck_,
                                 ventoySecureBootCheck_, ventoyGptCheck_}) {
         SubclassFlatCheckbox(checkbox);
-        InvalidateRect(checkbox, nullptr, TRUE);
     }
 
     UpdateAdvancedControls();
