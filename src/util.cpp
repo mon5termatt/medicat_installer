@@ -4,6 +4,7 @@
 #include <windows.h>
 
 #include <sstream>
+#include <filesystem>
 
 namespace medicat {
 
@@ -51,8 +52,7 @@ std::wstring JoinPath(const std::wstring& a, const std::wstring& b) {
 }
 
 bool FileExists(const std::wstring& path) {
-    const DWORD attr = GetFileAttributesW(path.c_str());
-    return attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY);
+    return std::filesystem::exists(path);
 }
 
 std::wstring FormatBytes(uint64_t bytes) {
