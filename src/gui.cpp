@@ -8,6 +8,9 @@
 #include "util.hpp"
 #include "ventoy.hpp"
 
+#include "download.hpp"
+#include "downloads.hpp"
+
 #include <commctrl.h>
 #include <uxtheme.h>
 #include <windowsx.h>

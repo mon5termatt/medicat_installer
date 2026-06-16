@@ -1,6 +1,6 @@
 #include "download.hpp"
 
-#include "util.h"
+#include "util.hpp"
 
 #include <windows.h>
 #include <winhttp.h>
