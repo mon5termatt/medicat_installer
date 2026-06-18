@@ -3,6 +3,7 @@
 #include <shlwapi.h>
 #include <windows.h>
 
+#include <filesystem>
 #include <sstream>
 
 namespace medicat {
@@ -21,19 +22,96 @@ std::wstring GetExeDirectory() {
     return path.substr(0, pos);
 }
 
-std::wstring GetMedicatTempDir() {
+std::wstring GetMedicatTempRoot() {
     wchar_t temp[MAX_PATH]{};
     const DWORD len = GetTempPathW(MAX_PATH, temp);
     if (len == 0 || len >= MAX_PATH) {
         return JoinPath(GetExeDirectory(), L"MedicatInstaller");
     }
+    return JoinPath(std::wstring(temp, len), L"MedicatInstaller");
+}
 
-    std::wstring root = JoinPath(std::wstring(temp, len), L"MedicatInstaller");
+namespace {
+
+bool IsProcessRunning(const DWORD pid) {
+    if (pid == 0) {
+        return false;
+    }
+
+    const HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, pid);
+    if (!process) {
+        return false;
+    }
+
+    const DWORD wait = WaitForSingleObject(process, 0);
+    CloseHandle(process);
+    return wait == WAIT_TIMEOUT;
+}
+
+DWORD ParsePidDirName(const std::wstring& name) {
+    if (name.empty()) {
+        return 0;
+    }
+
+    for (const wchar_t ch : name) {
+        if (ch < L'0' || ch > L'9') {
+            return 0;
+        }
+    }
+
+    return static_cast<DWORD>(std::wcstoul(name.c_str(), nullptr, 10));
+}
+
+}  // namespace
+
+std::wstring GetMedicatTempDir() {
+    const std::wstring root = GetMedicatTempRoot();
     CreateDirectoryW(root.c_str(), nullptr);
 
-    std::wstring dir = JoinPath(root, std::to_wstring(GetCurrentProcessId()));
+    const std::wstring dir = JoinPath(root, std::to_wstring(GetCurrentProcessId()));
     CreateDirectoryW(dir.c_str(), nullptr);
     return dir;
+}
+
+void CleanupMedicatTempOnExit() {
+    namespace fs = std::filesystem;
+
+    const std::wstring root = GetMedicatTempRoot();
+    if (root.empty()) {
+        return;
+    }
+
+    std::error_code ec;
+    if (!fs::exists(root, ec) || ec) {
+        return;
+    }
+
+    const DWORD currentPid = GetCurrentProcessId();
+    for (const fs::directory_entry& entry : fs::directory_iterator(root, ec)) {
+        if (ec) {
+            break;
+        }
+
+        if (!entry.is_directory(ec)) {
+            fs::remove(entry.path(), ec);
+            ec.clear();
+            continue;
+        }
+
+        const DWORD pid = ParsePidDirName(entry.path().filename().wstring());
+        if (pid == 0) {
+            continue;
+        }
+
+        if (pid == currentPid || !IsProcessRunning(pid)) {
+            fs::remove_all(entry.path(), ec);
+            ec.clear();
+        }
+    }
+
+    if (fs::is_empty(root, ec)) {
+        fs::remove(root, ec);
+    }
 }
 
 std::wstring JoinPath(const std::wstring& a, const std::wstring& b) {

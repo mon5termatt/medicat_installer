@@ -83,15 +83,10 @@ BundledTools EnsureBundledTools(const HINSTANCE instance) {
     tools.dir = GetMedicatTempDir();
 
     tools.sevenZa = JoinPath(tools.dir, L"7za.exe");
-    tools.sevenZ = JoinPath(tools.dir, L"7z.exe");
     tools.md5Manifest = JoinPath(tools.dir, L"MedicatFiles.md5");
 
     if (!EnsureExtracted(instance, IDR_7ZA, tools.sevenZa)) {
         tools.error = L"Failed to extract bundled 7za.exe";
-        return tools;
-    }
-    if (!EnsureExtracted(instance, IDR_7Z, tools.sevenZ)) {
-        tools.error = L"Failed to extract bundled 7z.exe";
         return tools;
     }
     if (!EnsureExtracted(instance, IDR_MEDICAT_MD5, tools.md5Manifest)) {

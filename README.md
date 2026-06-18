@@ -25,7 +25,7 @@ Windows GUI installer for preparing a MediCat USB: Ventoy install/upgrade, optio
 ## What it does
 
 - **Ventoy** — download, extract, fresh install (`/I`) or in-place upgrade (`/U`) based on drive state and checkboxes
-- **Ventoy UI** — if Ventoy is missing: **Install Ventoy** is forced on; if present: optional **Update Ventoy?**
+- **Ventoy UI** — if Ventoy is missing: **Install Ventoy** is forced on; if present: optional **Update Ventoy**
 - **Format** — optional NTFS format; forced when Ventoy is not on the drive
 - **Extract** — `MediCat.USB.v21.12.7z` via bundled `7za.exe` with live file log + status bar
 - **Verify** — post-install or standalone MD5 check against embedded `MedicatFiles.md5`
@@ -34,7 +34,7 @@ Windows GUI installer for preparing a MediCat USB: Ventoy install/upgrade, optio
 
 ## Requirements
 
-- Windows 10/11 x64 (ARM64 build possible from source)
+- Windows 10/11 **x64** or **32-bit (x86)** — build the matching installer (see below)
 - Administrator elevation (UAC)
 - Internet for Ventoy download (first run; offline Ventoy zip cache supported)
 - USB drive with **≥ 30 GiB** total capacity
@@ -42,14 +42,27 @@ Windows GUI installer for preparing a MediCat USB: Ventoy install/upgrade, optio
 
 ## Build from source
 
-Requires Visual Studio 2022 (or Build Tools), CMake 3.16+, Python 3, and repo assets `7za.exe`, `bin/7z.exe`, `MedicatFiles.md5`.
+Requires Visual Studio 2022 (or Build Tools), CMake 3.16+, Python 3, `bin/7z/x64/7za.exe` or `bin/7z/x32/7za.exe`, and `MedicatFiles.md5`.
+
+**64-bit (default):**
 
 ```bat
 cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
-Output: `build\Release\MedicatInstaller.exe`
+Output: `build/Release/MedicatInstaller.exe`
+
+**32-bit:**
+
+```bat
+cmake -B build-x86 -G "Visual Studio 17 2022" -A Win32
+cmake --build build-x86 --config Release
+```
+
+Output: `build-x86/Release/MedicatInstaller.exe`
+
+Each build embeds only the `7za.exe` for that CPU (x64 or x86).
 
 See [`FEATURES.md`](FEATURES.md) for the feature checklist and [`TODO.md`](TODO.md) for planned work (e.g. support log upload).  
 Developer architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
@@ -60,22 +73,20 @@ Plain-text diagnostics only — these are the files users (and future support up
 
 | File | When |
 |------|------|
-| `medicat_installer.log` | Always — main session log |
+| `medicat_installer.log` | Always — main session log (includes system/diagnostic sections) |
 | `extract.log` | During 7za extraction (raw stdout/stderr) |
 | `reextract.log` | During selective re-extract of failed files |
 | `check.log` | During MD5 verify — one line per file (`OK` / `FAIL` / `SKIP`) |
-| `debug.log` | **On errors only** — OS/hardware info, tool versions, recent log tail |
 | `failed_files.txt` | When verification finds failures |
 
-If something breaks, attach `debug.log` and `medicat_installer.log` to your issue. A future release will upload **`.log` / `.txt` files only** to a support server with a Discord keyword — see [`TODO.md`](TODO.md).
+If something breaks, attach `medicat_installer.log` to your issue. A future release will upload **`.log` / `.txt` files only** to a support server with a Discord keyword — see [`TODO.md`](TODO.md).
 
 ## Repo layout
 
 ```
 MedicatInstaller.exe   # release binary (or build/Release/ after build)
 MediCat.USB.v21.12.7z  # user-supplied archive (not in repo)
-7za.exe                # bundled into installer at build time
-bin/7z.exe             # bundled into installer at build time
+bin/7z/x64/7za.exe or bin/7z/x32/7za.exe  # bundled per build arch
 MedicatFiles.md5       # verification manifest (bundled)
 src/                   # C++ source
 i18n/                  # translations

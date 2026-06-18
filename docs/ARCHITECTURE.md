@@ -20,7 +20,7 @@ medicat_installer/
 │   ├── bundle.cpp          # Embedded 7za, 7z, MD5 resources
 │   ├── download.cpp        # WinHTTP (Ventoy, mirrors)
 │   ├── offline.cpp         # Offline Ventoy/archive cache paths
-│   ├── debug.cpp           # debug.log on failure
+│   ├── debug.cpp           # System/installer diagnostics → medicat_installer.log
 │   ├── log.cpp             # medicat_installer.log
 │   ├── i18n.cpp            # Runtime translation lookup
 │   ├── i18n_generated.h    # Build-generated string table (do not edit by hand)
@@ -119,14 +119,14 @@ flowchart TD
 
 ### Ventoy / format decision table
 
-| Ventoy on drive | Format checkbox | Update Ventoy? | Ventoy CLI |
+| Ventoy on drive | Format checkbox | Update Ventoy | Ventoy CLI |
 |-----------------|-----------------|----------------|------------|
 | No | Forced on (logic) | Forced on (logic) | `/I` |
 | Yes | User choice | Unchecked | Skip Ventoy |
 | Yes | User choice | Checked | `/U` (if format off) |
 | Yes | Checked | Either | `/I` |
 
-Detection: `{drive}\ventoy` folder exists (`TestVentoyInstalled`).
+Detection: `{drive}\ventoy` folder **or** physical-disk layout matching Ventoy2Disk (`VTOYEFI` 32 MiB EFI partition at sector 2048 layout) via `TestVentoyInstalled`.
 
 **UI vs logic:** When Ventoy is missing, checkboxes show checked state but stay **enabled**; `FormatChecked()` / `RunVentoyChecked()` enforce `true` via `RequiresForcedVentoyInstall()`. Drive-letter changes refresh labels/checks; toggling **Show all drives** does not.
 
@@ -167,11 +167,10 @@ Detection: `{drive}\ventoy` folder exists (`TestVentoyInstalled`).
 
 | File | Writer | When |
 |------|--------|------|
-| `medicat_installer.log` | `log.cpp` | Every session |
+| `medicat_installer.log` | `log.cpp`, `debug.cpp` | Every session (includes diagnostic sections) |
 | `extract.log` | `extract.cpp` | Full 7za extract |
 | `reextract.log` | `extract.cpp` | Selective re-extract |
 | `check.log` | `verify.cpp` | MD5 pass/fail lines |
-| `debug.log` | `debug.cpp` | `PostDone(false)` only |
 | `failed_files.txt` | `verify.cpp` | Verification failures |
 
 Future support upload: **`.log` / `.txt` only** — see [`TODO.md`](../TODO.md).

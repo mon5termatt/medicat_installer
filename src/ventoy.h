@@ -41,6 +41,12 @@ bool LoadBundledVentoyVersionList(HINSTANCE instance, std::vector<std::wstring>&
 // Download/extract Ventoy if missing or version mismatch.
 VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options);
 
+struct VentoyDetectionResult {
+    bool installed = false;
+    std::vector<std::wstring> logLines;  // English diagnostics for medicat_installer.log
+};
+
+VentoyDetectionResult DetectVentoyOnDrive(const std::wstring& driveLetter);
 bool TestVentoyInstalled(const std::wstring& driveLetter);
 
 VentoyResult RunVentoyInstall(const std::wstring& ventoyExe, const std::wstring& driveLetter, bool upgrade,

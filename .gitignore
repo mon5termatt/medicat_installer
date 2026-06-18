@@ -27,6 +27,7 @@ translate/
 
 # C++ build output
 build/
+build-x86/
 out/
 bundle/
 *.obj

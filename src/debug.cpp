@@ -6,9 +6,7 @@
 
 #include <windows.h>
 
-#include <chrono>
 #include <fstream>
-#include <iomanip>
 #include <sstream>
 #include <vector>
 
@@ -23,35 +21,17 @@ namespace medicat {
 
 namespace {
 
-std::string WideToUtf8(const std::wstring& text) {
+std::wstring Utf8ToWide(const std::string& text) {
     if (text.empty()) {
         return {};
     }
-    const int size = WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    if (size <= 1) {
+    const int len = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, nullptr, 0);
+    if (len <= 1) {
         return {};
     }
-    std::string out(static_cast<size_t>(size - 1), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, out.data(), size, nullptr, nullptr);
-    return out;
-}
-
-std::wstring NowStamp() {
-    const auto now = std::chrono::system_clock::now();
-    const auto t = std::chrono::system_clock::to_time_t(now);
-    std::tm tm{};
-    localtime_s(&tm, &t);
-    std::wostringstream ss;
-    ss << std::put_time(&tm, L"%Y-%m-%d %H:%M:%S");
-    return ss.str();
-}
-
-void AppendLine(std::ostringstream& out, const char* label, const std::wstring& value) {
-    out << label << WideToUtf8(value) << "\n";
-}
-
-void AppendLineUtf8(std::ostringstream& out, const char* label, const std::string& value) {
-    out << label << value << "\n";
+    std::wstring wide(static_cast<size_t>(len - 1), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, wide.data(), len);
+    return wide;
 }
 
 bool IsProcessElevated() {
@@ -93,6 +73,177 @@ bool GetOsVersion(DWORD& major, DWORD& minor, DWORD& build) {
     return true;
 }
 
+std::wstring ReadRegString(const HKEY root, const wchar_t* subkey, const wchar_t* valueName) {
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(root, subkey, 0, KEY_READ | KEY_WOW64_64KEY, &key) != ERROR_SUCCESS) {
+        return {};
+    }
+
+    wchar_t buffer[512]{};
+    DWORD size = sizeof(buffer);
+    DWORD type = 0;
+    const LSTATUS status =
+        RegQueryValueExW(key, valueName, nullptr, &type, reinterpret_cast<LPBYTE>(buffer), &size);
+    RegCloseKey(key);
+    if (status != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ)) {
+        return {};
+    }
+    return buffer;
+}
+
+DWORD ReadRegDword(const HKEY root, const wchar_t* subkey, const wchar_t* valueName) {
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(root, subkey, 0, KEY_READ | KEY_WOW64_64KEY, &key) != ERROR_SUCCESS) {
+        return 0;
+    }
+
+    DWORD value = 0;
+    DWORD size = sizeof(value);
+    DWORD type = 0;
+    const LSTATUS status =
+        RegQueryValueExW(key, valueName, nullptr, &type, reinterpret_cast<LPBYTE>(&value), &size);
+    RegCloseKey(key);
+    if (status != ERROR_SUCCESS || type != REG_DWORD) {
+        return 0;
+    }
+    return value;
+}
+
+struct WindowsVersionInfo {
+    std::wstring productName;
+    std::wstring displayVersion;
+    std::wstring editionId;
+    std::wstring installationType;
+    DWORD ntMajor = 0;
+    DWORD ntMinor = 0;
+    DWORD build = 0;
+    DWORD ubr = 0;
+};
+
+std::wstring DescribeEditionId(const std::wstring& editionId) {
+    if (editionId.empty()) {
+        return {};
+    }
+
+    struct EditionEntry {
+        const wchar_t* id;
+        const wchar_t* label;
+    };
+    static constexpr EditionEntry kEditions[] = {
+        {L"Professional", L"Pro"},
+        {L"ProfessionalN", L"Pro N"},
+        {L"ProfessionalWorkstation", L"Pro for Workstations"},
+        {L"ProfessionalWorkstationN", L"Pro for Workstations N"},
+        {L"Enterprise", L"Enterprise"},
+        {L"EnterpriseN", L"Enterprise N"},
+        {L"EnterpriseS", L"Enterprise LTSC"},
+        {L"EnterpriseSN", L"Enterprise LTSC N"},
+        {L"IoTEnterprise", L"IoT Enterprise"},
+        {L"IoTEnterpriseS", L"IoT Enterprise LTSC"},
+        {L"Core", L"Home"},
+        {L"CoreN", L"Home N"},
+        {L"CoreSingleLanguage", L"Home Single Language"},
+        {L"CoreCountrySpecific", L"Home China"},
+        {L"Education", L"Education"},
+        {L"EducationN", L"Education N"},
+        {L"ServerStandard", L"Server Standard"},
+        {L"ServerDatacenter", L"Server Datacenter"},
+        {L"ServerDatacenterCore", L"Server Datacenter Core"},
+    };
+
+    for (const EditionEntry& entry : kEditions) {
+        if (_wcsicmp(editionId.c_str(), entry.id) == 0) {
+            return entry.label;
+        }
+    }
+    return editionId;
+}
+
+WindowsVersionInfo GetWindowsVersionInfo() {
+    constexpr wchar_t kNtVersionKey[] = L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
+
+    WindowsVersionInfo info;
+    GetOsVersion(info.ntMajor, info.ntMinor, info.build);
+
+    info.productName = ReadRegString(HKEY_LOCAL_MACHINE, kNtVersionKey, L"ProductName");
+    info.displayVersion = ReadRegString(HKEY_LOCAL_MACHINE, kNtVersionKey, L"DisplayVersion");
+    if (info.displayVersion.empty()) {
+        info.displayVersion = ReadRegString(HKEY_LOCAL_MACHINE, kNtVersionKey, L"ReleaseId");
+    }
+    info.editionId = ReadRegString(HKEY_LOCAL_MACHINE, kNtVersionKey, L"EditionID");
+    info.installationType = ReadRegString(HKEY_LOCAL_MACHINE, kNtVersionKey, L"InstallationType");
+
+    const std::wstring regBuild = ReadRegString(HKEY_LOCAL_MACHINE, kNtVersionKey, L"CurrentBuildNumber");
+    if (!regBuild.empty()) {
+        info.build = static_cast<DWORD>(std::wcstoul(regBuild.c_str(), nullptr, 10));
+    }
+    info.ubr = ReadRegDword(HKEY_LOCAL_MACHINE, kNtVersionKey, L"UBR");
+
+    if (info.build >= 22000 && info.productName.rfind(L"Windows 10", 0) == 0) {
+        info.productName.replace(0, 10, L"Windows 11");
+    }
+
+    return info;
+}
+
+std::wstring FormatWindowsVersionLine(const WindowsVersionInfo& info) {
+    std::wostringstream ss;
+    if (!info.productName.empty()) {
+        ss << info.productName;
+    } else if (info.ntMajor != 0 || info.ntMinor != 0) {
+        ss << info.ntMajor << L"." << info.ntMinor;
+    } else {
+        ss << L"Windows";
+    }
+
+    if (!info.displayVersion.empty()) {
+        ss << L", version " << info.displayVersion;
+    }
+
+    ss << L", OS build " << info.build;
+    if (info.ubr > 0) {
+        ss << L"." << info.ubr;
+    }
+    return ss.str();
+}
+
+std::wstring FormatNtVersionLine(const WindowsVersionInfo& info) {
+    std::wostringstream ss;
+    ss << info.ntMajor << L"." << info.ntMinor << L"." << info.build;
+    if (info.ubr > 0) {
+        ss << L"." << info.ubr;
+    }
+    return ss.str();
+}
+
+std::wstring GetProcessorName() {
+    constexpr wchar_t kCpuKey[] = L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0";
+    std::wstring name = ReadRegString(HKEY_LOCAL_MACHINE, kCpuKey, L"ProcessorNameString");
+    while (!name.empty() && (name.front() == L' ' || name.front() == L'\t')) {
+        name.erase(name.begin());
+    }
+    while (!name.empty() && (name.back() == L' ' || name.back() == L'\t')) {
+        name.pop_back();
+    }
+    return name;
+}
+
+std::wstring GetSystemModelLine() {
+    constexpr wchar_t kBiosKey[] = L"HARDWARE\\DESCRIPTION\\System\\BIOS";
+    const std::wstring manufacturer = ReadRegString(HKEY_LOCAL_MACHINE, kBiosKey, L"SystemManufacturer");
+    const std::wstring product = ReadRegString(HKEY_LOCAL_MACHINE, kBiosKey, L"SystemProductName");
+    if (manufacturer.empty() && product.empty()) {
+        return {};
+    }
+    if (manufacturer.empty()) {
+        return product;
+    }
+    if (product.empty()) {
+        return manufacturer;
+    }
+    return manufacturer + L" " + product;
+}
+
 std::wstring GetProcessorArchitecture() {
     USHORT processMachine = 0;
     USHORT nativeMachine = 0;
@@ -118,15 +269,6 @@ std::wstring GetProcessorArchitecture() {
 #endif
 }
 
-std::wstring QueryEnvVar(const wchar_t* name) {
-    wchar_t buffer[32767]{};
-    const DWORD len = GetEnvironmentVariableW(name, buffer, static_cast<DWORD>(std::size(buffer)));
-    if (len == 0 || len >= std::size(buffer)) {
-        return L"";
-    }
-    return std::wstring(buffer, len);
-}
-
 std::wstring ReadDriveVentoyVersion(const std::wstring& driveLetter) {
     if (driveLetter.size() < 2) {
         return L"";
@@ -148,16 +290,7 @@ std::wstring ReadDriveVentoyVersion(const std::wstring& driveLetter) {
     while (!content.empty() && (content.back() == '\r' || content.back() == '\n' || content.back() == ' ')) {
         content.pop_back();
     }
-    if (content.empty()) {
-        return L"";
-    }
-    const int len = MultiByteToWideChar(CP_UTF8, 0, content.c_str(), -1, nullptr, 0);
-    if (len <= 1) {
-        return L"";
-    }
-    std::wstring wide(static_cast<size_t>(len - 1), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, content.c_str(), -1, wide.data(), len);
-    return wide;
+    return Utf8ToWide(content);
 }
 
 std::wstring DescribeDrive(const std::wstring& driveLetter) {
@@ -193,6 +326,40 @@ std::wstring DescribeDrive(const std::wstring& driveLetter) {
     return ss.str();
 }
 
+std::string TrimLineWhitespace(std::string line) {
+    while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ' || line.back() == '\t')) {
+        line.pop_back();
+    }
+    size_t start = 0;
+    while (start < line.size() && (line[start] == ' ' || line[start] == '\t')) {
+        ++start;
+    }
+    return line.substr(start);
+}
+
+std::string ExtractToolVersionLine(const std::string& captured) {
+    std::string firstNonEmpty;
+    size_t pos = 0;
+    while (pos < captured.size()) {
+        size_t end = captured.find('\n', pos);
+        if (end == std::string::npos) {
+            end = captured.size();
+        }
+        std::string line = TrimLineWhitespace(captured.substr(pos, end - pos));
+        pos = (end < captured.size()) ? end + 1 : captured.size();
+        if (line.empty()) {
+            continue;
+        }
+        if (firstNonEmpty.empty()) {
+            firstNonEmpty = line;
+        }
+        if (line.rfind("7-Zip", 0) == 0) {
+            return line;
+        }
+    }
+    return firstNonEmpty;
+}
+
 std::wstring GetToolVersionLine(const std::wstring& exePath) {
     if (exePath.empty() || !FileExists(exePath)) {
         return L"(not found)";
@@ -213,15 +380,17 @@ std::wstring GetToolVersionLine(const std::wstring& exePath) {
     SetHandleInformation(stdoutRead, HANDLE_FLAG_INHERIT, 0);
     SetHandleInformation(stderrRead, HANDLE_FLAG_INHERIT, 0);
 
+    HANDLE nullIn = CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ, &sa, OPEN_EXISTING, 0, nullptr);
+
     STARTUPINFOW si{};
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
     si.wShowWindow = SW_HIDE;
     si.hStdOutput = stdoutWrite;
     si.hStdError = stderrWrite;
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.hStdInput = (nullIn != INVALID_HANDLE_VALUE) ? nullIn : nullptr;
 
-    std::wstring cmd = L"\"" + exePath + L"\"";
+    std::wstring cmd = L"\"" + exePath + L"\" -h";
     std::vector<wchar_t> cmdBuffer(cmd.begin(), cmd.end());
     cmdBuffer.push_back(L'\0');
 
@@ -232,7 +401,14 @@ std::wstring GetToolVersionLine(const std::wstring& exePath) {
         CloseHandle(stdoutWrite);
         CloseHandle(stderrRead);
         CloseHandle(stderrWrite);
+        if (nullIn != INVALID_HANDLE_VALUE) {
+            CloseHandle(nullIn);
+        }
         return L"(could not launch)";
+    }
+
+    if (nullIn != INVALID_HANDLE_VALUE) {
+        CloseHandle(nullIn);
     }
 
     CloseHandle(stdoutWrite);
@@ -240,10 +416,15 @@ std::wstring GetToolVersionLine(const std::wstring& exePath) {
 
     std::string captured;
     char buffer[512];
-    auto drain = [&](HANDLE pipe) {
+    auto drainAvailable = [&](HANDLE pipe) {
         for (;;) {
+            DWORD available = 0;
+            if (!PeekNamedPipe(pipe, nullptr, 0, nullptr, &available, nullptr) || available == 0) {
+                break;
+            }
+            const DWORD toRead = (available < sizeof(buffer)) ? available : static_cast<DWORD>(sizeof(buffer));
             DWORD read = 0;
-            if (!ReadFile(pipe, buffer, sizeof(buffer), &read, nullptr) || read == 0) {
+            if (!ReadFile(pipe, buffer, toRead, &read, nullptr) || read == 0) {
                 break;
             }
             captured.append(buffer, read);
@@ -253,38 +434,35 @@ std::wstring GetToolVersionLine(const std::wstring& exePath) {
         }
     };
 
-    const DWORD wait = WaitForSingleObject(pi.hProcess, 5000);
-    drain(stdoutRead);
-    drain(stderrRead);
-    if (wait == WAIT_TIMEOUT) {
-        TerminateProcess(pi.hProcess, 1);
+    const DWORD startTick = GetTickCount();
+    for (;;) {
+        drainAvailable(stdoutRead);
+        drainAvailable(stderrRead);
+
+        const DWORD wait = WaitForSingleObject(pi.hProcess, 50);
+        if (wait == WAIT_OBJECT_0) {
+            break;
+        }
+        if (GetTickCount() - startTick > 5000) {
+            TerminateProcess(pi.hProcess, 1);
+            WaitForSingleObject(pi.hProcess, 1000);
+            break;
+        }
     }
+
+    drainAvailable(stdoutRead);
+    drainAvailable(stderrRead);
 
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
     CloseHandle(stdoutRead);
     CloseHandle(stderrRead);
 
-    const auto firstLine = [&]() -> std::string {
-        size_t end = captured.find('\n');
-        std::string line = captured.substr(0, end == std::string::npos ? captured.size() : end);
-        while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) {
-            line.pop_back();
-        }
-        return line;
-    }();
-
-    if (firstLine.empty()) {
+    const std::string versionLine = ExtractToolVersionLine(captured);
+    if (versionLine.empty()) {
         return L"(no version output)";
     }
-
-    const int len = MultiByteToWideChar(CP_UTF8, 0, firstLine.c_str(), -1, nullptr, 0);
-    if (len <= 1) {
-        return L"(invalid version output)";
-    }
-    std::wstring wide(static_cast<size_t>(len - 1), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, firstLine.c_str(), -1, wide.data(), len);
-    return wide;
+    return Utf8ToWide(versionLine);
 }
 
 std::wstring DescribeFile(const std::wstring& path) {
@@ -305,135 +483,137 @@ std::wstring DescribeFile(const std::wstring& path) {
     return path + L" (" + FormatBytes(size) + L")";
 }
 
-std::vector<std::string> ReadInstallerLogTail(const std::wstring& path, const size_t maxLines) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
-        return {};
-    }
+void WriteApplicationSection(const DiagnosticContext& context,
+                             const std::function<void(const std::wstring&)>& write) {
+    auto field = [&](const wchar_t* label, const std::wstring& value) {
+        write(std::wstring(label) + value);
+    };
 
-    std::vector<std::string> lines;
-    std::string line;
-    while (std::getline(in, line)) {
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-        lines.push_back(line);
-        if (lines.size() > maxLines) {
-            lines.erase(lines.begin());
-        }
-    }
-    return lines;
+    write(kDiagnosticSeparator);
+    write(L"[Application]");
+    field(L"Installer version: ", Utf8ToWide(INSTALLER_VERSION));
+    field(L"MediCat USB version: ", Utf8ToWide(MEDICAT_USB_VERSION));
+    field(L"Executable directory: ", context.outputDir);
+    field(L"Process architecture: ", GetProcessorArchitecture());
+    field(L"Elevated admin: ", IsProcessElevated() ? L"yes" : L"no");
 }
 
-}  // namespace
+void WriteSystemSection(const DiagnosticContext& context, const std::function<void(const std::wstring&)>& write) {
+    auto field = [&](const wchar_t* label, const std::wstring& value) {
+        write(std::wstring(label) + value);
+    };
+    (void)context;
 
-std::wstring WriteDebugLog(const DebugReportContext& context) {
-    if (context.outputDir.empty()) {
-        return L"";
-    }
+    write(kDiagnosticSeparator);
+    write(L"[System]");
 
-    const std::wstring outputPath = JoinPath(context.outputDir, L"debug.log");
-    std::ostringstream body;
-    body << "===== MediCat Installer debug.log =====\n";
-    AppendLineUtf8(body, "Generated: ", WideToUtf8(NowStamp()));
-    AppendLine(body, "Operation: ", context.operation.empty() ? L"unknown" : context.operation);
-    AppendLine(body, "Error title: ", context.errorTitle);
-    AppendLine(body, "Error message: ", context.errorMessage);
-    body << "\n";
-
-    body << "[Application]\n";
-    AppendLineUtf8(body, "Installer version: ", INSTALLER_VERSION);
-    AppendLineUtf8(body, "MediCat USB version: ", MEDICAT_USB_VERSION);
-    AppendLine(body, "Executable directory: ", context.outputDir);
-    AppendLine(body, "Process architecture: ", GetProcessorArchitecture());
-    AppendLine(body, "Elevated admin: ", IsProcessElevated() ? L"yes" : L"no");
-    body << "\n";
-
-    body << "[System]\n";
-    DWORD major = 0;
-    DWORD minor = 0;
-    DWORD build = 0;
-    if (GetOsVersion(major, minor, build)) {
-        std::wostringstream os;
-        os << major << L"." << minor << L" (build " << build << L")";
-        AppendLine(body, "Windows version: ", os.str());
+    const WindowsVersionInfo win = GetWindowsVersionInfo();
+    if (win.ntMajor != 0 || win.build != 0 || !win.productName.empty()) {
+        field(L"Windows: ", FormatWindowsVersionLine(win));
+        field(L"NT version: ", FormatNtVersionLine(win));
+        const std::wstring edition = DescribeEditionId(win.editionId);
+        if (!edition.empty()) {
+            field(L"Edition: ", edition);
+            if (!win.editionId.empty() && _wcsicmp(win.editionId.c_str(), edition.c_str()) != 0) {
+                field(L"Edition ID: ", win.editionId);
+            }
+        }
+        if (!win.installationType.empty()) {
+            field(L"Installation type: ", win.installationType);
+        }
     } else {
-        AppendLine(body, "Windows version: ", L"(unknown)");
+        field(L"Windows: ", L"(unknown)");
     }
+
+    const std::wstring systemModel = GetSystemModelLine();
+    if (!systemModel.empty()) {
+        field(L"System: ", systemModel);
+    }
+
+    const std::wstring cpuName = GetProcessorName();
+    if (!cpuName.empty()) {
+        field(L"Processor: ", cpuName);
+    }
+    field(L"Processor architecture: ", GetProcessorArchitecture());
 
     wchar_t computerName[MAX_COMPUTERNAME_LENGTH + 1]{};
     DWORD computerLen = MAX_COMPUTERNAME_LENGTH + 1;
     if (GetComputerNameW(computerName, &computerLen)) {
-        AppendLine(body, "Computer name: ", std::wstring(computerName, computerLen));
+        field(L"Computer name: ", std::wstring(computerName, computerLen));
     }
 
     wchar_t userName[256]{};
     DWORD userLen = static_cast<DWORD>(std::size(userName));
     if (GetUserNameW(userName, &userLen)) {
-        AppendLine(body, "User name: ", std::wstring(userName, userLen));
+        field(L"User name: ", std::wstring(userName, userLen));
     }
 
     wchar_t localeName[LOCALE_NAME_MAX_LENGTH]{};
     if (GetUserDefaultLocaleName(localeName, LOCALE_NAME_MAX_LENGTH) > 0) {
-        AppendLine(body, "User locale: ", localeName);
+        field(L"User locale: ", localeName);
     }
 
     MEMORYSTATUSEX mem{};
     mem.dwLength = sizeof(mem);
     if (GlobalMemoryStatusEx(&mem)) {
-        const uint64_t totalRam = mem.ullTotalPhys;
-        const uint64_t availRam = mem.ullAvailPhys;
         std::wostringstream ram;
-        ram << FormatBytes(totalRam) << L" total, " << FormatBytes(availRam) << L" available";
-        AppendLine(body, "Physical memory: ", ram.str());
+        ram << FormatBytes(mem.ullTotalPhys) << L" total, " << FormatBytes(mem.ullAvailPhys) << L" available";
+        field(L"Physical memory: ", ram.str());
     }
 
     SYSTEM_INFO sys{};
     GetSystemInfo(&sys);
-    body << "Logical processors: " << sys.dwNumberOfProcessors << "\n";
-    AppendLine(body, "PROCESSOR_ARCHITECTURE env: ", QueryEnvVar(L"PROCESSOR_ARCHITECTURE"));
-    AppendLine(body, "PROCESSOR_IDENTIFIER env: ", QueryEnvVar(L"PROCESSOR_IDENTIFIER"));
-    body << "\n";
+    field(L"Logical processors: ", std::to_wstring(sys.dwNumberOfProcessors));
+}
 
-    body << "[Installer options]\n";
-    AppendLine(body, "Selected drive: ", DescribeDrive(context.selectedDrive));
-    AppendLine(body, "Format drive: ", context.formatChecked ? L"yes" : L"no");
-    AppendLine(body, "Run Ventoy: ", context.runVentoyChecked ? L"yes" : L"no");
-    AppendLine(body, "Ventoy GPT: ", context.ventoyGpt ? L"yes" : L"no");
-    AppendLine(body, "Ventoy Secure Boot: ", context.ventoySecureBoot ? L"enabled" : L"disabled");
-    AppendLine(body, "Pinned Ventoy version: ",
-               context.pinnedVentoyVersion.empty() ? L"(latest)" : context.pinnedVentoyVersion);
-    body << "\n";
+void WriteBundledToolsSection(const DiagnosticContext& context,
+                              const std::function<void(const std::wstring&)>& write) {
+    auto field = [&](const wchar_t* label, const std::wstring& value) {
+        write(std::wstring(label) + value);
+    };
 
-    body << "[Bundled tools]\n";
-    AppendLine(body, "7za.exe: ", DescribeFile(context.sevenZaPath));
-    AppendLine(body, "7za version: ", GetToolVersionLine(context.sevenZaPath));
-    AppendLine(body, "7z.exe: ", DescribeFile(context.sevenZPath));
-    AppendLine(body, "7z version: ", GetToolVersionLine(context.sevenZPath));
-    AppendLine(body, "MedicatFiles.md5: ", DescribeFile(context.md5ManifestPath));
-    AppendLine(body, "MediCat archive: ", DescribeFile(context.archivePath));
-    body << "\n";
+    write(kDiagnosticSeparator);
+    write(L"[Bundled tools]");
+    field(L"7za.exe: ", DescribeFile(context.sevenZaPath));
+    field(L"7za version: ", GetToolVersionLine(context.sevenZaPath));
+    field(L"MedicatFiles.md5: ", DescribeFile(context.md5ManifestPath));
+    field(L"MediCat archive: ", DescribeFile(context.archivePath));
+    write(kDiagnosticSeparator);
+}
 
-    body << "[Recent installer log]\n";
-    const std::vector<std::string> tail = ReadInstallerLogTail(context.installerLogPath, 80);
-    if (tail.empty()) {
-        body << "(installer log unavailable)\n";
-    } else {
-        for (const std::string& line : tail) {
-            body << line << "\n";
-        }
+void WriteInstallerOptionsSection(const DiagnosticContext& context,
+                                  const std::function<void(const std::wstring&)>& write) {
+    auto field = [&](const wchar_t* label, const std::wstring& value) {
+        write(std::wstring(label) + value);
+    };
+
+    write(kDiagnosticSeparator);
+    write(L"[Installer options]");
+    if (!context.operation.empty()) {
+        field(L"Operation: ", context.operation);
     }
+    field(L"Selected drive: ", DescribeDrive(context.selectedDrive));
+    field(L"Format drive: ", context.formatChecked ? L"yes" : L"no");
+    field(L"Run Ventoy: ", context.runVentoyChecked ? L"yes" : L"no");
+    field(L"Ventoy GPT: ", context.ventoyGpt ? L"yes" : L"no");
+    field(L"Ventoy Secure Boot: ", context.ventoySecureBoot ? L"enabled" : L"disabled");
+    field(L"Pinned Ventoy version: ",
+          context.pinnedVentoyVersion.empty() ? L"(latest)" : context.pinnedVentoyVersion);
+    write(kDiagnosticSeparator);
+}
 
-    std::ofstream out(outputPath, std::ios::binary | std::ios::trunc);
-    if (!out) {
-        return L"";
-    }
-    const std::string content = body.str();
-    out.write(content.data(), static_cast<std::streamsize>(content.size()));
-    if (!out.good()) {
-        return L"";
-    }
-    return outputPath;
+}  // namespace
+
+void LogSystemDiagnostics(const DiagnosticContext& context,
+                          const std::function<void(const std::wstring&)>& logLine) {
+    WriteApplicationSection(context, logLine);
+    WriteSystemSection(context, logLine);
+    WriteBundledToolsSection(context, logLine);
+}
+
+void LogInstallerDiagnostics(const DiagnosticContext& context,
+                             const std::function<void(const std::wstring&)>& logLine) {
+    WriteInstallerOptionsSection(context, logLine);
 }
 
 }  // namespace medicat

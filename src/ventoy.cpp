@@ -1,5 +1,6 @@
 #include "ventoy.h"
 
+#include "drives.h"
 #include "download.h"
 #include "extract.h"
 #include "offline.h"
@@ -12,7 +13,146 @@
 #include <sstream>
 #include <vector>
 
+#include <cstring>
+
 namespace medicat {
+
+namespace {
+
+constexpr UINT32 kVentoyPart1StartSector = 2048;
+constexpr UINT32 kVentoyEfiPartSectors = (32u * 1024u * 1024u) / 512u;  // 32 MiB EFI partition
+
+#pragma pack(push, 1)
+struct VentoyPartTable {
+    BYTE Active;
+    BYTE StartHead;
+    UINT16 StartSector : 6;
+    UINT16 StartCylinder : 10;
+    BYTE FsFlag;
+    BYTE EndHead;
+    UINT16 EndSector : 6;
+    UINT16 EndCylinder : 10;
+    UINT32 StartSectorId;
+    UINT32 SectorCount;
+};
+
+struct VentoyMbrHead {
+    BYTE BootCode[446];
+    VentoyPartTable PartTbl[4];
+    BYTE Byte55;
+    BYTE ByteAA;
+};
+
+struct VentoyGptHdr {
+    CHAR Signature[8];
+    BYTE Version[4];
+    UINT32 Length;
+    UINT32 Crc;
+    BYTE Reserved1[4];
+    UINT64 EfiStartLBA;
+    UINT64 EfiBackupLBA;
+    UINT64 PartAreaStartLBA;
+    UINT64 PartAreaEndLBA;
+    GUID DiskGuid;
+    UINT64 PartTblStartLBA;
+    UINT32 PartTblTotNum;
+    UINT32 PartTblEntryLen;
+    UINT32 PartTblCrc;
+    BYTE Reserved2[420];
+};
+
+struct VentoyGptPartTbl {
+    GUID PartType;
+    GUID PartGuid;
+    UINT64 StartLBA;
+    UINT64 LastLBA;
+    UINT64 Attr;
+    WCHAR Name[36];
+};
+
+struct VentoyGptInfo {
+    VentoyMbrHead MBR;
+    VentoyGptHdr Head;
+    VentoyGptPartTbl PartTbl[128];
+};
+#pragma pack(pop)
+
+// Partition layout check aligned with Ventoy2Disk IsVentoyPhyDrive (VTOYEFI + 32 MiB part 2).
+bool IsVentoyPhysicalDrive(const DWORD phyDrive) {
+    std::wostringstream path;
+    path << L"\\\\.\\PhysicalDrive" << phyDrive;
+    const HANDLE disk =
+        CreateFileW(path.str().c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0,
+                    nullptr);
+    if (disk == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    VentoyMbrHead mbr{};
+    DWORD read = 0;
+    if (!ReadFile(disk, &mbr, sizeof(mbr), &read, nullptr) || read != sizeof(mbr)) {
+        CloseHandle(disk);
+        return false;
+    }
+
+    if (mbr.Byte55 != 0x55 || mbr.ByteAA != 0xAA) {
+        CloseHandle(disk);
+        return false;
+    }
+
+    if (mbr.PartTbl[0].FsFlag == 0xEE) {
+        VentoyGptInfo gpt{};
+        SetFilePointer(disk, 0, nullptr, FILE_BEGIN);
+        const BOOL gptRead = ReadFile(disk, &gpt, sizeof(gpt), &read, nullptr);
+        CloseHandle(disk);
+        if (!gptRead || read != sizeof(gpt)) {
+            return false;
+        }
+
+        if (memcmp(gpt.Head.Signature, "EFI PART", 8) != 0) {
+            return false;
+        }
+
+        static const WCHAR kVtoyEfiName[] = L"VTOYEFI";
+        if (memcmp(gpt.PartTbl[1].Name, kVtoyEfiName, sizeof(kVtoyEfiName) - sizeof(WCHAR)) != 0) {
+            return false;
+        }
+
+        if (gpt.PartTbl[0].StartLBA != kVentoyPart1StartSector) {
+            return false;
+        }
+
+        const UINT32 part2SectorCount =
+            static_cast<UINT32>(gpt.PartTbl[1].LastLBA + 1 - gpt.PartTbl[1].StartLBA);
+        if (gpt.PartTbl[1].StartLBA != gpt.PartTbl[0].LastLBA + 1 ||
+            part2SectorCount != kVentoyEfiPartSectors) {
+            return false;
+        }
+
+        return true;
+    }
+
+    CloseHandle(disk);
+
+    if (mbr.PartTbl[0].StartSectorId != kVentoyPart1StartSector) {
+        return false;
+    }
+
+    const UINT32 part2Start = mbr.PartTbl[0].StartSectorId + mbr.PartTbl[0].SectorCount;
+    if (mbr.PartTbl[1].StartSectorId != part2Start || mbr.PartTbl[1].SectorCount != kVentoyEfiPartSectors) {
+        return false;
+    }
+
+    return true;
+}
+
+bool VentoyFolderPresent(const std::wstring& root) {
+    const std::wstring ventoyFolder = JoinPath(root, L"ventoy");
+    const DWORD attr = GetFileAttributesW(ventoyFolder.c_str());
+    return attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+}  // namespace
 
 namespace {
 
@@ -370,14 +510,69 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
     return result;
 }
 
-bool TestVentoyInstalled(const std::wstring& driveLetter) {
+VentoyDetectionResult DetectVentoyOnDrive(const std::wstring& driveLetter) {
+    VentoyDetectionResult result;
+    auto log = [&](const std::wstring& line) { result.logLines.push_back(line); };
+
+    if (driveLetter.size() < 2) {
+        log(L"Ventoy detection: invalid drive letter");
+        return result;
+    }
+
     std::wstring root = driveLetter;
     if (root.size() == 2 && root[1] == L':') {
         root += L'\\';
     }
-    const std::wstring ventoyFolder = JoinPath(root, L"ventoy");
-    const DWORD attr = GetFileAttributesW(ventoyFolder.c_str());
-    return attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY);
+
+    log(L"Ventoy detection on " + driveLetter + L":");
+
+    const std::wstring ventoyFolderPath = JoinPath(root, L"ventoy");
+    const bool folderPresent = VentoyFolderPresent(root);
+    log(L"  ventoy folder (" + ventoyFolderPath + L"): " + (folderPresent ? L"found" : L"not found"));
+
+    const DriveIdentity identity = GetDriveIdentity(driveLetter);
+    bool layoutMatched = false;
+    if (!identity.valid) {
+        log(L"  physical disk: could not resolve drive identity");
+    } else {
+        std::wstring diskList;
+        for (const DWORD diskNumber : identity.diskNumbers) {
+            if (!diskList.empty()) {
+                diskList += L", ";
+            }
+            diskList += L"PhysicalDrive" + std::to_wstring(diskNumber);
+        }
+        log(L"  physical disk(s): " + diskList);
+
+        for (const DWORD diskNumber : identity.diskNumbers) {
+            const bool layoutMatch = IsVentoyPhysicalDrive(diskNumber);
+            log(L"  VTOYEFI layout on PhysicalDrive" + std::to_wstring(diskNumber) + L": " +
+                (layoutMatch ? L"matched (Ventoy2Disk partition layout)" : L"not matched"));
+            if (layoutMatch) {
+                layoutMatched = true;
+            }
+        }
+    }
+
+    result.installed = folderPresent || layoutMatched;
+
+    if (result.installed) {
+        if (folderPresent && layoutMatched) {
+            log(L"  result: Ventoy found (ventoy folder + VTOYEFI partition layout)");
+        } else if (folderPresent) {
+            log(L"  result: Ventoy found (ventoy folder on data partition)");
+        } else {
+            log(L"  result: Ventoy found (VTOYEFI partition layout only; no ventoy folder on data partition)");
+        }
+    } else {
+        log(L"  result: Ventoy not found");
+    }
+
+    return result;
+}
+
+bool TestVentoyInstalled(const std::wstring& driveLetter) {
+    return DetectVentoyOnDrive(driveLetter).installed;
 }
 
 VentoyResult RunVentoyInstall(const std::wstring& ventoyExe, const std::wstring& driveLetter,

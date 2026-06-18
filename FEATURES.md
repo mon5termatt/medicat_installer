@@ -15,7 +15,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | VHD/VHDX drive detection | ✅ | `BusTypeFileBackedVirtual` |
 | Skip `C:` drive | ✅ | |
 | Format checkbox (NTFS) | 🟡 | `format.com` only; forced on when Ventoy not on drive |
-| Ventoy action checkbox | ✅ | **Install Ventoy** (forced) vs **Update Ventoy?** (optional) based on detection |
+| Ventoy action checkbox | ✅ | **Install Ventoy** (forced) vs **Update Ventoy** (optional) based on detection |
 | MediCat `.7z` extraction | ✅ | Bundled `7za.exe`, byte-based progress |
 | Post-extract MD5 verification | ✅ | `MedicatFiles.md5` manifest; missing + hash mismatch |
 | Progress bar + status bar | ✅ | Single-line status bar below progress; `SetStatusBar` / `PostStatusBar` |
@@ -30,7 +30,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Detect existing Ventoy on selected drive | ✅ | `TestVentoyInstalled` — `{drive}\ventoy` folder; status bar + checkbox mode |
+| Detect existing Ventoy on selected drive | ✅ | `TestVentoyInstalled` — `ventoy` folder or VTOYEFI disk layout (Ventoy2Disk `IsVentoyPhyDrive` parity) |
 | Download latest Ventoy from GitHub | ✅ | GitHub releases; optional pin in Advanced |
 | Extract Ventoy zip | ✅ | Bundled `7za.exe` |
 | Fresh install `VTOYCLI /I` | ✅ | When format checked or Ventoy not detected |

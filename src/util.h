@@ -6,7 +6,9 @@
 namespace medicat {
 
 std::wstring GetExeDirectory();
+std::wstring GetMedicatTempRoot();
 std::wstring GetMedicatTempDir();
+void CleanupMedicatTempOnExit();
 std::wstring JoinPath(const std::wstring& a, const std::wstring& b);
 bool FileExists(const std::wstring& path);
 uint64_t GetFileSizeBytes(const std::wstring& path);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "debug.h"
 #include "gui.h"
 #include "log.h"
 #include "ventoy.h"
@@ -31,7 +32,8 @@ private:
     void PostExtractProgress(int percent, const std::wstring& file = L"", bool resetLog = false);
     void PostStatusBar(const std::wstring& text);  // Thread-safe; updates Gui::SetStatusBar on the UI thread.
     void PostDone(bool success, const std::wstring& message, const std::wstring& title = L"");
-    std::wstring WriteErrorDebugLog(const std::wstring& message, const std::wstring& title);
+    void LogOperationFailure(const std::wstring& message, const std::wstring& title);
+    DiagnosticContext BuildDiagnosticContext() const;
     VerificationOutcome VerifyDriveFiles(const std::wstring& drive, bool showFileProgress = true);
     bool TryReExtractFailedFiles(const std::wstring& drive, const std::wstring& archive,
                                  const std::vector<std::wstring>& failureDetails);
@@ -45,7 +47,6 @@ private:
     std::unique_ptr<Logger> log_;
     std::wstring root_;
     std::wstring sevenZa_;
-    std::wstring sevenZ_;
     std::wstring md5Manifest_;
     std::wstring currentOperation_;
     std::atomic<bool> installing_{false};

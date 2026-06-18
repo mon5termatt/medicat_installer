@@ -21,11 +21,10 @@ Tracked future work and planned features not yet implemented.
 
 | File | Type | When |
 |------|------|------|
-| `medicat_installer.log` | `.log` | Every session |
+| `medicat_installer.log` | `.log` | Every session (includes diagnostic sections) |
 | `extract.log` | `.log` | Full 7za output during extract |
 | `reextract.log` | `.log` | Selective re-extract (`7za @list`) |
 | `check.log` | `.log` | Per-file MD5 verify results |
-| `debug.log` | `.log` | Auto-written on operation failure |
 | `failed_files.txt` | `.txt` | Verification failures list |
 | `support_manifest.txt` | `.txt` | **Generated at upload** — version, drive, options, OS summary |
 
@@ -38,7 +37,7 @@ Skip any path that is missing. Reject anything that is not `.log` or `.txt`.
 - [ ] `UploadSupportLogs()` — WinHTTP POST multipart or pre-signed URL flow; progress in status bar.
 - [ ] Generate or receive **support keyword** from server response; display copy-friendly UI (read-only field + Copy button).
 - [ ] Wire into **verification still failed after re-extract** dialog (primary entry point).
-- [ ] Optional: **Upload logs** on generic failure (`PostDone(false, …)` / `debug.log` path).
+- [ ] Optional: **Upload logs** on generic failure (`PostDone(false, …)`).
 - [ ] i18n keys: upload button, in-progress status, success with keyword, upload failed, privacy note.
 - [ ] Handle offline / upload errors without blocking dismiss.
 - [ ] Pre-upload validation: refuse bundle if zero eligible files; never include `MediCat.USB*.7z` or other binaries.

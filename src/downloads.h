@@ -25,6 +25,8 @@ constexpr wchar_t kDownloadGoogleDriveUrl[] =
 constexpr wchar_t kDownloadMegaUrl[] = L"https://mega.nz/folder/jg1DWbaK#Qo6XsYzjx-HyIpxj8xQTiQ";
 constexpr wchar_t kDownloadAllUrl[] = L"http://medicatusb.com/#downloads";
 constexpr wchar_t kManualInstallDocUrl[] = L"https://medicatusb.com/docs/medicat/installation/manual-install/";
+constexpr wchar_t kSevenZipProjectUrl[] = L"https://www.7-zip.org/";
+constexpr wchar_t kVentoyProjectUrl[] = L"https://www.ventoy.net/en/index.html";
 
 struct AlternativeDownloadOption {
     const wchar_t* labelKey;

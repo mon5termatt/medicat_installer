@@ -14,7 +14,7 @@ Native Windows installer for MediCat USB bootable media. **Active development is
 | `pwsh` | PowerShell 7 + WinForms | Legacy alpha |
 | `main` | Batch scripts | Community maintenance |
 
-The C++ installer handles Ventoy install/upgrade, optional NTFS format, `MediCat.USB.v21.12.7z` extraction, MD5 verification, and selective re-extract on verify failure. Tools (`7za.exe`, `7z.exe`, `MedicatFiles.md5`) are **embedded in the exe** and extracted to `%TEMP%\MedicatInstaller\{pid}\` at runtime.
+The C++ installer handles Ventoy install/upgrade, optional NTFS format, `MediCat.USB.v21.12.7z` extraction, MD5 verification, and selective re-extract on verify failure. Tools (`7za.exe`, `MedicatFiles.md5`) are **embedded in the exe** (one `7za` per build arch) and extracted to `%TEMP%\MedicatInstaller\{pid}\` at runtime.
 
 **Docs:** [`README.md`](README.md) · [`FEATURES.md`](FEATURES.md) · [`TODO.md`](TODO.md) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
@@ -26,7 +26,7 @@ i18n/translations.json
 tools/               # i18n_codegen.py, Ventoy version list, offline populate
 res/                 # manifest, icons, bundle.rc.in
 build/               # CMake output (gitignored)
-7za.exe, bin/7z.exe, MedicatFiles.md5   # bundle inputs at repo root
+bin/7z/x64/7za.exe or bin/7z/x32/7za.exe, MedicatFiles.md5   # bundle inputs (per build arch)
 ```
 
 ## Architecture
@@ -42,7 +42,7 @@ build/               # CMake output (gitignored)
 | `ventoy.cpp` | Download, extract, `VTOYCLI /I` or `/U` |
 | `extract.cpp` | `7za` subprocess; full + selective (`@list`) extract |
 | `verify.cpp` | Parallel MD5 verify, `check.log`, manifest load |
-| `debug.cpp` | Auto `debug.log` on errors (system + tool diagnostics) |
+| `debug.cpp` | System/installer diagnostics written to `medicat_installer.log` |
 | `bundle.cpp` | Extract embedded resources from exe |
 | `download.cpp` | WinHTTP downloads (Ventoy, archive mirrors) |
 | `offline.cpp` | Offline Ventoy/archive cache paths |
@@ -75,13 +75,13 @@ PostDone(success, message, title);               // WM_MEDICAT_DONE
 1. **Fail-safe** — confirm wipe/Ventoy/drive-letter changes; log everything
 2. **Thread-safe UI** — workers post messages; GUI thread owns HWNDs
 3. **Single-file distribution** — bundle 7za/7z/MD5 into exe; no sidecar copies
-4. **Diagnostics on failure** — `debug.log` auto-written in `PostDone(false, …)`
+4. **Diagnostics on failure** — failure details + installer options appended to `medicat_installer.log` in `PostDone(false, …)`
 
 ## Ventoy UI & install logic
 
-- **Detect on drive select:** `TestVentoyInstalled(drive)` → `{drive}\ventoy` folder; updates status bar + checkbox mode (`RefreshDriveVentoyControls`)
+- **Detect on drive select:** `TestVentoyInstalled(drive)` — `ventoy` folder or VTOYEFI partition layout on the physical disk
 - **No Ventoy on drive:** checkbox shows **Install Ventoy** — checked; format + Ventoy forced in getters (`RequiresForcedVentoyInstall`)
-- **Ventoy present:** checkbox shows **Update Ventoy?** — optional; format enabled (defaults unchecked on drive change)
+- **Ventoy present:** checkbox shows **Update Ventoy** — optional; format enabled (defaults unchecked on drive change)
 - **Install thread:** `runVentoy = Gui::RunVentoyChecked()`; `/I` when `format || !ventoyInstalled`; `/U` for in-place upgrade otherwise
 - Advanced: pin Ventoy version, GPT (`/GPT`), Secure Boot (`/NOSB`)
 
@@ -106,11 +106,10 @@ Plain-text diagnostics only — future support upload is **`.log` / `.txt` only*
 
 | File | When |
 |------|------|
-| `medicat_installer.log` | Every session |
+| `medicat_installer.log` | Every session (includes system/diagnostic sections; failure block on errors) |
 | `extract.log` | 7za stdout/stderr during full extract |
 | `reextract.log` | Selective re-extract (`7za @list`) |
 | `check.log` | Per-file MD5 result during verify |
-| `debug.log` | On operation failure only |
 | `failed_files.txt` | Verification failures |
 
 ## i18n
@@ -123,13 +122,18 @@ Plain-text diagnostics only — future support upload is **`.log` / `.txt` only*
 ## Build
 
 ```bat
+# x64
 cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
+
+# Win32
+cmake -B build-x86 -G "Visual Studio 17 2022" -A Win32
+cmake --build build-x86 --config Release
 ```
 
-Output: `build/Release/MedicatInstaller.exe`
+Output: `build/Release/MedicatInstaller.exe` or `build-x86/Release/MedicatInstaller.exe`
 
-**Bundle inputs** (repo root): `7za.exe` (or `7z/x64/7za.exe`), `bin/7z.exe`, `MedicatFiles.md5`
+**Bundle inputs:** `bin/7z/x64/7za.exe` (x64) or `bin/7z/x32/7za.exe` (Win32), `MedicatFiles.md5`
 
 Defines: `INSTALLER_VERSION`, `MEDICAT_USB_VERSION` (CMake)
 
@@ -148,7 +152,7 @@ Defines: `INSTALLER_VERSION`, `MEDICAT_USB_VERSION` (CMake)
 2. Wire progress through `PostExtractProgress` / `PostStatusBar` / `onFileLog` callbacks
 3. Add i18n keys for user-visible strings (all five languages)
 4. Log via `log_->Info/Error/Debug` in `app.cpp`; module `onLog` for verify/ventoy
-5. On new failure paths, ensure `PostDone(false, msg)` runs so `debug.log` is generated
+5. On new failure paths, ensure `PostDone(false, msg)` runs so failure diagnostics are logged
 6. Do not commit `build/`, logs, `Ventoy2Disk/`, or `.7z` archives — see README **Contributing**
 
 ## Testing notes

@@ -6,38 +6,25 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 
-# Pick 7za for target CPU architecture.
-if(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
-    set(BUNDLE_7ZA "${REPO_ROOT}/bin/7z/arm64/7za.exe")
-elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    if(EXISTS "${REPO_ROOT}/bin/7z/x64/7za.exe")
-        set(BUNDLE_7ZA "${REPO_ROOT}/bin/7z/x64/7za.exe")
-    else()
-        set(BUNDLE_7ZA "${REPO_ROOT}/bin/7z/7za.exe")
-    endif()
+# Bundle 7za matching the installer target CPU (x64 or Win32).
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(BUNDLE_7ZA "${REPO_ROOT}/bin/7z/x64/7za.exe")
 else()
     set(BUNDLE_7ZA "${REPO_ROOT}/bin/7z/x32/7za.exe")
 endif()
-
-set(BUNDLE_7Z "${REPO_ROOT}/bin/7z.exe")
 set(BUNDLE_MD5 "${REPO_ROOT}/MedicatFiles.md5")
 
 if(NOT EXISTS "${BUNDLE_7ZA}")
     message(FATAL_ERROR "7za.exe not found for bundling: ${BUNDLE_7ZA}")
-endif()
-if(NOT EXISTS "${BUNDLE_7Z}")
-    message(FATAL_ERROR "7z.exe not found for bundling: ${BUNDLE_7Z}")
 endif()
 if(NOT EXISTS "${BUNDLE_MD5}")
     message(FATAL_ERROR "MedicatFiles.md5 not found for bundling: ${BUNDLE_MD5}")
 endif()
 
 file(TO_NATIVE_PATH "${BUNDLE_7ZA}" BUNDLE_7ZA_PATH)
-file(TO_NATIVE_PATH "${BUNDLE_7Z}" BUNDLE_7Z_PATH)
 file(TO_NATIVE_PATH "${BUNDLE_MD5}" BUNDLE_MD5_PATH)
 # RC treats \7 as an escape — use forward slashes in the resource script.
 string(REPLACE "\\" "/" BUNDLE_7ZA_PATH "${BUNDLE_7ZA_PATH}")
-string(REPLACE "\\" "/" BUNDLE_7Z_PATH "${BUNDLE_7Z_PATH}")
 string(REPLACE "\\" "/" BUNDLE_MD5_PATH "${BUNDLE_MD5_PATH}")
 
 set(VENTOY_VERSIONS_GEN "${CMAKE_BINARY_DIR}/ventoy_versions.txt")
@@ -56,7 +43,7 @@ file(TO_NATIVE_PATH "${VENTOY_VERSIONS_GEN}" VENTOY_VERSIONS_PATH)
 string(REPLACE "\\" "/" VENTOY_VERSIONS_PATH "${VENTOY_VERSIONS_PATH}")
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/res/bundle.rc.in" "${CMAKE_BINARY_DIR}/bundle.rc" @ONLY)
 set_source_files_properties("${CMAKE_BINARY_DIR}/bundle.rc" PROPERTIES
-    OBJECT_DEPENDS "${VENTOY_VERSIONS_GEN};${BUNDLE_MD5}"
+    OBJECT_DEPENDS "${VENTOY_VERSIONS_GEN};${BUNDLE_MD5};${BUNDLE_7ZA}"
 )
 
 set(I18N_JSON "${REPO_ROOT}/i18n/translations.json")

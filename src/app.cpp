@@ -74,6 +74,10 @@ bool ConfirmWipeDrive(HWND hwnd, const std::wstring& drive, const bool format, c
 
 }  // namespace
 
+struct MedicatTempDirGuard {
+    ~MedicatTempDirGuard() { CleanupMedicatTempOnExit(); }
+};
+
 App::App(HINSTANCE instance) : instance_(instance) {
     i18n::Load();
     root_ = GetExeDirectory();
@@ -82,47 +86,65 @@ App::App(HINSTANCE instance) : instance_(instance) {
     const BundledTools tools = EnsureBundledTools(instance_);
     if (!tools.ok) {
         log_->Error(tools.error);
-        DebugReportContext startupContext;
-        startupContext.outputDir = root_;
-        startupContext.operation = L"startup";
-        startupContext.errorMessage = tools.error;
-        startupContext.errorTitle = L"Bundled tools";
-        startupContext.installerLogPath = JoinPath(root_, L"medicat_installer.log");
-        const std::wstring debugPath = WriteDebugLog(startupContext);
-        if (!debugPath.empty()) {
-            log_->Info(L"Debug log written to: " + debugPath);
-        }
     } else {
         sevenZa_ = tools.sevenZa;
-        sevenZ_ = tools.sevenZ;
         md5Manifest_ = tools.md5Manifest;
-        log_->Debug(L"Bundled 7za: " + sevenZa_);
-        log_->Debug(L"Bundled 7z: " + sevenZ_);
-        log_->Debug(L"Bundled MD5: " + md5Manifest_);
     }
 }
 
 int App::Run() {
+    MedicatTempDirGuard tempCleanup;
+    LogSystemDiagnostics(BuildDiagnosticContext(),
+                         [this](const std::wstring& line) { log_->Info(line); });
+    log_->Info(L"MediCat Installer (C++) started");
+    gui_.SetLogHandler([this](const std::wstring& msg) { log_->Info(msg); });
+
     if (!gui_.Create(instance_)) {
         return 1;
     }
 
-    if (sevenZa_.empty() || sevenZ_.empty()) {
+    if (sevenZa_.empty()) {
         currentOperation_ = L"startup";
-        const std::wstring debugPath = WriteErrorDebugLog(i18n::Tr(L"messages.7zip_not_found"), i18n::Tr(L"titles.7zip_not_found"));
-        std::wstring message = i18n::Tr(L"messages.7zip_not_found");
-        if (!debugPath.empty()) {
-            message += L"\n\nDiagnostic log saved to:\n" + debugPath;
-        }
-        MessageBoxW(gui_.Hwnd(), message.c_str(), i18n::Tr(L"titles.7zip_not_found").c_str(), MB_ICONERROR);
+        LogOperationFailure(i18n::Tr(L"messages.7zip_not_found"), i18n::Tr(L"titles.7zip_not_found"));
+        MessageBoxW(gui_.Hwnd(), i18n::Tr(L"messages.7zip_not_found").c_str(),
+                    i18n::Tr(L"titles.7zip_not_found").c_str(), MB_ICONERROR);
         return 1;
     }
 
-    log_->Info(L"MediCat Installer (C++) started");
-
     gui_.SetInstallHandler([this] { OnInstall(); });
     gui_.SetVerifyHandler([this] { OnVerify(); });
+    LogInstallerDiagnostics(BuildDiagnosticContext(),
+                            [this](const std::wstring& line) { log_->Info(line); });
     return gui_.Run();
+}
+
+DiagnosticContext App::BuildDiagnosticContext() const {
+    DiagnosticContext context;
+    context.outputDir = root_;
+    context.sevenZaPath = sevenZa_;
+    context.md5ManifestPath = md5Manifest_;
+    context.archivePath = ResolveMediCatArchivePath(root_);
+    context.operation = currentOperation_;
+    if (gui_.Hwnd()) {
+        context.selectedDrive = gui_.SelectedDrive();
+        context.formatChecked = gui_.FormatChecked();
+        context.runVentoyChecked = gui_.RunVentoyChecked();
+        context.ventoySecureBoot = gui_.VentoySecureBootChecked();
+        context.ventoyGpt = gui_.VentoyGptChecked();
+        context.pinnedVentoyVersion = gui_.PinnedVentoyVersion();
+    }
+    return context;
+}
+
+void App::LogOperationFailure(const std::wstring& message, const std::wstring& title) {
+    log_->Info(kDiagnosticSeparator);
+    log_->Info(L"[Failure]");
+    if (!title.empty()) {
+        log_->Info(L"Error title: " + title);
+    }
+    log_->Info(L"Error message: " + message);
+    LogInstallerDiagnostics(BuildDiagnosticContext(),
+                            [this](const std::wstring& line) { log_->Info(line); });
 }
 
 void App::PostProgress(const int percent, const bool clearLog) {
@@ -150,40 +172,11 @@ void App::PostStatusBar(const std::wstring& text) {
 
 void App::PostDone(const bool success, const std::wstring& message, const std::wstring& title) {
     installing_ = false;
-    std::wstring displayMessage = message;
     if (!success && !message.empty()) {
-        const std::wstring debugPath = WriteErrorDebugLog(message, title);
-        if (!debugPath.empty()) {
-            displayMessage += L"\n\nDiagnostic log saved to:\n" + debugPath;
-        }
+        LogOperationFailure(message, title);
     }
-    auto* payload = new DonePayload{success, displayMessage, title};
+    auto* payload = new DonePayload{success, message, title};
     PostToGui(gui_.Hwnd(), WM_MEDICAT_DONE, reinterpret_cast<LPARAM>(payload));
-}
-
-std::wstring App::WriteErrorDebugLog(const std::wstring& message, const std::wstring& title) {
-    DebugReportContext context;
-    context.outputDir = root_;
-    context.errorMessage = message;
-    context.errorTitle = title;
-    context.operation = currentOperation_;
-    context.selectedDrive = gui_.SelectedDrive();
-    context.installerLogPath = JoinPath(root_, L"medicat_installer.log");
-    context.sevenZaPath = sevenZa_;
-    context.sevenZPath = sevenZ_;
-    context.md5ManifestPath = md5Manifest_;
-    context.archivePath = ResolveMediCatArchivePath(root_);
-    context.formatChecked = gui_.FormatChecked();
-    context.runVentoyChecked = gui_.RunVentoyChecked();
-    context.ventoySecureBoot = gui_.VentoySecureBootChecked();
-    context.ventoyGpt = gui_.VentoyGptChecked();
-    context.pinnedVentoyVersion = gui_.PinnedVentoyVersion();
-
-    const std::wstring debugPath = WriteDebugLog(context);
-    if (!debugPath.empty()) {
-        log_->Info(L"Debug log written to: " + debugPath);
-    }
-    return debugPath;
 }
 
 App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const bool showFileProgress) {
@@ -594,7 +587,11 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
         log_->Info(L"Ventoy v" + ready.version + L" ready");
 
         PostProgress(0);
-        const bool ventoyInstalled = TestVentoyInstalled(drive);
+        const VentoyDetectionResult ventoyDetection = DetectVentoyOnDrive(drive);
+        for (const std::wstring& line : ventoyDetection.logLines) {
+            log_->Info(line);
+        }
+        const bool ventoyInstalled = ventoyDetection.installed;
         if (ventoyInstalled) {
             log_->Info(i18n::Tr(L"log.ventoy_detected"));
         } else {

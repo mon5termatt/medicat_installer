@@ -1,18 +1,17 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
 namespace medicat {
 
-struct DebugReportContext {
+constexpr wchar_t kDiagnosticSeparator[] = L"======================================";
+
+struct DiagnosticContext {
     std::wstring outputDir;
-    std::wstring errorMessage;
-    std::wstring errorTitle;
     std::wstring operation;
     std::wstring selectedDrive;
-    std::wstring installerLogPath;
     std::wstring sevenZaPath;
-    std::wstring sevenZPath;
     std::wstring md5ManifestPath;
     std::wstring archivePath;
     bool formatChecked = false;
@@ -22,7 +21,12 @@ struct DebugReportContext {
     std::wstring pinnedVentoyVersion;
 };
 
-// Writes debug.log beside the installer. Returns the path written, or empty on failure.
-std::wstring WriteDebugLog(const DebugReportContext& context);
+// Application + system + bundled tools (logged before session start line).
+void LogSystemDiagnostics(const DiagnosticContext& context,
+                          const std::function<void(const std::wstring&)>& logLine);
+
+// Installer options for the selected drive (logged after the drive list is ready).
+void LogInstallerDiagnostics(const DiagnosticContext& context,
+                             const std::function<void(const std::wstring&)>& logLine);
 
 }  // namespace medicat

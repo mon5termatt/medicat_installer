@@ -48,6 +48,10 @@ struct DonePayload {
     std::wstring title;
 };
 
+struct VentoyDetectionResult;
+
+struct DriveInfo;
+
 enum class BusyProgressMode { FileLog, Verify, Download, None };
 
 class Gui {
@@ -58,6 +62,7 @@ public:
     int Run();
     void SetInstallHandler(InstallHandler handler);
     void SetVerifyHandler(InstallHandler handler);
+    void SetLogHandler(std::function<void(const std::wstring&)> handler);
     void SetBusy(bool busy, BusyProgressMode progressMode = BusyProgressMode::FileLog);
     void SetProgress(int percent, bool clearLog = false);
     void SetDownloadProgress(int percent, const std::wstring& barText, const std::wstring& labelText);
@@ -69,6 +74,7 @@ public:
     // Clears the optional detail file-log popup only; does not touch the status bar.
     void ClearFileLog();
     void OpenFileLogWindow();
+    void OpenCreditsWindow();
     void OpenReExtractPrompt(ReExtractPromptPayload* payload);
     void FinishReExtractPrompt(bool wantReExtract);
     void ShowDone(bool success, const std::wstring& message, const std::wstring& title = L"");
@@ -88,6 +94,7 @@ private:
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     static LRESULT CALLBACK ProgressBarProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     static LRESULT CALLBACK FileLogWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+    static LRESULT CALLBACK CreditsWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     static LRESULT CALLBACK ReExtractWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     void OnCreate(HWND hwnd);
     void OnCommand(WPARAM wp);
@@ -95,6 +102,9 @@ private:
     void RefreshDriveVentoyStatus();
     void RefreshDriveVentoyControls();
     void EnforceForcedDriveCheckboxes();
+    void LogVentoyDetection(const std::wstring& drive, const VentoyDetectionResult& detection);
+    void LogDriveListSelection(const std::vector<DriveInfo>& drives, int selectedIdx, const std::wstring& previous,
+                               int restoreIdx);
     void FlushInstallUi();
     void BatchAppendDetailLog(const std::vector<std::wstring>& files, size_t startIndex);
     void SyncDetailLog();
@@ -103,6 +113,8 @@ private:
     void UpdateAdvancedControls();
     void LayoutHeader();
     void LayoutMainContent();
+    void RefreshCreditsWindowText();
+    void LayoutCreditsWindow();
     void UpdateArchivePanel();
     bool IsArchiveAvailable() const;
     void EnsureVentoyVersionsLoaded();
@@ -135,6 +147,7 @@ private:
     HWND verifyFilesBtn_ = nullptr;
     HWND openLogBtn_ = nullptr;
     HWND manualInstallBtn_ = nullptr;
+    HWND creditsBtn_ = nullptr;
     HWND progressBar_ = nullptr;
     HWND statusBar_ = nullptr;
     HWND archiveMissingLabel_ = nullptr;
@@ -144,6 +157,11 @@ private:
     HWND altDownloadOpenBtn_ = nullptr;
     HWND fileLogWindow_ = nullptr;
     HWND fileLogList_ = nullptr;
+    HWND creditsWindow_ = nullptr;
+    HWND creditsIntro_ = nullptr;
+    HWND creditsSevenZipBtn_ = nullptr;
+    HWND creditsVentoyBtn_ = nullptr;
+    HWND creditsCloseBtn_ = nullptr;
     HWND reExtractWindow_ = nullptr;
     HWND reExtractMessage_ = nullptr;
     HWND reExtractList_ = nullptr;
@@ -161,6 +179,10 @@ private:
     std::wstring progressPercentText_ = L"0%";
     InstallHandler onInstall_;
     InstallHandler onVerify_;
+    std::function<void(const std::wstring&)> onLog_;
+    bool hasLastVentoyLog_ = false;
+    std::wstring lastVentoyLogDrive_;
+    bool lastVentoyLogFound_ = false;
     HBITMAP logoBitmap_ = nullptr;
     std::vector<std::wstring> ventoyVersions_;
     bool ventoyVersionsLoading_ = false;

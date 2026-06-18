@@ -59,6 +59,8 @@ constexpr int kProgressHeight = 28;
 constexpr int kOpenLogBtnHeight = 32;
 constexpr int kManualInstallBtnHeight = 32;
 constexpr int kManualInstallGap = 10;
+constexpr int kCreditsBtnHeight = 28;
+constexpr int kCreditsBtnGap = 8;
 constexpr int kActionRowGap = 12;
 constexpr int kStatusBarHeight = 20;
 constexpr int kCheckboxRowHeight = kCheckboxHeight + 8;
@@ -84,6 +86,7 @@ struct MainContentLayout {
     int openLogY = 0;
     int statusBarY = 0;
     int manualInstallY = 0;
+    int creditsBtnY = 0;
     int requiredClientHeight = 0;
 };
 
@@ -106,7 +109,8 @@ MainContentLayout ComputeMainContentLayout(const bool expanded, const bool archi
     layout.openLogY = layout.progressY + (kProgressHeight - kOpenLogBtnHeight) / 2;
     layout.statusBarY = layout.progressY + kProgressRowHeight + 8;
     layout.manualInstallY = layout.statusBarY + kStatusBarHeight + kManualInstallGap;
-    layout.requiredClientHeight = layout.manualInstallY + kManualInstallBtnHeight + kBottomChrome;
+    layout.creditsBtnY = layout.manualInstallY + kManualInstallBtnHeight + kCreditsBtnGap;
+    layout.requiredClientHeight = layout.creditsBtnY + kCreditsBtnHeight + kBottomChrome;
     return layout;
 }
 
@@ -168,6 +172,11 @@ constexpr int kDownloadMirror2BtnId = 1021;
 constexpr int kAltDownloadComboId = 1022;
 constexpr int kAltDownloadOpenBtnId = 1023;
 constexpr int kManualInstallBtnId = 1024;
+constexpr int kCreditsBtnId = 1025;
+constexpr int kCreditsIntroId = 1130;
+constexpr int kCreditsSevenZipBtnId = 1131;
+constexpr int kCreditsVentoyBtnId = 1132;
+constexpr int kCreditsCloseBtnId = 1133;
 constexpr int kReExtractMessageId = 1101;
 constexpr int kReExtractListId = 1102;
 constexpr int kReExtractBtnId = 1103;
@@ -181,7 +190,15 @@ constexpr int kAltComboWidth = 360;
 constexpr int kAltOpenBtnWidth = kContentWidth - kAltComboWidth - kDownloadBtnGap;
 constexpr int kAltOpenBtnX = kMargin + kAltComboWidth + kDownloadBtnGap;
 constexpr wchar_t kFileLogWindowClass[] = L"MedicatFileLogWindow";
+constexpr wchar_t kCreditsWindowClass[] = L"MedicatCreditsWindow";
 constexpr wchar_t kReExtractWindowClass[] = L"MedicatReExtractWindow";
+constexpr int kCreditsClientWidth = 400;
+constexpr int kCreditsClientHeight = 268;
+constexpr int kCreditsDialogMargin = 24;
+constexpr int kCreditsDialogTopPad = 20;
+constexpr int kCreditsDialogBtnHeight = 34;
+constexpr int kCreditsDialogBtnGap = 10;
+constexpr int kCreditsDialogSectionGap = 20;
 
 struct LanguageOption {
     const wchar_t* code;
@@ -225,6 +242,44 @@ int DownloadPercent(const uint64_t downloaded, const uint64_t total) {
         return 0;
     }
     return static_cast<int>((downloaded * 100) / total);
+}
+
+int CreditsOuterWidth() {
+    RECT frame{0, 0, kCreditsClientWidth, kCreditsClientHeight};
+    AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0);
+    return frame.right - frame.left;
+}
+
+int CreditsOuterHeight() {
+    RECT frame{0, 0, kCreditsClientWidth, kCreditsClientHeight};
+    AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0);
+    return frame.bottom - frame.top;
+}
+
+int MeasureWrappedStaticHeight(HWND hwnd, const std::wstring& text, const int width) {
+    if (!hwnd || text.empty() || width <= 0) {
+        return 40;
+    }
+
+    const HDC hdc = GetDC(hwnd);
+    if (!hdc) {
+        return 40;
+    }
+
+    const HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
+    HFONT oldFont = nullptr;
+    if (font) {
+        oldFont = reinterpret_cast<HFONT>(SelectObject(hdc, font));
+    }
+
+    RECT rc{0, 0, width, 0};
+    DrawTextW(hdc, text.c_str(), -1, &rc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+
+    if (oldFont) {
+        SelectObject(hdc, oldFont);
+    }
+    ReleaseDC(hwnd, hdc);
+    return std::max(32, static_cast<int>(rc.bottom - rc.top) + 4);
 }
 
 struct GlowButtonState {
@@ -525,6 +580,15 @@ bool Gui::Create(HINSTANCE instance) {
     logWc.lpszClassName = kFileLogWindowClass;
     RegisterClassExW(&logWc);
 
+    WNDCLASSEXW creditsWc{};
+    creditsWc.cbSize = sizeof(creditsWc);
+    creditsWc.lpfnWndProc = Gui::CreditsWndProc;
+    creditsWc.hInstance = instance;
+    creditsWc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    creditsWc.hbrBackground = theme::GetBrushes().window;
+    creditsWc.lpszClassName = kCreditsWindowClass;
+    RegisterClassExW(&creditsWc);
+
     WNDCLASSEXW reExtractWc{};
     reExtractWc.cbSize = sizeof(reExtractWc);
     reExtractWc.lpfnWndProc = Gui::ReExtractWndProc;
@@ -557,6 +621,70 @@ int Gui::Run() {
 void Gui::SetInstallHandler(InstallHandler handler) { onInstall_ = std::move(handler); }
 
 void Gui::SetVerifyHandler(InstallHandler handler) { onVerify_ = std::move(handler); }
+
+void Gui::SetLogHandler(std::function<void(const std::wstring&)> handler) { onLog_ = std::move(handler); }
+
+void Gui::LogVentoyDetection(const std::wstring& drive, const VentoyDetectionResult& detection) {
+    if (!onLog_ || drive.empty()) {
+        return;
+    }
+
+    const bool changed =
+        !hasLastVentoyLog_ || drive != lastVentoyLogDrive_ || detection.installed != lastVentoyLogFound_;
+    if (!changed) {
+        return;
+    }
+
+    for (const std::wstring& line : detection.logLines) {
+        onLog_(line);
+    }
+
+    hasLastVentoyLog_ = true;
+    lastVentoyLogDrive_ = drive;
+    lastVentoyLogFound_ = detection.installed;
+}
+
+void Gui::LogDriveListSelection(const std::vector<DriveInfo>& drives, const int selectedIdx,
+                                const std::wstring& previous, const int restoreIdx) {
+    if (!onLog_) {
+        return;
+    }
+
+    onLog_(L"Drive list refresh (show all drives: " +
+           std::wstring(ShowAllDrivesChecked() ? L"yes" : L"no") + L"):");
+
+    if (drives.empty()) {
+        onLog_(L"  no eligible drives (USB/VHD/fixed >= 30 GiB; C: hidden)");
+        onLog_(L"  default selection: none");
+        return;
+    }
+
+    for (size_t i = 0; i < drives.size(); ++i) {
+        onLog_(L"  [" + std::to_wstring(i) + L"] " + drives[i].letter + L" — " + drives[i].display);
+    }
+
+    if (selectedIdx < 0 || static_cast<size_t>(selectedIdx) >= drives.size()) {
+        onLog_(L"  default selection: none");
+        return;
+    }
+
+    const DriveInfo& selected = drives[static_cast<size_t>(selectedIdx)];
+    std::wstring reason;
+    if (restoreIdx >= 0 && !previous.empty()) {
+        reason = L"kept previous selection " + previous;
+    } else {
+        const int vhdDefault = DefaultDriveIndex(drives);
+        if (vhdDefault == selectedIdx) {
+            reason = L"first VHD/VHDX in list (installer default)";
+        } else if (selectedIdx == 0) {
+            reason = L"first eligible drive in list (no VHD/VHDX default)";
+        } else {
+            reason = L"drive index " + std::to_wstring(selectedIdx);
+        }
+    }
+
+    onLog_(L"  default selection: " + selected.letter + L" — " + reason);
+}
 
 void Gui::SetDownloadControlsEnabled(const bool enabled) {
     for (HWND control : {downloadMirror1Btn_, downloadMirror2Btn_, altDownloadCombo_, altDownloadOpenBtn_}) {
@@ -904,6 +1032,197 @@ LRESULT CALLBACK Gui::FileLogWndProc(const HWND hwnd, const UINT msg, const WPAR
         case WM_DESTROY:
             self->fileLogWindow_ = nullptr;
             self->fileLogList_ = nullptr;
+            return 0;
+        default:
+            break;
+    }
+    return DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+void Gui::RefreshCreditsWindowText() {
+    if (!creditsWindow_ || !IsWindow(creditsWindow_)) {
+        return;
+    }
+
+    SetWindowTextW(creditsWindow_, i18n::Tr(L"ui.credits_window_title").c_str());
+    if (creditsIntro_ && IsWindow(creditsIntro_)) {
+        SetWindowTextW(creditsIntro_, i18n::Tr(L"ui.credits_intro").c_str());
+    }
+    if (creditsSevenZipBtn_ && IsWindow(creditsSevenZipBtn_)) {
+        SetWindowTextW(creditsSevenZipBtn_, i18n::Tr(L"ui.credits_open_7zip").c_str());
+    }
+    if (creditsVentoyBtn_ && IsWindow(creditsVentoyBtn_)) {
+        SetWindowTextW(creditsVentoyBtn_, i18n::Tr(L"ui.credits_open_ventoy").c_str());
+    }
+    if (creditsCloseBtn_ && IsWindow(creditsCloseBtn_)) {
+        SetWindowTextW(creditsCloseBtn_, i18n::Tr(L"ui.credits_close_button").c_str());
+    }
+    LayoutCreditsWindow();
+}
+
+void Gui::LayoutCreditsWindow() {
+    if (!creditsWindow_ || !IsWindow(creditsWindow_)) {
+        return;
+    }
+
+    RECT client{};
+    GetClientRect(creditsWindow_, &client);
+    const int clientWidth = client.right - client.left;
+    const int contentWidth = std::max(0, clientWidth - 2 * kCreditsDialogMargin);
+
+    int y = kCreditsDialogTopPad;
+    if (creditsIntro_ && IsWindow(creditsIntro_)) {
+        const std::wstring intro = i18n::Tr(L"ui.credits_intro");
+        const int introHeight = MeasureWrappedStaticHeight(creditsIntro_, intro, contentWidth);
+        SetWindowPos(creditsIntro_, nullptr, kCreditsDialogMargin, y, contentWidth, introHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+        y += introHeight + kCreditsDialogSectionGap;
+    }
+
+    const auto placeButton = [&](HWND button) {
+        if (!button || !IsWindow(button)) {
+            return;
+        }
+        SetWindowPos(button, nullptr, kCreditsDialogMargin, y, contentWidth, kCreditsDialogBtnHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+        y += kCreditsDialogBtnHeight + kCreditsDialogBtnGap;
+    };
+
+    placeButton(creditsSevenZipBtn_);
+    placeButton(creditsVentoyBtn_);
+    y += kCreditsDialogBtnGap;
+    placeButton(creditsCloseBtn_);
+}
+
+void Gui::OpenCreditsWindow() {
+    if (creditsWindow_ && IsWindow(creditsWindow_)) {
+        RefreshCreditsWindowText();
+        ShowWindow(creditsWindow_, SW_SHOW);
+        SetForegroundWindow(creditsWindow_);
+        return;
+    }
+
+    RECT mainRc{};
+    GetWindowRect(hwnd_, &mainRc);
+    const int windowWidth = CreditsOuterWidth();
+    const int windowHeight = CreditsOuterHeight();
+    const int x = mainRc.left + ((mainRc.right - mainRc.left) - windowWidth) / 2;
+    const int y = mainRc.top + ((mainRc.bottom - mainRc.top) - windowHeight) / 2;
+
+    creditsWindow_ = CreateWindowExW(
+        0, kCreditsWindowClass, i18n::Tr(L"ui.credits_window_title").c_str(),
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+        x, y, windowWidth, windowHeight, hwnd_, nullptr, instance_, this);
+    if (!creditsWindow_) {
+        return;
+    }
+
+    theme::EnableDarkModeRecursive(creditsWindow_);
+    const HFONT uiFont = theme::MakeUiFont();
+    const HFONT subtitleFont = theme::MakeSubtitleFont();
+
+    creditsIntro_ = CreateWindowW(
+        L"STATIC", i18n::Tr(L"ui.credits_intro").c_str(),
+        WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
+        0, 0, 100, 40, creditsWindow_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCreditsIntroId)), instance_, nullptr);
+
+    creditsSevenZipBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.credits_open_7zip").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        0, 0, 100, kCreditsDialogBtnHeight, creditsWindow_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCreditsSevenZipBtnId)), instance_, nullptr);
+
+    creditsVentoyBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.credits_open_ventoy").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        0, 0, 100, kCreditsDialogBtnHeight, creditsWindow_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCreditsVentoyBtnId)), instance_, nullptr);
+
+    creditsCloseBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.credits_close_button").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        0, 0, 100, kCreditsDialogBtnHeight, creditsWindow_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCreditsCloseBtnId)), instance_, nullptr);
+
+    SendMessageW(creditsIntro_, WM_SETFONT, reinterpret_cast<WPARAM>(subtitleFont), TRUE);
+    for (HWND child : {creditsSevenZipBtn_, creditsVentoyBtn_, creditsCloseBtn_}) {
+        if (child && IsWindow(child)) {
+            SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+        }
+    }
+
+    SubclassGlowButton(creditsSevenZipBtn_, false);
+    SubclassGlowButton(creditsVentoyBtn_, false);
+    SubclassGlowButton(creditsCloseBtn_, false);
+
+    LayoutCreditsWindow();
+    ShowWindow(creditsWindow_, SW_SHOW);
+    SetForegroundWindow(creditsWindow_);
+    UpdateWindow(creditsWindow_);
+}
+
+LRESULT CALLBACK Gui::CreditsWndProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp) {
+    Gui* self = nullptr;
+    if (msg == WM_NCCREATE) {
+        auto* cs = reinterpret_cast<CREATESTRUCTW*>(lp);
+        self = static_cast<Gui*>(cs->lpCreateParams);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+        return TRUE;
+    }
+
+    self = reinterpret_cast<Gui*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    if (!self) {
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    }
+
+    switch (msg) {
+        case WM_COMMAND: {
+            const int id = LOWORD(wp);
+            if (id == kCreditsSevenZipBtnId) {
+                OpenBrowserUrl(kSevenZipProjectUrl);
+                return 0;
+            }
+            if (id == kCreditsVentoyBtnId) {
+                OpenBrowserUrl(kVentoyProjectUrl);
+                return 0;
+            }
+            if (id == kCreditsCloseBtnId) {
+                DestroyWindow(hwnd);
+                return 0;
+            }
+            break;
+        }
+        case WM_ERASEBKGND: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            RECT rc{};
+            GetClientRect(hwnd, &rc);
+            FillRect(hdc, &rc, theme::GetBrushes().window);
+            return 1;
+        }
+        case WM_SIZE:
+            self->LayoutCreditsWindow();
+            return 0;
+        case WM_CTLCOLORSTATIC: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            const HWND ctl = reinterpret_cast<HWND>(lp);
+            SetBkMode(hdc, TRANSPARENT);
+            if (ctl == self->creditsIntro_) {
+                SetTextColor(hdc, theme::Colors().muted);
+            } else {
+                SetTextColor(hdc, theme::Colors().text);
+            }
+            return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
+        }
+        case WM_CLOSE:
+            DestroyWindow(hwnd);
+            return 0;
+        case WM_DESTROY:
+            self->creditsWindow_ = nullptr;
+            self->creditsIntro_ = nullptr;
+            self->creditsSevenZipBtn_ = nullptr;
+            self->creditsVentoyBtn_ = nullptr;
+            self->creditsCloseBtn_ = nullptr;
             return 0;
         default:
             break;
@@ -1435,9 +1754,19 @@ void Gui::LayoutMainContent() {
         SetWindowPos(manualInstallBtn_, nullptr, contentLeft, layout.manualInstallY, kContentWidth, kManualInstallBtnHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
+    if (creditsBtn_ && IsWindow(creditsBtn_)) {
+        SetWindowPos(creditsBtn_, nullptr, contentLeft, layout.creditsBtnY, kContentWidth, kCreditsBtnHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
 
     int requiredClientHeight = layout.requiredClientHeight;
-    if (manualInstallBtn_ && IsWindow(manualInstallBtn_)) {
+    if (creditsBtn_ && IsWindow(creditsBtn_)) {
+        RECT btnRect{};
+        GetWindowRect(creditsBtn_, &btnRect);
+        POINT bottomRight{btnRect.right, btnRect.bottom};
+        ScreenToClient(hwnd_, &bottomRight);
+        requiredClientHeight = std::max(requiredClientHeight, static_cast<int>(bottomRight.y) + kBottomChrome);
+    } else if (manualInstallBtn_ && IsWindow(manualInstallBtn_)) {
         RECT btnRect{};
         GetWindowRect(manualInstallBtn_, &btnRect);
         POINT bottomRight{btnRect.right, btnRect.bottom};
@@ -1585,6 +1914,9 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             }
             if (self->reExtractWindow_ && IsWindow(self->reExtractWindow_)) {
                 DestroyWindow(self->reExtractWindow_);
+            }
+            if (self->creditsWindow_ && IsWindow(self->creditsWindow_)) {
+                DestroyWindow(self->creditsWindow_);
             }
             if (self->logoBitmap_) {
                 DeleteObject(self->logoBitmap_);
@@ -1764,6 +2096,12 @@ void Gui::OnCreate(HWND hwnd) {
         kMargin, initialLayout.manualInstallY, kContentWidth, kManualInstallBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kManualInstallBtnId)), instance_, nullptr);
 
+    creditsBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.credits_licenses_button").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        kMargin, initialLayout.creditsBtnY, kContentWidth, kCreditsBtnHeight, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCreditsBtnId)), instance_, nullptr);
+
     versionLabel_ = CreateWindowW(
         L"STATIC", versionText,
         WS_CHILD | WS_VISIBLE | SS_RIGHT | SS_NOPREFIX,
@@ -1773,7 +2111,7 @@ void Gui::OnCreate(HWND hwnd) {
          {languageCombo_, titleLabel_, versionLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_,
           altDownloadCombo_, altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_, ventoyActionCheck_, advancedCheck_,
           pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_, verifyFilesBtn_,
-          openLogBtn_, manualInstallBtn_, progressBar_, statusBar_}) {
+          openLogBtn_, manualInstallBtn_, creditsBtn_, progressBar_, statusBar_}) {
         if (child && IsWindow(child)) {
             SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
         }
@@ -1788,6 +2126,7 @@ void Gui::OnCreate(HWND hwnd) {
     SubclassGlowButton(verifyFilesBtn_, false);
     SubclassGlowButton(openLogBtn_, false);
     SubclassGlowButton(manualInstallBtn_, false);
+    SubclassGlowButton(creditsBtn_, false);
     SubclassGlowButton(downloadMirror1Btn_, true);
     SubclassGlowButton(downloadMirror2Btn_, true);
     SubclassGlowButton(altDownloadOpenBtn_, false);
@@ -1802,6 +2141,7 @@ void Gui::OnCreate(HWND hwnd) {
     UpdateAdvancedControls();
     LayoutHeader();
     UpdateArchivePanel();
+    LayoutMainContent();
     SetTimer(hwnd_, kArchiveCheckTimerId, kArchiveCheckIntervalMs, nullptr);
     RefreshTranslatedUi();
 }
@@ -1843,6 +2183,10 @@ void Gui::OnCommand(WPARAM wp) {
     }
     if (id == kManualInstallBtnId) {
         OpenBrowserUrl(kManualInstallDocUrl);
+        return;
+    }
+    if (id == kCreditsBtnId) {
+        OpenCreditsWindow();
         return;
     }
     if (id == kDownloadMirror1BtnId) {
@@ -1918,6 +2262,10 @@ void Gui::RefreshTranslatedUi() {
     if (manualInstallBtn_ && IsWindow(manualInstallBtn_)) {
         SetWindowTextW(manualInstallBtn_, i18n::Tr(L"ui.manual_install_button").c_str());
     }
+    if (creditsBtn_ && IsWindow(creditsBtn_)) {
+        SetWindowTextW(creditsBtn_, i18n::Tr(L"ui.credits_licenses_button").c_str());
+    }
+    RefreshCreditsWindowText();
     if (archiveMissingLabel_ && IsWindow(archiveMissingLabel_)) {
         SetWindowTextW(archiveMissingLabel_, i18n::Tr(L"ui.archive_missing", kMediCatArchiveFileName).c_str());
     }
@@ -1943,7 +2291,7 @@ void Gui::RefreshTranslatedUi() {
     for (HWND child : {titleLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_, altDownloadCombo_,
                        altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_,
                        ventoyActionCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_,
-                       installBtn_, verifyFilesBtn_, openLogBtn_, manualInstallBtn_, progressBar_, statusBar_,
+                       installBtn_, verifyFilesBtn_, openLogBtn_, manualInstallBtn_, creditsBtn_, progressBar_, statusBar_,
                        languageCombo_, versionLabel_}) {
         refreshControl(child);
     }
@@ -1983,6 +2331,7 @@ void Gui::RefreshDrives() {
     if (def >= 0) {
         SendMessageW(driveCombo_, CB_SETCURSEL, def, 0);
     }
+    LogDriveListSelection(drives, def, previous, restoreIdx);
     RefreshDriveVentoyStatus();
 }
 
@@ -1992,16 +2341,26 @@ void Gui::RefreshDriveVentoyStatus() {
     }
 
     const std::wstring drive = SelectedDrive();
-    ventoyOnDrive_ = !drive.empty() && TestVentoyInstalled(drive);
+    if (drive.empty()) {
+        hasLastVentoyLog_ = false;
+        ventoyOnDrive_ = false;
+
+        if (drive != lastVentoyControlDrive_) {
+            lastVentoyControlDrive_ = drive;
+            RefreshDriveVentoyControls();
+        }
+
+        SetStatusBar(i18n::Tr(L"status.status_ready"));
+        return;
+    }
+
+    const VentoyDetectionResult detection = DetectVentoyOnDrive(drive);
+    LogVentoyDetection(drive, detection);
+    ventoyOnDrive_ = detection.installed;
 
     if (drive != lastVentoyControlDrive_) {
         lastVentoyControlDrive_ = drive;
         RefreshDriveVentoyControls();
-    }
-
-    if (drive.empty()) {
-        SetStatusBar(i18n::Tr(L"status.status_ready"));
-        return;
     }
 
     if (ventoyOnDrive_) {
