@@ -10,9 +10,6 @@
 #include <sstream>
 #include <vector>
 
-#ifndef INSTALLER_VERSION
-#define INSTALLER_VERSION "dev"
-#endif
 #ifndef MEDICAT_USB_VERSION
 #define MEDICAT_USB_VERSION "unknown"
 #endif
@@ -491,7 +488,8 @@ void WriteApplicationSection(const DiagnosticContext& context,
 
     write(kDiagnosticSeparator);
     write(L"[Application]");
-    field(L"Installer version: ", Utf8ToWide(INSTALLER_VERSION));
+    field(L"Installer version: ", Utf8ToWide(kInstallerVersion));
+    field(L"Installer build: ", std::to_wstring(kInstallerBuildNumber));
     field(L"MediCat USB version: ", Utf8ToWide(MEDICAT_USB_VERSION));
     field(L"Executable directory: ", context.outputDir);
     field(L"Process architecture: ", GetProcessorArchitecture());

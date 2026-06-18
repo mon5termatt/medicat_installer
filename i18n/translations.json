@@ -30,6 +30,7 @@
       "credits_open_7zip": "7-Zip project",
       "credits_open_ventoy": "Ventoy project",
       "credits_close_button": "Close",
+      "feedback_button": "Bug report & feedback",
       "file_log_title": "Extraction File Log",
       "re_extract_window_title": "Verification Failed",
       "re_extract_summary": "{0} file(s) failed verification.",
@@ -233,6 +234,7 @@
       "credits_open_7zip": "Proyecto 7-Zip",
       "credits_open_ventoy": "Proyecto Ventoy",
       "credits_close_button": "Cerrar",
+      "feedback_button": "Informe de errores y sugerencias",
       "file_log_title": "Registro de extracción",
       "re_extract_window_title": "Verificación fallida",
       "re_extract_summary": "{0} archivo(s) fallaron la verificación.",
@@ -435,6 +437,7 @@
       "credits_open_7zip": "Projet 7-Zip",
       "credits_open_ventoy": "Projet Ventoy",
       "credits_close_button": "Fermer",
+      "feedback_button": "Signaler un bug ou une demande",
       "file_log_title": "Journal d'extraction",
       "re_extract_window_title": "Vérification échouée",
       "re_extract_summary": "{0} fichier(s) ont échoué la vérification.",
@@ -637,6 +640,7 @@
       "credits_open_7zip": "Projekt 7-Zip",
       "credits_open_ventoy": "Projekt Ventoy",
       "credits_close_button": "Zamknij",
+      "feedback_button": "Zgłoś błąd lub pomysł",
       "file_log_title": "Dziennik rozpakowywania",
       "re_extract_window_title": "Weryfikacja nie powiodła się",
       "re_extract_summary": "{0} plików nie przeszło weryfikacji.",
@@ -851,7 +855,8 @@
       "credits_intro": "Bu yükleyici üçüncü taraf araçlar kullanır. Lisans ve atıf bilgileri için her projeyi açın.",
       "credits_open_7zip": "7-Zip projesi",
       "credits_open_ventoy": "Ventoy projesi",
-      "credits_close_button": "Kapat"
+      "credits_close_button": "Kapat",
+      "feedback_button": "Hata bildirimi ve öneri"
     },
     "status": {
       "status_ready": "MediCat kurulumu için hazır",

@@ -46,6 +46,15 @@ set_source_files_properties("${CMAKE_BINARY_DIR}/bundle.rc" PROPERTIES
     OBJECT_DEPENDS "${VENTOY_VERSIONS_GEN};${BUNDLE_MD5};${BUNDLE_7ZA}"
 )
 
+set(BUILD_NUMBER_FILE "${REPO_ROOT}/build_number.txt")
+set(BUILD_VERSION_CPP "${REPO_ROOT}/generated/build_version.cpp")
+file(MAKE_DIRECTORY "${REPO_ROOT}/generated")
+if(NOT EXISTS "${BUILD_VERSION_CPP}")
+    file(WRITE "${BUILD_VERSION_CPP}"
+"// Placeholder — regenerated before each build.\nnamespace medicat {\nextern const char kInstallerVersion[] = \"0.0.0\";\nextern const int kInstallerBuildNumber = 0;\n}\n"
+    )
+endif()
+
 set(I18N_JSON "${REPO_ROOT}/i18n/translations.json")
 set(I18N_GEN "${CMAKE_CURRENT_SOURCE_DIR}/src/i18n_generated.h")
 set(I18N_CODEGEN "${REPO_ROOT}/tools/i18n_codegen.py")
@@ -68,6 +77,7 @@ set_property(
 file(GLOB_RECURSE SOURCE_FILES "src/*.cpp" "src/*.hpp")
 add_executable(MedicatInstaller WIN32
     ${SOURCE_FILES}
+    "${BUILD_VERSION_CPP}"
     "${CMAKE_BINARY_DIR}/bundle.rc"
     "${CMAKE_BINARY_DIR}/ventoy_versions.txt"
     "${I18N_GEN}"
@@ -76,6 +86,17 @@ add_executable(MedicatInstaller WIN32
 if(CMAKE_SIZEOF_VOID_P EQUAL 4)
     set_target_properties(MedicatInstaller PROPERTIES OUTPUT_NAME "MedicatInstaller-x86")
 endif()
+
+add_custom_command(TARGET MedicatInstaller PRE_BUILD
+    COMMAND python "${REPO_ROOT}/tools/bump_build_number.py"
+        "${BUILD_NUMBER_FILE}"
+        "${BUILD_VERSION_CPP}"
+        --major ${PROJECT_VERSION_MAJOR}
+        --minor ${PROJECT_VERSION_MINOR}
+        --skip-if-env MEDICAT_BUILD_NUMBER_BUMPED
+    WORKING_DIRECTORY "${REPO_ROOT}"
+    COMMENT "Incrementing build number"
+)
 
 target_include_directories(MedicatInstaller PRIVATE src "${CMAKE_CURRENT_SOURCE_DIR}/res")
 
@@ -88,7 +109,6 @@ target_compile_definitions(MedicatInstaller PRIVATE
     _UNICODE
     WIN32_LEAN_AND_MEAN
     NOMINMAX
-    INSTALLER_VERSION="${PROJECT_VERSION}"
     MEDICAT_USB_VERSION="21.12"
 )
 

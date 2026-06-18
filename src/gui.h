@@ -148,6 +148,7 @@ private:
     HWND openLogBtn_ = nullptr;
     HWND manualInstallBtn_ = nullptr;
     HWND creditsBtn_ = nullptr;
+    HWND feedbackBtn_ = nullptr;
     HWND progressBar_ = nullptr;
     HWND statusBar_ = nullptr;
     HWND archiveMissingLabel_ = nullptr;

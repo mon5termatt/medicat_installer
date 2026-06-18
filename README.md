@@ -60,9 +60,19 @@ cmake -B build-x86 -G "Visual Studio 17 2022" -A Win32
 cmake --build build-x86 --config Release
 ```
 
-Output: `build-x86/Release/MedicatInstaller-x86.exe`
+Output: `build/Release/MedicatInstaller.exe` or `build-x86/Release/MedicatInstaller-x86.exe`
 
 Each build embeds only the `7za.exe` for that CPU (x64 or x86).
+
+**Upload to GitHub prerelease** (after a successful build):
+
+```bat
+rebuild.bat release
+rebuild.bat release 3521-BETA
+tools\upload_release.bat
+```
+
+Uses `release_tag.txt` (default prerelease tag), or the latest prerelease if that file is missing. Requires [`gh`](https://cli.github.com/) authenticated for the repo.
 
 See [`FEATURES.md`](FEATURES.md) for the feature checklist and [`TODO.md`](TODO.md) for planned work (e.g. support log upload).  
 Developer architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

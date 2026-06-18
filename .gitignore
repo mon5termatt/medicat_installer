@@ -59,3 +59,5 @@ desktop.ini
 # IDE / local build artifacts
 .vs/
 build-ninja/
+build_number.txt
+generated/

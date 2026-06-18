@@ -22,10 +22,6 @@ namespace medicat {
 
 namespace {
 
-#ifndef INSTALLER_VERSION
-#define INSTALLER_VERSION "dev"
-#endif
-
 constexpr int kMargin = 20;
 constexpr int kContentWidth = 520;
 constexpr int kWindowWidth = 560;
@@ -61,6 +57,7 @@ constexpr int kManualInstallBtnHeight = 32;
 constexpr int kManualInstallGap = 10;
 constexpr int kCreditsBtnHeight = 28;
 constexpr int kCreditsBtnGap = 8;
+constexpr int kFooterBtnGap = 8;
 constexpr int kActionRowGap = 12;
 constexpr int kStatusBarHeight = 20;
 constexpr int kCheckboxRowHeight = kCheckboxHeight + 8;
@@ -173,6 +170,7 @@ constexpr int kAltDownloadComboId = 1022;
 constexpr int kAltDownloadOpenBtnId = 1023;
 constexpr int kManualInstallBtnId = 1024;
 constexpr int kCreditsBtnId = 1025;
+constexpr int kFeedbackBtnId = 1026;
 constexpr int kCreditsIntroId = 1130;
 constexpr int kCreditsSevenZipBtnId = 1131;
 constexpr int kCreditsVentoyBtnId = 1132;
@@ -1755,14 +1753,24 @@ void Gui::LayoutMainContent() {
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (creditsBtn_ && IsWindow(creditsBtn_)) {
-        SetWindowPos(creditsBtn_, nullptr, contentLeft, layout.creditsBtnY, kContentWidth, kCreditsBtnHeight,
+        const int footerBtnWidth = (kContentWidth - kFooterBtnGap) / 2;
+        SetWindowPos(creditsBtn_, nullptr, contentLeft, layout.creditsBtnY, footerBtnWidth, kCreditsBtnHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (feedbackBtn_ && IsWindow(feedbackBtn_)) {
+        const int footerBtnWidth = (kContentWidth - kFooterBtnGap) / 2;
+        SetWindowPos(feedbackBtn_, nullptr, contentLeft + footerBtnWidth + kFooterBtnGap, layout.creditsBtnY,
+                     footerBtnWidth, kCreditsBtnHeight, SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
     int requiredClientHeight = layout.requiredClientHeight;
-    if (creditsBtn_ && IsWindow(creditsBtn_)) {
+    HWND bottomFooterBtn = creditsBtn_;
+    if (feedbackBtn_ && IsWindow(feedbackBtn_)) {
+        bottomFooterBtn = feedbackBtn_;
+    }
+    if (bottomFooterBtn && IsWindow(bottomFooterBtn)) {
         RECT btnRect{};
-        GetWindowRect(creditsBtn_, &btnRect);
+        GetWindowRect(bottomFooterBtn, &btnRect);
         POINT bottomRight{btnRect.right, btnRect.bottom};
         ScreenToClient(hwnd_, &bottomRight);
         requiredClientHeight = std::max(requiredClientHeight, static_cast<int>(bottomRight.y) + kBottomChrome);
@@ -1992,7 +2000,7 @@ void Gui::OnCreate(HWND hwnd) {
         createDownloadBtn(kAltDownloadOpenBtnId, i18n::Tr(L"ui.alt_download_open").c_str(), kAltOpenBtnWidth);
 
     wchar_t versionText[32]{};
-    swprintf_s(versionText, L"v%hs", INSTALLER_VERSION);
+    swprintf_s(versionText, L"v%hs", kInstallerVersion);
     const MainContentLayout initialLayout = ComputeMainContentLayout(false, false);
     driveLabel_ = CreateWindowW(
         L"STATIC", i18n::Tr(L"ui.drive_label").c_str(),
@@ -2096,11 +2104,19 @@ void Gui::OnCreate(HWND hwnd) {
         kMargin, initialLayout.manualInstallY, kContentWidth, kManualInstallBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kManualInstallBtnId)), instance_, nullptr);
 
+    const int footerBtnWidth = (kContentWidth - kFooterBtnGap) / 2;
+
     creditsBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.credits_licenses_button").c_str(),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        kMargin, initialLayout.creditsBtnY, kContentWidth, kCreditsBtnHeight, hwnd,
+        kMargin, initialLayout.creditsBtnY, footerBtnWidth, kCreditsBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCreditsBtnId)), instance_, nullptr);
+
+    feedbackBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.feedback_button").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        kMargin + footerBtnWidth + kFooterBtnGap, initialLayout.creditsBtnY, footerBtnWidth, kCreditsBtnHeight, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFeedbackBtnId)), instance_, nullptr);
 
     versionLabel_ = CreateWindowW(
         L"STATIC", versionText,
@@ -2111,7 +2127,7 @@ void Gui::OnCreate(HWND hwnd) {
          {languageCombo_, titleLabel_, versionLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_,
           altDownloadCombo_, altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_, ventoyActionCheck_, advancedCheck_,
           pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_, verifyFilesBtn_,
-          openLogBtn_, manualInstallBtn_, creditsBtn_, progressBar_, statusBar_}) {
+          openLogBtn_, manualInstallBtn_, creditsBtn_, feedbackBtn_, progressBar_, statusBar_}) {
         if (child && IsWindow(child)) {
             SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
         }
@@ -2127,6 +2143,7 @@ void Gui::OnCreate(HWND hwnd) {
     SubclassGlowButton(openLogBtn_, false);
     SubclassGlowButton(manualInstallBtn_, false);
     SubclassGlowButton(creditsBtn_, false);
+    SubclassGlowButton(feedbackBtn_, false);
     SubclassGlowButton(downloadMirror1Btn_, true);
     SubclassGlowButton(downloadMirror2Btn_, true);
     SubclassGlowButton(altDownloadOpenBtn_, false);
@@ -2187,6 +2204,10 @@ void Gui::OnCommand(WPARAM wp) {
     }
     if (id == kCreditsBtnId) {
         OpenCreditsWindow();
+        return;
+    }
+    if (id == kFeedbackBtnId) {
+        OpenBrowserUrl(kBetaFeedbackUrl);
         return;
     }
     if (id == kDownloadMirror1BtnId) {
@@ -2265,6 +2286,9 @@ void Gui::RefreshTranslatedUi() {
     if (creditsBtn_ && IsWindow(creditsBtn_)) {
         SetWindowTextW(creditsBtn_, i18n::Tr(L"ui.credits_licenses_button").c_str());
     }
+    if (feedbackBtn_ && IsWindow(feedbackBtn_)) {
+        SetWindowTextW(feedbackBtn_, i18n::Tr(L"ui.feedback_button").c_str());
+    }
     RefreshCreditsWindowText();
     if (archiveMissingLabel_ && IsWindow(archiveMissingLabel_)) {
         SetWindowTextW(archiveMissingLabel_, i18n::Tr(L"ui.archive_missing", kMediCatArchiveFileName).c_str());
@@ -2284,7 +2308,7 @@ void Gui::RefreshTranslatedUi() {
     }
     if (versionLabel_ && IsWindow(versionLabel_)) {
         wchar_t versionText[32]{};
-        swprintf_s(versionText, L"v%hs", INSTALLER_VERSION);
+        swprintf_s(versionText, L"v%hs", kInstallerVersion);
         SetWindowTextW(versionLabel_, versionText);
     }
 

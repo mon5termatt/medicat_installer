@@ -19,4 +19,7 @@ std::wstring FormatPercent(int percent);
 std::wstring ShortDisplayPath(const std::wstring& path, size_t maxLen = 60);
 std::vector<std::wstring> SplitLines(const std::wstring& text);
 
+extern const char kInstallerVersion[];
+extern const int kInstallerBuildNumber;
+
 }  // namespace medicat

@@ -135,7 +135,7 @@ Output: `build/Release/MedicatInstaller.exe` or `build-x86/Release/MedicatInstal
 
 **Bundle inputs:** `bin/7z/x64/7za.exe` (x64) or `bin/7z/x32/7za.exe` (Win32), `MedicatFiles.md5`
 
-Defines: `INSTALLER_VERSION`, `MEDICAT_USB_VERSION` (CMake)
+Defines: `MEDICAT_USB_VERSION` (CMake); `kInstallerVersion` / `kInstallerBuildNumber` (auto-incremented per build via `build_number.txt`)
 
 ## Code conventions (C++)
 
