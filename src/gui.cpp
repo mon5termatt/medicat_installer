@@ -1116,22 +1116,26 @@ std::wstring Gui::SelectedDrive() const {
     return L"";
 }
 
+namespace {
+
+bool RequiresForcedVentoyInstall(const bool ventoyOnDrive, const std::wstring& drive) {
+    return !ventoyOnDrive && !drive.empty();
+}
+
+}  // namespace
+
 bool Gui::FormatChecked() const {
-    if (!ventoyOnDrive_) {
-        const std::wstring drive = SelectedDrive();
-        if (!drive.empty()) {
-            return true;
-        }
+    const std::wstring drive = SelectedDrive();
+    if (RequiresForcedVentoyInstall(ventoyOnDrive_, drive)) {
+        return true;
     }
     return SendMessageW(formatCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
 }
 
 bool Gui::RunVentoyChecked() const {
-    if (!ventoyOnDrive_) {
-        const std::wstring drive = SelectedDrive();
-        if (!drive.empty()) {
-            return true;
-        }
+    const std::wstring drive = SelectedDrive();
+    if (RequiresForcedVentoyInstall(ventoyOnDrive_, drive)) {
+        return true;
     }
     return SendMessageW(ventoyActionCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
 }
@@ -2033,7 +2037,8 @@ void Gui::RefreshDriveVentoyControls() {
 }
 
 void Gui::EnforceForcedDriveCheckboxes() {
-    if (ventoyOnDrive_ || SelectedDrive().empty()) {
+    const std::wstring drive = SelectedDrive();
+    if (!RequiresForcedVentoyInstall(ventoyOnDrive_, drive)) {
         return;
     }
 

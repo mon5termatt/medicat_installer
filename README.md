@@ -51,7 +51,8 @@ cmake --build build --config Release
 
 Output: `build\Release\MedicatInstaller.exe`
 
-See [`FEATURES.md`](FEATURES.md) for the feature checklist and [`TODO.md`](TODO.md) for planned work (e.g. support log upload).
+See [`FEATURES.md`](FEATURES.md) for the feature checklist and [`TODO.md`](TODO.md) for planned work (e.g. support log upload).  
+Developer architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Logs (beside the exe)
 
@@ -79,6 +80,7 @@ MedicatFiles.md5       # verification manifest (bundled)
 src/                   # C++ source
 i18n/                  # translations
 tools/                 # build-time scripts (Ventoy list, i18n codegen)
+docs/                  # ARCHITECTURE.md — module map, flows, conventions
 ```
 
 Runtime folders (`Ventoy2Disk/`, `build/`, offline cache) are created locally and gitignored.

@@ -16,7 +16,7 @@ Native Windows installer for MediCat USB bootable media. **Active development is
 
 The C++ installer handles Ventoy install/upgrade, optional NTFS format, `MediCat.USB.v21.12.7z` extraction, MD5 verification, and selective re-extract on verify failure. Tools (`7za.exe`, `7z.exe`, `MedicatFiles.md5`) are **embedded in the exe** and extracted to `%TEMP%\MedicatInstaller\{pid}\` at runtime.
 
-**Docs:** [`README.md`](README.md) · [`FEATURES.md`](FEATURES.md) · [`TODO.md`](TODO.md)
+**Docs:** [`README.md`](README.md) · [`FEATURES.md`](FEATURES.md) · [`TODO.md`](TODO.md) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
 ## Repo layout
 
@@ -80,7 +80,7 @@ PostDone(success, message, title);               // WM_MEDICAT_DONE
 ## Ventoy UI & install logic
 
 - **Detect on drive select:** `TestVentoyInstalled(drive)` → `{drive}\ventoy` folder; updates status bar + checkbox mode (`RefreshDriveVentoyControls`)
-- **No Ventoy on drive:** checkbox shows **Install Ventoy** — checked + disabled; format forced on + disabled
+- **No Ventoy on drive:** checkbox shows **Install Ventoy** — checked; format + Ventoy forced in getters (`RequiresForcedVentoyInstall`)
 - **Ventoy present:** checkbox shows **Update Ventoy?** — optional; format enabled (defaults unchecked on drive change)
 - **Install thread:** `runVentoy = Gui::RunVentoyChecked()`; `/I` when `format || !ventoyInstalled`; `/U` for in-place upgrade otherwise
 - Advanced: pin Ventoy version, GPT (`/GPT`), Secure Boot (`/NOSB`)
