@@ -29,7 +29,7 @@ if errorlevel 1 goto fail
 echo.
 echo Build OK:
 echo   %~dp0build\Release\MedicatInstaller.exe
-echo   %~dp0build-x86\Release\MedicatInstaller.exe
+echo   %~dp0build-x86\Release\MedicatInstaller-x86.exe
 exit /b 0
 
 :fail

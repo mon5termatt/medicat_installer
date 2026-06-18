@@ -73,6 +73,10 @@ add_executable(MedicatInstaller WIN32
     "${I18N_GEN}"
 )
 
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    set_target_properties(MedicatInstaller PROPERTIES OUTPUT_NAME "MedicatInstaller-x86")
+endif()
+
 target_include_directories(MedicatInstaller PRIVATE src "${CMAKE_CURRENT_SOURCE_DIR}/res")
 
 if(MSVC)

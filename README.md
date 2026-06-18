@@ -60,7 +60,7 @@ cmake -B build-x86 -G "Visual Studio 17 2022" -A Win32
 cmake --build build-x86 --config Release
 ```
 
-Output: `build-x86/Release/MedicatInstaller.exe`
+Output: `build-x86/Release/MedicatInstaller-x86.exe`
 
 Each build embeds only the `7za.exe` for that CPU (x64 or x86).
 
