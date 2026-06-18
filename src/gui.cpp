@@ -432,6 +432,8 @@ LRESULT CALLBACK FlatCheckboxProc(const HWND hwnd, const UINT msg, const WPARAM 
             }
             break;
         case WM_ENABLE:
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return CallWindowProcW(state->original, hwnd, msg, wp, lp);
         case WM_UPDATEUISTATE:
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
@@ -1115,6 +1117,12 @@ std::wstring Gui::SelectedDrive() const {
 }
 
 bool Gui::FormatChecked() const {
+    if (!ventoyOnDrive_) {
+        const std::wstring drive = SelectedDrive();
+        if (!drive.empty()) {
+            return true;
+        }
+    }
     return SendMessageW(formatCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
 }
 
@@ -1805,6 +1813,10 @@ void Gui::OnCommand(WPARAM wp) {
         RefreshDrives();
         return;
     }
+    if (id == kFormatCheckId || id == kVentoyActionCheckId) {
+        EnforceForcedDriveCheckboxes();
+        return;
+    }
     if (id == kDriveComboId && HIWORD(wp) == CBN_SELCHANGE) {
         RefreshDriveVentoyStatus();
         return;
@@ -1975,9 +1987,14 @@ void Gui::RefreshDriveVentoyStatus() {
         return;
     }
 
-    RefreshDriveVentoyControls();
-
     const std::wstring drive = SelectedDrive();
+    ventoyOnDrive_ = !drive.empty() && TestVentoyInstalled(drive);
+
+    if (drive != lastVentoyControlDrive_) {
+        lastVentoyControlDrive_ = drive;
+        RefreshDriveVentoyControls();
+    }
+
     if (drive.empty()) {
         SetStatusBar(i18n::Tr(L"status.status_ready"));
         return;
@@ -1991,40 +2008,40 @@ void Gui::RefreshDriveVentoyStatus() {
 }
 
 void Gui::RefreshDriveVentoyControls() {
-    const bool interactive = busyProgressMode_ == BusyProgressMode::None;
     const std::wstring drive = SelectedDrive();
-    const bool driveChanged = drive != lastVentoyControlDrive_;
-    lastVentoyControlDrive_ = drive;
-    ventoyOnDrive_ = !drive.empty() && TestVentoyInstalled(drive);
 
     if (ventoyActionCheck_ && IsWindow(ventoyActionCheck_)) {
         if (drive.empty()) {
             SetWindowTextW(ventoyActionCheck_, i18n::Tr(L"ui.install_ventoy_checkbox").c_str());
             SendMessageW(ventoyActionCheck_, BM_SETCHECK, BST_UNCHECKED, 0);
-            EnableWindow(ventoyActionCheck_, interactive);
         } else if (ventoyOnDrive_) {
             SetWindowTextW(ventoyActionCheck_, i18n::Tr(L"ui.update_ventoy_checkbox").c_str());
-            if (driveChanged) {
-                SendMessageW(ventoyActionCheck_, BM_SETCHECK, BST_UNCHECKED, 0);
-            }
-            EnableWindow(ventoyActionCheck_, interactive);
+            SendMessageW(ventoyActionCheck_, BM_SETCHECK, BST_UNCHECKED, 0);
         } else {
             SetWindowTextW(ventoyActionCheck_, i18n::Tr(L"ui.install_ventoy_checkbox").c_str());
             SendMessageW(ventoyActionCheck_, BM_SETCHECK, BST_CHECKED, 0);
-            EnableWindow(ventoyActionCheck_, FALSE);
         }
     }
 
     if (formatCheck_ && IsWindow(formatCheck_)) {
         if (drive.empty() || ventoyOnDrive_) {
-            if (ventoyOnDrive_ && driveChanged) {
-                SendMessageW(formatCheck_, BM_SETCHECK, BST_UNCHECKED, 0);
-            }
-            EnableWindow(formatCheck_, interactive);
+            SendMessageW(formatCheck_, BM_SETCHECK, BST_UNCHECKED, 0);
         } else {
             SendMessageW(formatCheck_, BM_SETCHECK, BST_CHECKED, 0);
-            EnableWindow(formatCheck_, FALSE);
         }
+    }
+}
+
+void Gui::EnforceForcedDriveCheckboxes() {
+    if (ventoyOnDrive_ || SelectedDrive().empty()) {
+        return;
+    }
+
+    if (ventoyActionCheck_ && IsWindow(ventoyActionCheck_)) {
+        SendMessageW(ventoyActionCheck_, BM_SETCHECK, BST_CHECKED, 0);
+    }
+    if (formatCheck_ && IsWindow(formatCheck_)) {
+        SendMessageW(formatCheck_, BM_SETCHECK, BST_CHECKED, 0);
     }
 }
 

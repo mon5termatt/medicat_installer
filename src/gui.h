@@ -94,6 +94,7 @@ private:
     void RefreshDrives();
     void RefreshDriveVentoyStatus();
     void RefreshDriveVentoyControls();
+    void EnforceForcedDriveCheckboxes();
     void FlushInstallUi();
     void BatchAppendDetailLog(const std::vector<std::wstring>& files, size_t startIndex);
     void SyncDetailLog();
