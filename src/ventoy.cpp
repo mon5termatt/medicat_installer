@@ -146,12 +146,6 @@ bool IsVentoyPhysicalDrive(const DWORD phyDrive) {
     return true;
 }
 
-bool VentoyFolderPresent(const std::wstring& root) {
-    const std::wstring ventoyFolder = JoinPath(root, L"ventoy");
-    const DWORD attr = GetFileAttributesW(ventoyFolder.c_str());
-    return attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY);
-}
-
 }  // namespace
 
 namespace {
@@ -519,16 +513,7 @@ VentoyDetectionResult DetectVentoyOnDrive(const std::wstring& driveLetter) {
         return result;
     }
 
-    std::wstring root = driveLetter;
-    if (root.size() == 2 && root[1] == L':') {
-        root += L'\\';
-    }
-
     log(L"Ventoy detection on " + driveLetter + L":");
-
-    const std::wstring ventoyFolderPath = JoinPath(root, L"ventoy");
-    const bool folderPresent = VentoyFolderPresent(root);
-    log(L"  ventoy folder (" + ventoyFolderPath + L"): " + (folderPresent ? L"found" : L"not found"));
 
     const DriveIdentity identity = GetDriveIdentity(driveLetter);
     bool layoutMatched = false;
@@ -554,16 +539,10 @@ VentoyDetectionResult DetectVentoyOnDrive(const std::wstring& driveLetter) {
         }
     }
 
-    result.installed = folderPresent || layoutMatched;
+    result.installed = layoutMatched;
 
     if (result.installed) {
-        if (folderPresent && layoutMatched) {
-            log(L"  result: Ventoy found (ventoy folder + VTOYEFI partition layout)");
-        } else if (folderPresent) {
-            log(L"  result: Ventoy found (ventoy folder on data partition)");
-        } else {
-            log(L"  result: Ventoy found (VTOYEFI partition layout only; no ventoy folder on data partition)");
-        }
+        log(L"  result: Ventoy found (VTOYEFI partition layout)");
     } else {
         log(L"  result: Ventoy not found");
     }
@@ -612,11 +591,18 @@ VentoyResult RunVentoyInstall(const std::wstring& ventoyExe, const std::wstring&
 }
 
 bool FormatDriveNtfs(const std::wstring& driveLetter, const std::wstring& label) {
-    std::wstring drive = driveLetter;
-    if (drive.size() == 2 && drive[1] == L':') {
-        drive += L':';
+    if (driveLetter.empty()) {
+        return false;
     }
-    std::wstring cmd = L"format.com " + drive + L" /FS:NTFS /X /Q /V:" + label + L" /Y";
+    wchar_t letter = driveLetter[0];
+    if (letter >= L'a' && letter <= L'z') {
+        letter = static_cast<wchar_t>(letter - L'a' + L'A');
+    }
+    if (letter < L'A' || letter > L'Z') {
+        return false;
+    }
+    const std::wstring drive = std::wstring(1, letter) + L":";
+    const std::wstring cmd = L"format.com " + drive + L" /FS:NTFS /X /Q /V:" + label + L" /Y";
     return RunHiddenProcess(cmd) == 0;
 }
 

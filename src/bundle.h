@@ -16,7 +16,7 @@ struct BundledTools {
     std::wstring error;
 };
 
-// Extract embedded 7za.exe (arch-selected) and MedicatFiles.md5 to %TEMP%\MedicatInstaller\{pid}\.
+// Extract embedded 7za.exe (arch-selected) and MedicatFiles.md5.gz to %TEMP%\MedicatInstaller\{pid}\.
 BundledTools EnsureBundledTools(HINSTANCE instance);
 
 }  // namespace medicat

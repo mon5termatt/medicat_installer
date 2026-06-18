@@ -1,5 +1,6 @@
 #include "drives.h"
 
+#include "cancel.h"
 #include "i18n.h"
 #include "util.h"
 
@@ -37,7 +38,8 @@ ULARGE_INTEGER QueryFreeBytes(const std::wstring& root) {
     return zero;
 }
 
-bool IsFileBackedVirtualDisk(const DWORD diskNumber) {
+bool QueryDiskBusType(const DWORD diskNumber, STORAGE_BUS_TYPE& busType) {
+    busType = BusTypeUnknown;
     std::wostringstream path;
     path << L"\\\\.\\PhysicalDrive" << diskNumber;
     const HANDLE disk =
@@ -53,14 +55,28 @@ bool IsFileBackedVirtualDisk(const DWORD diskNumber) {
     BYTE buffer[1024]{};
     DWORD returned = 0;
     const BOOL ok = DeviceIoControl(disk, IOCTL_STORAGE_QUERY_PROPERTY, &query, sizeof(query), buffer,
-                                  sizeof(buffer), &returned, nullptr);
+                                    sizeof(buffer), &returned, nullptr);
     CloseHandle(disk);
     if (!ok || returned < sizeof(STORAGE_DEVICE_DESCRIPTOR)) {
         return false;
     }
 
     const auto* desc = reinterpret_cast<const STORAGE_DEVICE_DESCRIPTOR*>(buffer);
-    return desc->BusType == BusTypeFileBackedVirtual;
+    busType = desc->BusType;
+    return true;
+}
+
+bool IsFileBackedVirtualDisk(const DWORD diskNumber) {
+    STORAGE_BUS_TYPE busType = BusTypeUnknown;
+    return QueryDiskBusType(diskNumber, busType) && busType == BusTypeFileBackedVirtual;
+}
+
+bool IsUsbBusDisk(const DWORD diskNumber) {
+    STORAGE_BUS_TYPE busType = BusTypeUnknown;
+    if (!QueryDiskBusType(diskNumber, busType)) {
+        return false;
+    }
+    return busType == BusTypeUsb || busType == BusTypeSd || busType == BusTypeMmc;
 }
 
 std::set<wchar_t> GetVhdDriveLetters() {
@@ -226,6 +242,19 @@ bool GetVolumeDiskNumbers(const wchar_t letter, std::vector<DWORD>& diskNumbers)
     return !diskNumbers.empty();
 }
 
+bool IsUsbBusVolume(const wchar_t letter) {
+    std::vector<DWORD> diskNumbers;
+    if (!GetVolumeDiskNumbers(letter, diskNumbers)) {
+        return false;
+    }
+    for (const DWORD diskNumber : diskNumbers) {
+        if (IsUsbBusDisk(diskNumber)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool IdentityMatches(const DriveIdentity& a, const DriveIdentity& b) {
     if (!a.valid || !b.valid) {
         return false;
@@ -259,8 +288,9 @@ std::vector<DriveInfo> ListTargetDrives(const bool includeAllDrives) {
         const std::wstring root = std::wstring(1, letter) + L":\\";
         const UINT driveType = GetDriveTypeW(root.c_str());
         const bool isVhd = vhdLetters.count(letter) > 0;
-        const bool isUsb = driveType == DRIVE_REMOVABLE;
-        const bool isFixed = driveType == DRIVE_FIXED;
+        const bool isUsbBus = IsUsbBusVolume(letter);
+        const bool isUsb = driveType == DRIVE_REMOVABLE || isUsbBus;
+        const bool isFixed = driveType == DRIVE_FIXED && !isUsbBus;
 
         if (isVhd) {
             TryAddDrive(drives, letter, L"VHD");
@@ -410,9 +440,21 @@ uint64_t GetArchiveUncompressedSize(const std::wstring& sevenZipExe, const std::
                         nullptr, &si, &pi)) {
         return 0;
     }
-    WaitForSingleObject(pi.hProcess, INFINITE);
+
+    ChildProcessRegistration childProcess(pi.hProcess);
+    while (WaitForSingleObject(pi.hProcess, 100) == WAIT_TIMEOUT) {
+        if (IsCancelRequested()) {
+            TerminateProcess(pi.hProcess, 1);
+            break;
+        }
+    }
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
+
+    if (IsCancelRequested()) {
+        DeleteFileW(listOut.c_str());
+        return 0;
+    }
 
     HANDLE h = CreateFileW(listOut.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
                            FILE_ATTRIBUTE_NORMAL, nullptr);

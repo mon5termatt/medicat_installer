@@ -62,6 +62,30 @@ Skip any path that is missing. Reject anything that is not `.log` or `.txt`.
 
 ---
 
+## Drive monitoring (USB plug/unplug)
+
+**Goal:** Detect when USB drives are connected or removed and refresh the drive list automatically, with a clear alert when a new removable drive appears so the user does not need to click **Refresh Drives**.
+
+### Planned behavior
+
+- Register for device change notifications (`WM_DEVICECHANGE` / `DBT_DEVICEARRIVAL` / `DBT_DEVICEREMOVECOMPLETE`) on the main window or a hidden notification window.
+- Debounce rapid plug/unplug events before repopulating the combo (avoid UI flicker).
+- On **arrival** of a relevant USB/removable volume: refresh drive list, optionally select the new drive if it is eligible (≥ 30 GiB, not `C:`), and show a short status-bar or toast-style message (e.g. “USB drive detected: E:”).
+- On **removal**: refresh list; if the selected drive disappeared, clear selection and warn before install/verify.
+- Respect **Show all drives** — same filtering rules as manual refresh (`drives.cpp`).
+- Do not refresh while a long operation is in progress (`SetBusy`) unless the removed drive is the active target (then block or prompt).
+
+### Tasks
+
+- [x] `WM_DEVICECHANGE` handler in `gui.cpp` (or dedicated `drives_monitor.cpp`).
+- [x] Debounced `RefreshDrives()` call from UI thread (post message from notification handler).
+- [x] User-visible alert on new eligible USB (status bar + optional balloon/status text).
+- [x] Handle selected drive vanishing mid-session (disable install, clear combo selection).
+- [x] i18n keys for plug-in / unplug messages.
+- [ ] Manual test: USB stick, VHD attach/detach, Ventoy remount under new letter.
+
+---
+
 ## Other (add items below)
 
 - [ ] _(none yet)_

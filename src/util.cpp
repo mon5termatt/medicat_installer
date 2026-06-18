@@ -263,4 +263,20 @@ std::vector<std::wstring> SplitLines(const std::wstring& text) {
     return lines;
 }
 
+bool IsProcessElevated() {
+    BOOL elevated = FALSE;
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+        return false;
+    }
+
+    TOKEN_ELEVATION elevation{};
+    DWORD size = 0;
+    if (GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size)) {
+        elevated = elevation.TokenIsElevated;
+    }
+    CloseHandle(token);
+    return elevated != FALSE;
+}
+
 }  // namespace medicat

@@ -30,6 +30,8 @@ exit /b 1
 
 :args_done
 
+call :close_running_installer
+
 echo Regenerating i18n...
 python "tools\i18n_codegen.py"
 if errorlevel 1 goto fail
@@ -39,17 +41,13 @@ python "tools\bump_build_number.py" "build_number.txt" "generated\build_version.
 if errorlevel 1 goto fail
 set MEDICAT_BUILD_NUMBER_BUMPED=1
 
-if not exist "build\CMakeCache.txt" (
-    echo Configuring x64 CMake...
-    cmake -B build -G "Visual Studio 17 2022" -A x64
-    if errorlevel 1 goto fail
-)
+echo Configuring x64 CMake...
+cmake -B build -G "Visual Studio 17 2022" -A x64
+if errorlevel 1 goto fail
 
-if not exist "build-x86\CMakeCache.txt" (
-    echo Configuring Win32 CMake...
-    cmake -B build-x86 -G "Visual Studio 17 2022" -A Win32
-    if errorlevel 1 goto fail
-)
+echo Configuring Win32 CMake...
+cmake -B build-x86 -G "Visual Studio 17 2022" -A Win32
+if errorlevel 1 goto fail
 
 echo Building x64 Release...
 cmake --build build --config Release
@@ -69,6 +67,22 @@ if "%UPLOAD_RELEASE%"=="1" (
     if errorlevel 1 goto fail
 )
 
+exit /b 0
+
+:close_running_installer
+echo Checking for running installer...
+for %%P in (MedicatInstaller.exe MedicatInstaller-x86.exe) do (
+    tasklist /FI "IMAGENAME eq %%P" 2>nul | find /I "%%P" >nul
+    if not errorlevel 1 (
+        echo Closing %%P...
+        taskkill /IM %%P /F >nul 2>&1
+        if errorlevel 1 (
+            echo Warning: could not close %%P. Close it manually if linking fails.
+        ) else (
+            timeout /t 1 /nobreak >nul
+        )
+    )
+)
 exit /b 0
 
 :fail

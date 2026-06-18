@@ -1,5 +1,6 @@
 #include "verify.h"
 
+#include "cancel.h"
 #include "download.h"
 #include "offline.h"
 #include "util.h"
@@ -651,6 +652,10 @@ void VerifyEntriesParallel(const VerifyOptions& options, const std::wstring& dri
 
     const auto worker = [&]() {
         while (true) {
+            if (IsCancelRequested()) {
+                break;
+            }
+
             const size_t index = nextIndex.fetch_add(1, std::memory_order_relaxed);
             if (index >= entries.size()) {
                 break;
@@ -705,6 +710,16 @@ void VerifyEntriesParallel(const VerifyOptions& options, const std::wstring& dri
     }
     for (std::thread& thread : threads) {
         thread.join();
+    }
+
+    if (IsCancelRequested()) {
+        result.error = L"Cancelled";
+        result.success = false;
+        if (checkLog.IsOpen()) {
+            checkLog.WriteSummary(L"Cancelled");
+            checkLog.Close();
+        }
+        return;
     }
 
     result.verifiedFiles = state.verifiedFiles;

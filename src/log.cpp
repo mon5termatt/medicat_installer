@@ -1,5 +1,7 @@
 #include "log.h"
 
+#include "cli.h"
+
 #include <windows.h>
 
 #include <chrono>
@@ -43,12 +45,27 @@ Logger::Logger(std::wstring path) : path_(std::move(path)) {
     out << "========================================\n";
 }
 
+void Logger::SetConsoleMirror(const bool enabled, const bool errorsOnly) {
+    std::lock_guard lock(mutex_);
+    consoleMirror_ = enabled;
+    consoleErrorsOnly_ = errorsOnly;
+    if (enabled) {
+        AttachCliConsole();
+    }
+}
+
 void Logger::Write(const std::wstring& level, const std::wstring& message) {
     std::lock_guard lock(mutex_);
+    const std::wstring stamp = NowStamp();
+    const std::wstring line = L"[" + stamp + L"] " + level + L": " + message;
+
     std::ofstream out(WideToUtf8(path_), std::ios::app);
-    out << "[" << WideToUtf8(NowStamp()) << "] " << WideToUtf8(level) << ": "
-        << WideToUtf8(message) << "\n";
+    out << WideToUtf8(line) << "\n";
     out.flush();
+
+    if (consoleMirror_ && (!consoleErrorsOnly_ || level == L"ERROR")) {
+        WriteCliLine(line);
+    }
 }
 
 void Logger::Info(const std::wstring& message) { Write(L"INFO", message); }

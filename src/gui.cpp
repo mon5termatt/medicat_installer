@@ -11,10 +11,12 @@
 #include "ventoy.h"
 
 #include <commctrl.h>
+#include <dbt.h>
 #include <uxtheme.h>
 #include <windowsx.h>
 
 #include <algorithm>
+#include <memory>
 #include <sstream>
 #include <thread>
 
@@ -181,8 +183,10 @@ constexpr int kReExtractBtnId = 1103;
 constexpr int kReExtractCloseBtnId = 1104;
 constexpr UINT_PTR kUiRefreshTimerId = 1;
 constexpr UINT_PTR kArchiveCheckTimerId = 2;
+constexpr UINT_PTR kDriveRefreshTimerId = 3;
 constexpr UINT kUiRefreshIntervalMs = 250;
 constexpr UINT kArchiveCheckIntervalMs = 3000;
+constexpr UINT kDriveDebounceMs = 500;
 constexpr int kMirrorBtnWidth = (kContentWidth - kDownloadBtnGap) / 2;
 constexpr int kAltComboWidth = 360;
 constexpr int kAltOpenBtnWidth = kContentWidth - kAltComboWidth - kDownloadBtnGap;
@@ -252,6 +256,38 @@ int CreditsOuterHeight() {
     RECT frame{0, 0, kCreditsClientWidth, kCreditsClientHeight};
     AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0);
     return frame.bottom - frame.top;
+}
+
+std::vector<std::wstring> CollectComboDriveLetters(const HWND combo) {
+    std::vector<std::wstring> letters;
+    if (!combo || !IsWindow(combo)) {
+        return letters;
+    }
+
+    const int count = static_cast<int>(SendMessageW(combo, CB_GETCOUNT, 0, 0));
+    letters.reserve(static_cast<size_t>(count));
+    for (int i = 0; i < count; ++i) {
+        const auto* letter = reinterpret_cast<std::wstring*>(SendMessageW(combo, CB_GETITEMDATA, i, 0));
+        if (letter && !letter->empty()) {
+            letters.push_back(*letter);
+        }
+    }
+    return letters;
+}
+
+bool DriveLetterStillPresent(const std::wstring& driveLetter) {
+    if (driveLetter.size() < 2 || driveLetter[1] != L':') {
+        return false;
+    }
+
+    const wchar_t letter = driveLetter[0];
+    if (letter < L'A' || letter > L'Z') {
+        return false;
+    }
+
+    const int bit = letter - L'A';
+    const DWORD mask = GetLogicalDrives();
+    return (mask & (1u << bit)) != 0;
 }
 
 int MeasureWrappedStaticHeight(HWND hwnd, const std::wstring& text, const int width) {
@@ -716,7 +752,12 @@ void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
             FlushInstallUi();
         }
         busyProgressMode_ = BusyProgressMode::None;
-        RefreshDriveVentoyStatus();
+        if (pendingDriveRefresh_) {
+            pendingDriveRefresh_ = false;
+            RefreshDrives(true);
+        } else {
+            RefreshDriveVentoyStatus();
+        }
     }
 }
 
@@ -1817,6 +1858,11 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_COMMAND:
             self->OnCommand(wp);
             return 0;
+        case WM_DEVICECHANGE:
+            if (self->HandleDeviceChange(wp, lp)) {
+                return 0;
+            }
+            break;
         case WM_MEDICAT_PROGRESS: {
             auto* payload = reinterpret_cast<ProgressPayload*>(lp);
             if (payload) {
@@ -1838,6 +1884,9 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 self->FlushInstallUi();
             } else if (wp == kArchiveCheckTimerId) {
                 self->UpdateArchivePanel();
+            } else if (wp == kDriveRefreshTimerId) {
+                KillTimer(hwnd, kDriveRefreshTimerId);
+                self->OnDebouncedDriveChange();
             }
             return 0;
         case WM_SIZE:
@@ -1915,8 +1964,23 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             }
             return 0;
         }
+        case WM_MEDICAT_DRIVE_LIST: {
+            auto* payload = reinterpret_cast<DriveListPayload*>(lp);
+            if (payload) {
+                self->ApplyDriveList(payload);
+            }
+            return 0;
+        }
+        case WM_MEDICAT_VENTOY_STATUS: {
+            auto* payload = reinterpret_cast<VentoyStatusPayload*>(lp);
+            if (payload) {
+                self->ApplyVentoyStatus(payload);
+            }
+            return 0;
+        }
         case WM_DESTROY:
             KillTimer(hwnd, kArchiveCheckTimerId);
+            KillTimer(hwnd, kDriveRefreshTimerId);
             if (self->fileLogWindow_ && IsWindow(self->fileLogWindow_)) {
                 DestroyWindow(self->fileLogWindow_);
             }
@@ -2223,6 +2287,10 @@ void Gui::OnCommand(WPARAM wp) {
     }
 }
 
+void Gui::SetInitialLanguage(const std::wstring& languageCode) {
+    ApplyLanguageSelection(languageCode);
+}
+
 void Gui::ApplyLanguageSelection(const std::wstring& languageCode) {
     i18n::Load(languageCode);
     if (languageCombo_ && IsWindow(languageCombo_)) {
@@ -2321,7 +2389,30 @@ void Gui::RefreshTranslatedUi() {
     }
 }
 
-void Gui::RefreshDrives() {
+void Gui::RefreshDrives(const bool fromDeviceChange) {
+    RequestDriveRefresh(fromDeviceChange);
+}
+
+void Gui::RequestDriveRefresh(const bool fromDeviceChange) {
+    if (!driveCombo_ || !IsWindow(driveCombo_)) {
+        return;
+    }
+
+    if (driveRefreshInFlight_.load(std::memory_order_acquire)) {
+        driveRefreshCoalesce_.store(true, std::memory_order_release);
+        if (fromDeviceChange) {
+            driveRefreshCoalesceFromDevice_ = true;
+        }
+        return;
+    }
+
+    std::vector<std::wstring> lettersBefore;
+    std::wstring selectedBefore;
+    if (fromDeviceChange) {
+        lettersBefore = CollectComboDriveLetters(driveCombo_);
+        selectedBefore = SelectedDrive();
+    }
+
     std::wstring previous;
     const int previousIdx = static_cast<int>(SendMessageW(driveCombo_, CB_GETCURSEL, 0, 0));
     if (previousIdx >= 0) {
@@ -2332,6 +2423,46 @@ void Gui::RefreshDrives() {
         }
     }
 
+    const bool showAll = ShowAllDrivesChecked();
+    const uint64_t generation = ++driveListGeneration_;
+    const HWND hwnd = hwnd_;
+
+    SetStatusBar(i18n::Tr(L"status.scanning_drives"));
+    driveRefreshInFlight_.store(true, std::memory_order_release);
+
+    std::thread([hwnd, showAll, fromDeviceChange, lettersBefore = std::move(lettersBefore),
+                 selectedBefore = std::move(selectedBefore), previous = std::move(previous), generation]() {
+        auto* payload = new DriveListPayload{};
+        payload->drives = ListTargetDrives(showAll);
+        payload->lettersBefore = std::move(lettersBefore);
+        payload->selectedBefore = std::move(selectedBefore);
+        payload->previous = std::move(previous);
+        payload->fromDeviceChange = fromDeviceChange;
+        payload->generation = generation;
+        PostMessageW(hwnd, WM_MEDICAT_DRIVE_LIST, 0, reinterpret_cast<LPARAM>(payload));
+    }).detach();
+}
+
+void Gui::ApplyDriveList(DriveListPayload* payload) {
+    if (!payload || !driveCombo_ || !IsWindow(driveCombo_)) {
+        delete payload;
+        driveRefreshInFlight_.store(false, std::memory_order_release);
+        return;
+    }
+
+    std::unique_ptr<DriveListPayload> guard(payload);
+    if (payload->generation != driveListGeneration_.load(std::memory_order_acquire)) {
+        driveRefreshInFlight_.store(false, std::memory_order_release);
+        if (driveRefreshCoalesce_.exchange(false, std::memory_order_acq_rel)) {
+            const bool fromDevice = driveRefreshCoalesceFromDevice_;
+            driveRefreshCoalesceFromDevice_ = false;
+            RequestDriveRefresh(fromDevice);
+        } else {
+            RefreshDriveVentoyStatus();
+        }
+        return;
+    }
+
     const int count = static_cast<int>(SendMessageW(driveCombo_, CB_GETCOUNT, 0, 0));
     for (int i = 0; i < count; ++i) {
         const auto* letter = reinterpret_cast<std::wstring*>(SendMessageW(driveCombo_, CB_GETITEMDATA, i, 0));
@@ -2339,14 +2470,14 @@ void Gui::RefreshDrives() {
     }
 
     SendMessageW(driveCombo_, CB_RESETCONTENT, 0, 0);
-    const auto drives = ListTargetDrives(ShowAllDrivesChecked());
+    const auto& drives = payload->drives;
     int restoreIdx = -1;
     for (size_t i = 0; i < drives.size(); ++i) {
         const auto& d = drives[i];
         SendMessageW(driveCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(d.display.c_str()));
         const int idx = static_cast<int>(SendMessageW(driveCombo_, CB_GETCOUNT, 0, 0)) - 1;
         SendMessageW(driveCombo_, CB_SETITEMDATA, idx, reinterpret_cast<LPARAM>(new std::wstring(d.letter)));
-        if (!previous.empty() && d.letter == previous) {
+        if (!payload->previous.empty() && d.letter == payload->previous) {
             restoreIdx = idx;
         }
     }
@@ -2355,11 +2486,113 @@ void Gui::RefreshDrives() {
     if (def >= 0) {
         SendMessageW(driveCombo_, CB_SETCURSEL, def, 0);
     }
-    LogDriveListSelection(drives, def, previous, restoreIdx);
-    RefreshDriveVentoyStatus();
+    LogDriveListSelection(drives, def, payload->previous, restoreIdx);
+
+    const bool notified = payload->fromDeviceChange &&
+                          ApplyDriveChangeNotifications(payload->lettersBefore, drives, payload->selectedBefore);
+    RefreshDriveVentoyStatus(!notified);
+
+    driveRefreshInFlight_.store(false, std::memory_order_release);
+    if (driveRefreshCoalesce_.exchange(false, std::memory_order_acq_rel)) {
+        const bool fromDevice = driveRefreshCoalesceFromDevice_;
+        driveRefreshCoalesceFromDevice_ = false;
+        RequestDriveRefresh(fromDevice);
+    }
 }
 
-void Gui::RefreshDriveVentoyStatus() {
+bool Gui::HandleDeviceChange(const WPARAM wp, const LPARAM lp) {
+    if (wp != DBT_DEVICEARRIVAL && wp != DBT_DEVICEREMOVECOMPLETE) {
+        return false;
+    }
+
+    const auto* hdr = reinterpret_cast<const DEV_BROADCAST_HDR*>(lp);
+    if (!hdr || hdr->dbch_devicetype != DBT_DEVTYP_VOLUME) {
+        return false;
+    }
+
+    ScheduleDriveChangeRefresh();
+    return true;
+}
+
+void Gui::ScheduleDriveChangeRefresh() {
+    if (!hwnd_ || !IsWindow(hwnd_)) {
+        return;
+    }
+    SetTimer(hwnd_, kDriveRefreshTimerId, kDriveDebounceMs, nullptr);
+}
+
+void Gui::OnDebouncedDriveChange() {
+    if (busyProgressMode_ != BusyProgressMode::None) {
+        const std::wstring selected = SelectedDrive();
+        if (!selected.empty() && !DriveLetterStillPresent(selected)) {
+            pendingDriveRefresh_ = true;
+            SetStatusBar(i18n::Tr(L"status.selected_drive_removed", selected));
+            if (onLog_) {
+                onLog_(L"Selected drive removed during operation: " + selected);
+            }
+        }
+        return;
+    }
+
+    pendingDriveRefresh_ = false;
+    RefreshDrives(true);
+}
+
+bool Gui::ApplyDriveChangeNotifications(const std::vector<std::wstring>& lettersBefore,
+                                        const std::vector<DriveInfo>& drives,
+                                        const std::wstring& selectedBefore) {
+    const auto containsLetter = [&](const std::wstring& letter) {
+        return std::any_of(drives.begin(), drives.end(),
+                           [&](const DriveInfo& drive) { return drive.letter == letter; });
+    };
+
+    if (!selectedBefore.empty() && !containsLetter(selectedBefore)) {
+        SetStatusBar(i18n::Tr(L"status.selected_drive_removed", selectedBefore));
+        if (onLog_) {
+            onLog_(L"Selected drive removed: " + selectedBefore);
+        }
+        return true;
+    }
+
+    std::vector<const DriveInfo*> arrived;
+    for (const auto& drive : drives) {
+        const bool wasListed =
+            std::any_of(lettersBefore.begin(), lettersBefore.end(),
+                        [&](const std::wstring& letter) { return letter == drive.letter; });
+        if (!wasListed) {
+            arrived.push_back(&drive);
+        }
+    }
+
+    if (arrived.empty()) {
+        return false;
+    }
+
+    if (arrived.size() == 1) {
+        const DriveInfo& drive = *arrived[0];
+        for (size_t i = 0; i < drives.size(); ++i) {
+            if (drives[i].letter == drive.letter) {
+                SendMessageW(driveCombo_, CB_SETCURSEL, static_cast<WPARAM>(i), 0);
+                lastVentoyControlDrive_.clear();
+                RefreshDriveVentoyControls();
+                break;
+            }
+        }
+        SetStatusBar(i18n::Tr(L"status.drive_arrived", drive.display));
+        if (onLog_) {
+            onLog_(L"Drive arrived: " + drive.display);
+        }
+        return true;
+    }
+
+    SetStatusBar(i18n::Tr(L"status.drives_arrived", std::to_wstring(arrived.size())));
+    if (onLog_) {
+        onLog_(L"Drive list updated: " + std::to_wstring(arrived.size()) + L" new drive(s)");
+    }
+    return true;
+}
+
+void Gui::RefreshDriveVentoyStatus(const bool updateStatusBar) {
     if (busyProgressMode_ != BusyProgressMode::None) {
         return;
     }
@@ -2374,23 +2607,51 @@ void Gui::RefreshDriveVentoyStatus() {
             RefreshDriveVentoyControls();
         }
 
-        SetStatusBar(i18n::Tr(L"status.status_ready"));
+        if (updateStatusBar) {
+            SetStatusBar(i18n::Tr(L"status.status_ready"));
+        }
         return;
     }
 
-    const VentoyDetectionResult detection = DetectVentoyOnDrive(drive);
-    LogVentoyDetection(drive, detection);
-    ventoyOnDrive_ = detection.installed;
+    const uint64_t generation = ++ventoyStatusGeneration_;
+    const HWND hwnd = hwnd_;
+    std::thread([hwnd, drive, updateStatusBar, generation]() {
+        auto* payload = new VentoyStatusPayload{};
+        payload->drive = drive;
+        payload->detection = DetectVentoyOnDrive(drive);
+        payload->updateStatusBar = updateStatusBar;
+        payload->generation = generation;
+        PostMessageW(hwnd, WM_MEDICAT_VENTOY_STATUS, 0, reinterpret_cast<LPARAM>(payload));
+    }).detach();
+}
 
-    if (drive != lastVentoyControlDrive_) {
-        lastVentoyControlDrive_ = drive;
+void Gui::ApplyVentoyStatus(VentoyStatusPayload* payload) {
+    if (!payload) {
+        return;
+    }
+
+    std::unique_ptr<VentoyStatusPayload> guard(payload);
+    if (payload->generation != ventoyStatusGeneration_.load(std::memory_order_acquire)) {
+        return;
+    }
+    if (payload->drive != SelectedDrive()) {
+        return;
+    }
+
+    LogVentoyDetection(payload->drive, payload->detection);
+    ventoyOnDrive_ = payload->detection.installed;
+
+    if (payload->drive != lastVentoyControlDrive_) {
+        lastVentoyControlDrive_ = payload->drive;
         RefreshDriveVentoyControls();
     }
 
-    if (ventoyOnDrive_) {
-        SetStatusBar(i18n::Tr(L"status.ventoy_found", drive));
-    } else {
-        SetStatusBar(i18n::Tr(L"status.ventoy_not_on_drive", drive));
+    if (payload->updateStatusBar) {
+        if (ventoyOnDrive_) {
+            SetStatusBar(i18n::Tr(L"status.ventoy_found", payload->drive));
+        } else {
+            SetStatusBar(i18n::Tr(L"status.ventoy_not_on_drive", payload->drive));
+        }
     }
 }
 

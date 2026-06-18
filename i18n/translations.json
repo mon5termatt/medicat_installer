@@ -80,7 +80,11 @@
       "resuming_archive_mirror": "Resuming download from {0}...",
       "download_archive_complete": "Archive download complete",
       "ventoy_found": "Found Ventoy on {0}",
-      "ventoy_not_on_drive": "Ventoy not detected on {0}"
+      "ventoy_not_on_drive": "Ventoy not detected on {0}",
+      "drive_arrived": "Drive detected: {0}",
+      "drives_arrived": "{0} new drives detected",
+      "selected_drive_removed": "Selected drive {0} was removed — choose another drive",
+      "scanning_drives": "Scanning drives..."
     },
     "messages": {
       "no_internet": "No internet connection detected. Please check your connection and try again.",
@@ -285,7 +289,11 @@
       "resuming_archive_mirror": "Reanudando descarga desde {0}...",
       "download_archive_complete": "Descarga del archivo completada",
       "ventoy_found": "Ventoy encontrado en {0}",
-      "ventoy_not_on_drive": "Ventoy no detectado en {0}"
+      "ventoy_not_on_drive": "Ventoy no detectado en {0}",
+      "drive_arrived": "Unidad detectada: {0}",
+      "drives_arrived": "{0} unidades nuevas detectadas",
+      "selected_drive_removed": "Se quitó la unidad seleccionada {0} — elija otra",
+      "scanning_drives": "Buscando unidades..."
     },
     "messages": {
       "no_internet": "No se detectó conexión a internet. Por favor verifique su conexión e intente nuevamente.",
@@ -488,7 +496,11 @@
       "resuming_archive_mirror": "Reprise du téléchargement depuis {0}...",
       "download_archive_complete": "Téléchargement de l'archive terminé",
       "ventoy_found": "Ventoy trouvé sur {0}",
-      "ventoy_not_on_drive": "Ventoy non détecté sur {0}"
+      "ventoy_not_on_drive": "Ventoy non détecté sur {0}",
+      "drive_arrived": "Lecteur détecté : {0}",
+      "drives_arrived": "{0} nouveaux lecteurs détectés",
+      "selected_drive_removed": "Le lecteur sélectionné {0} a été retiré — choisissez-en un autre",
+      "scanning_drives": "Recherche des lecteurs..."
     },
     "messages": {
       "no_internet": "Aucune connexion Internet détectée. Veuillez vérifier votre connexion et réessayer.",
@@ -691,7 +703,11 @@
       "resuming_archive_mirror": "Wznawianie pobierania z {0}...",
       "download_archive_complete": "Pobieranie archiwum zakończone",
       "ventoy_found": "Znaleziono Ventoy na {0}",
-      "ventoy_not_on_drive": "Nie wykryto Ventoy na {0}"
+      "ventoy_not_on_drive": "Nie wykryto Ventoy na {0}",
+      "drive_arrived": "Wykryto dysk: {0}",
+      "drives_arrived": "Wykryto {0} nowych dysków",
+      "selected_drive_removed": "Wybrany dysk {0} został usunięty — wybierz inny",
+      "scanning_drives": "Wyszukiwanie dysków..."
     },
     "messages": {
       "no_internet": "Nie wykryto połączenia z Internetem. Sprawdź połączenie i spróbuj ponownie.",
@@ -893,6 +909,10 @@
       "download_archive_complete": "Arşiv indirme işlemi tamamlandı",
       "ventoy_found": "{0} üzerinde Ventoy bulundu",
       "ventoy_not_on_drive": "{0} üzerinde Ventoy algılanmadı",
+      "drive_arrived": "Sürücü algılandı: {0}",
+      "drives_arrived": "{0} yeni sürücü algılandı",
+      "selected_drive_removed": "Seçili sürücü {0} kaldırıldı — başka bir sürücü seçin",
+      "scanning_drives": "Sürücüler taranıyor...",
       "installing_module": "lib/... dizininden çıkarma kütüphaneleri yükleniyor"
     },
     "messages": {

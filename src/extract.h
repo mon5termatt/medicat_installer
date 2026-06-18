@@ -15,6 +15,7 @@ struct ExtractProgress {
 
 struct ExtractResult {
     bool success = false;
+    bool cancelled = false;
     int exitCode = -1;
     std::wstring error;
 };

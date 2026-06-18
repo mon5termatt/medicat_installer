@@ -1,8 +1,12 @@
 #pragma once
 
+#include "drives.h"
+#include "ventoy.h"
+
 #include <windows.h>
 
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -15,6 +19,8 @@ constexpr UINT WM_MEDICAT_PROGRESS = WM_APP + 1;
 constexpr UINT WM_MEDICAT_DONE = WM_APP + 2;
 constexpr UINT WM_MEDICAT_VENTOY_VERSIONS = WM_APP + 3;
 constexpr UINT WM_MEDICAT_REEXTRACT_PROMPT = WM_APP + 4;
+constexpr UINT WM_MEDICAT_DRIVE_LIST = WM_APP + 5;
+constexpr UINT WM_MEDICAT_VENTOY_STATUS = WM_APP + 6;
 
 struct ReExtractPromptState {
     HANDLE doneEvent = nullptr;
@@ -48,9 +54,21 @@ struct DonePayload {
     std::wstring title;
 };
 
-struct VentoyDetectionResult;
+struct DriveListPayload {
+    std::vector<DriveInfo> drives;
+    std::vector<std::wstring> lettersBefore;
+    std::wstring selectedBefore;
+    std::wstring previous;
+    bool fromDeviceChange = false;
+    uint64_t generation = 0;
+};
 
-struct DriveInfo;
+struct VentoyStatusPayload {
+    std::wstring drive;
+    VentoyDetectionResult detection;
+    bool updateStatusBar = true;
+    uint64_t generation = 0;
+};
 
 enum class BusyProgressMode { FileLog, Verify, Download, None };
 
@@ -78,6 +96,7 @@ public:
     void OpenReExtractPrompt(ReExtractPromptPayload* payload);
     void FinishReExtractPrompt(bool wantReExtract);
     void ShowDone(bool success, const std::wstring& message, const std::wstring& title = L"");
+    void SetInitialLanguage(const std::wstring& languageCode);
     std::wstring SelectedDrive() const;
     bool FormatChecked() const;
     bool RunVentoyChecked() const;
@@ -98,9 +117,18 @@ private:
     static LRESULT CALLBACK ReExtractWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     void OnCreate(HWND hwnd);
     void OnCommand(WPARAM wp);
-    void RefreshDrives();
-    void RefreshDriveVentoyStatus();
+    void RefreshDrives(bool fromDeviceChange = false);
+    void RequestDriveRefresh(bool fromDeviceChange = false);
+    void ApplyDriveList(DriveListPayload* payload);
+    void RefreshDriveVentoyStatus(bool updateStatusBar = true);
+    void ApplyVentoyStatus(VentoyStatusPayload* payload);
     void RefreshDriveVentoyControls();
+    bool HandleDeviceChange(WPARAM wp, LPARAM lp);
+    void ScheduleDriveChangeRefresh();
+    void OnDebouncedDriveChange();
+    bool ApplyDriveChangeNotifications(const std::vector<std::wstring>& lettersBefore,
+                                       const std::vector<DriveInfo>& drives,
+                                       const std::wstring& selectedBefore);
     void EnforceForcedDriveCheckboxes();
     void LogVentoyDetection(const std::wstring& drive, const VentoyDetectionResult& detection);
     void LogDriveListSelection(const std::vector<DriveInfo>& drives, int selectedIdx, const std::wstring& previous,
@@ -192,6 +220,12 @@ private:
     bool ventoyOnDrive_ = false;
     std::wstring lastVentoyControlDrive_;
     std::atomic<bool> downloadingArchive_{false};
+    bool pendingDriveRefresh_ = false;
+    bool driveRefreshCoalesceFromDevice_ = false;
+    std::atomic<bool> driveRefreshInFlight_{false};
+    std::atomic<bool> driveRefreshCoalesce_{false};
+    std::atomic<uint64_t> driveListGeneration_{0};
+    std::atomic<uint64_t> ventoyStatusGeneration_{0};
     BusyProgressMode busyProgressMode_ = BusyProgressMode::None;
 };
 

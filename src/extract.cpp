@@ -1,5 +1,6 @@
 #include "extract.h"
 
+#include "cancel.h"
 #include "drives.h"
 #include "util.h"
 
@@ -337,6 +338,7 @@ ExtractResult Extract7zArchive(
     CloseHandle(stdoutWrite);
     CloseHandle(stderrWrite);
 
+    ChildProcessRegistration childProcess(pi.hProcess);
     std::atomic<bool> running{true};
     std::wstring lastFile;
     int lastPercent = -1;
@@ -364,6 +366,11 @@ ExtractResult Extract7zArchive(
     std::wstring lineBuffer;
 
     while (true) {
+        if (IsCancelRequested()) {
+            TerminateProcess(pi.hProcess, 1);
+            break;
+        }
+
         DWORD avail = 0;
         if (!PeekNamedPipe(stdoutRead, nullptr, 0, nullptr, &avail, nullptr)) {
             break;
@@ -436,6 +443,14 @@ ExtractResult Extract7zArchive(
     CloseHandle(stderrRead);
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
+
+    if (IsCancelRequested()) {
+        result.cancelled = true;
+        result.success = false;
+        result.exitCode = static_cast<int>(exitCode);
+        result.error = L"Cancelled";
+        return result;
+    }
 
     result.exitCode = static_cast<int>(exitCode);
     result.success = (exitCode == 0);
@@ -543,6 +558,7 @@ ExtractResult Extract7zArchiveSelective(
     CloseHandle(stdoutWrite);
     CloseHandle(stderrWrite);
 
+    ChildProcessRegistration childProcess(pi.hProcess);
     std::atomic<bool> running{true};
     std::wstring lastFile;
     int lastPercent = -1;
@@ -570,6 +586,11 @@ ExtractResult Extract7zArchiveSelective(
     std::wstring lineBuffer;
 
     while (true) {
+        if (IsCancelRequested()) {
+            TerminateProcess(pi.hProcess, 1);
+            break;
+        }
+
         DWORD avail = 0;
         if (!PeekNamedPipe(stdoutRead, nullptr, 0, nullptr, &avail, nullptr)) {
             break;
@@ -627,6 +648,14 @@ ExtractResult Extract7zArchiveSelective(
     CloseHandle(stderrRead);
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
+
+    if (IsCancelRequested()) {
+        result.cancelled = true;
+        result.success = false;
+        result.exitCode = static_cast<int>(exitCode);
+        result.error = L"Cancelled";
+        return result;
+    }
 
     result.exitCode = static_cast<int>(exitCode);
     result.success = (exitCode == 0);
