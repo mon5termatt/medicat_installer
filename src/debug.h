@@ -29,4 +29,17 @@ void LogSystemDiagnostics(const DiagnosticContext& context,
 void LogInstallerDiagnostics(const DiagnosticContext& context,
                              const std::function<void(const std::wstring&)>& logLine);
 
+struct SessionSystemSnapshot {
+    int windowsBuild = 0;
+    std::string windowsMajorMinor;
+    std::string editionId;
+    std::string installationType;
+    std::string processorArch;
+    int logicalProcessors = 0;
+    std::string ramGbBucket;
+    std::string locale;
+};
+
+SessionSystemSnapshot CollectSessionSystemSnapshot();
+
 }  // namespace medicat

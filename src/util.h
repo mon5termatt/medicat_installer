@@ -21,6 +21,8 @@ std::vector<std::wstring> SplitLines(const std::wstring& text);
 
 bool IsProcessElevated();
 
+std::string WideToUtf8(const std::wstring& text);
+
 extern const char kInstallerVersion[];
 extern const int kInstallerBuildNumber;
 

@@ -600,6 +600,60 @@ void WriteInstallerOptionsSection(const DiagnosticContext& context,
     write(kDiagnosticSeparator);
 }
 
+SessionSystemSnapshot BuildSessionSystemSnapshot() {
+    SessionSystemSnapshot snapshot;
+    const WindowsVersionInfo win = GetWindowsVersionInfo();
+    snapshot.windowsBuild = static_cast<int>(win.build);
+    if (win.ntMajor != 0 || win.ntMinor != 0) {
+        snapshot.windowsMajorMinor = std::to_string(win.ntMajor) + "." + std::to_string(win.ntMinor);
+    }
+
+    auto wideToUtf8 = [](const std::wstring& text) {
+        if (text.empty()) {
+            return std::string();
+        }
+        const int len = WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        if (len <= 1) {
+            return std::string();
+        }
+        std::string out(static_cast<size_t>(len - 1), '\0');
+        WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, out.data(), len, nullptr, nullptr);
+        return out;
+    };
+
+    snapshot.editionId = wideToUtf8(win.editionId);
+    snapshot.installationType = wideToUtf8(win.installationType);
+    snapshot.processorArch = wideToUtf8(GetProcessorArchitecture());
+
+    SYSTEM_INFO sys{};
+    GetSystemInfo(&sys);
+    snapshot.logicalProcessors = static_cast<int>(sys.dwNumberOfProcessors);
+
+    MEMORYSTATUSEX mem{};
+    mem.dwLength = sizeof(mem);
+    if (GlobalMemoryStatusEx(&mem)) {
+        const uint64_t gb = mem.ullTotalPhys / (1024ULL * 1024ULL * 1024ULL);
+        if (gb >= 64) {
+            snapshot.ramGbBucket = "64+";
+        } else if (gb >= 32) {
+            snapshot.ramGbBucket = "32";
+        } else if (gb >= 16) {
+            snapshot.ramGbBucket = "16";
+        } else if (gb >= 8) {
+            snapshot.ramGbBucket = "8";
+        } else {
+            snapshot.ramGbBucket = "4";
+        }
+    }
+
+    wchar_t localeName[LOCALE_NAME_MAX_LENGTH]{};
+    if (GetUserDefaultLocaleName(localeName, LOCALE_NAME_MAX_LENGTH) > 0) {
+        snapshot.locale = wideToUtf8(localeName);
+    }
+
+    return snapshot;
+}
+
 }  // namespace
 
 void LogSystemDiagnostics(const DiagnosticContext& context,
@@ -612,6 +666,10 @@ void LogSystemDiagnostics(const DiagnosticContext& context,
 void LogInstallerDiagnostics(const DiagnosticContext& context,
                              const std::function<void(const std::wstring&)>& logLine) {
     WriteInstallerOptionsSection(context, logLine);
+}
+
+SessionSystemSnapshot CollectSessionSystemSnapshot() {
+    return BuildSessionSystemSnapshot();
 }
 
 }  // namespace medicat

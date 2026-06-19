@@ -10,14 +10,17 @@ Tracked future work and planned features not yet implemented.
 
 **Goal:** Tier A gives aggregate success/failure stats without user prompts. Tier B lets users upload diagnostic **log files only** after failures; staff look up bundles in Discord via a **support keyword**.
 
+**Status:** Tier A session reports implemented (launch + install/verify completion, `telemetry.medicatusb.com`). Tier B (log bundle upload) not yet implemented.
+
 **Upload policy:** Only plain-text diagnostics beside the installer — `*.log` and `*.txt`. No archives, executables, or user media. If extra context is needed (installer version, drive letter, checkbox state), generate a small `support_manifest.txt` at upload time rather than uploading non-log artifacts.
 
 ### User flow (planned)
 
-1. Install or verify fails (especially after re-extract still fails).
-2. User clicks **Upload logs for support** (re-extract failure window and/or main UI).
-3. Installer collects allowed log files, zips them, uploads to server, shows a **keyword** (e.g. `MEDICAT-A7X9K2`).
-4. User posts that keyword in Discord; staff retrieves the bundle server-side.
+1. Install or verify fails (especially after re-extract still fails) — **or** user chooses **Upload logs** manually from the main UI.
+2. User clicks **Upload logs for support** (re-extract failure window, generic failure dialog, and/or persistent main-window button).
+3. Consent dialog lists log file names; user confirms.
+4. Installer collects allowed log files, zips them, uploads to server, shows a **keyword** (e.g. `MEDICAT-A7X9K2`).
+5. User posts that keyword in Discord; staff retrieves the bundle server-side.
 
 ### Allowed files (beside exe)
 
@@ -34,33 +37,37 @@ Skip any path that is missing. Reject anything that is not `.log` or `.txt`.
 
 ### Client (installer) tasks
 
-- [ ] Define upload API contract (endpoint, auth, max size, response JSON with keyword).
+- [x] Tier A: session report JSON + background POST at launch and operation end (`support.cpp`, opt-out via preferences).
+- [ ] Define Tier B upload API contract (endpoint, auth, max size, response JSON with keyword).
 - [ ] `CollectSupportLogs()` — enumerate only `*.log` / `*.txt` in installer directory (+ generated `support_manifest.txt`); skip missing files; zip with bundled `7z` or miniz.
 - [ ] `UploadSupportLogs()` — WinHTTP POST multipart or pre-signed URL flow; progress in status bar.
 - [ ] Generate or receive **support keyword** from server response; display copy-friendly UI (read-only field + Copy button).
-- [ ] Wire into **verification still failed after re-extract** dialog (primary entry point).
+- [ ] **Manual Upload logs button** on main window (always available when idle; not failure-only) — opens consent dialog then upload flow.
+- [ ] Wire into **verification still failed after re-extract** dialog (primary failure entry point).
 - [ ] Optional: **Upload logs** on generic failure (`PostDone(false, …)`).
 - [ ] i18n keys: upload button, in-progress status, success with keyword, upload failed, privacy note.
 - [ ] Handle offline / upload errors without blocking dismiss.
 - [ ] Pre-upload validation: refuse bundle if zero eligible files; never include `MediCat.USB*.7z` or other binaries.
+- [ ] Settings: remember consent preference (`failure_log_upload_consent` in preferences JSON).
 
 ### Server / staff tasks
 
-- [ ] HTTP endpoint to accept log archive (rate limit, size cap).
-- [ ] Store bundle with unique id; return **keyword** to client.
-- [ ] Staff lookup by keyword (web UI, bot command, or admin panel).
-- [ ] Retention policy (e.g. 30 days) and PII review (paths may contain usernames).
+- [x] HTTP endpoint to accept session reports (`POST /v1/sessions`) — private `medicat-support-server` repo.
+- [x] HTTP endpoint to accept log archive (`POST /v1/support/uploads`); return keyword.
+- [x] Staff lookup by keyword (admin dashboard).
+- [ ] Retention policy automation on VPS (cron / `flask cleanup-expired`).
 
 ### Security & privacy
 
 - [ ] Upload scope limited to log/text diagnostics only (no `.7z`, `.exe`, etc.).
-- [ ] HTTPS only; user consent dialog before upload.
-- [ ] Keyword entropy high enough to prevent guessing (e.g. 6+ alphanumeric).
+- [ ] HTTPS only; user consent dialog before upload (required for manual button too).
+- [x] Keyword entropy high enough to prevent guessing (e.g. 6+ alphanumeric).
 
 ### UI hooks already in place
 
 - Re-extract failure message mentions future upload (`messages.verify_still_failed_after_reextract`).
 - Re-extract prompt window (`Gui::OpenReExtractPrompt`) — add **Upload logs** button there when implemented.
+- Main window — add **Upload logs for support** button (manual upload; planned).
 
 ---
 
@@ -90,4 +97,4 @@ Skip any path that is missing. Reject anything that is not `.log` or `.txt`.
 
 ## Other (add items below)
 
-- [ ] _(none yet)_
+- [ ] GUI setting: **Send anonymous usage reports** toggle (Tier A opt-out; preferences file already supported).

@@ -58,10 +58,17 @@ set_source_files_properties("${CMAKE_BINARY_DIR}/bundle.rc" PROPERTIES
 
 set(BUILD_NUMBER_FILE "${REPO_ROOT}/build_number.txt")
 set(BUILD_VERSION_CPP "${REPO_ROOT}/generated/build_version.cpp")
+set(INGEST_TOKEN_CPP "${REPO_ROOT}/generated/ingest_token.cpp")
+set(GENERATE_INGEST_SCRIPT "${REPO_ROOT}/tools/generate_ingest_token.py")
 file(MAKE_DIRECTORY "${REPO_ROOT}/generated")
 if(NOT EXISTS "${BUILD_VERSION_CPP}")
     file(WRITE "${BUILD_VERSION_CPP}"
 "// Placeholder — regenerated before each build.\nnamespace medicat {\nextern const char kInstallerVersion[] = \"0.0.0\";\nextern const int kInstallerBuildNumber = 0;\n}\n"
+    )
+endif()
+if(NOT EXISTS "${INGEST_TOKEN_CPP}")
+    file(WRITE "${INGEST_TOKEN_CPP}"
+"// Placeholder — regenerated at configure time.\n#include \"ingest_token.h\"\nnamespace medicat {\nstd::string GetIngestToken() { return {}; }\nbool HasIngestToken() { return false; }\n}\n"
     )
 endif()
 
@@ -88,6 +95,7 @@ file(GLOB_RECURSE SOURCE_FILES "src/*.cpp" "src/*.hpp")
 add_executable(MedicatInstaller WIN32
     ${SOURCE_FILES}
     "${BUILD_VERSION_CPP}"
+    "${INGEST_TOKEN_CPP}"
     "${CMAKE_BINARY_DIR}/bundle.rc"
     "${CMAKE_BINARY_DIR}/ventoy_versions.txt"
     "${BUNDLE_MD5_GZ}"
@@ -115,12 +123,42 @@ if(MSVC)
     set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} /I\"${CMAKE_CURRENT_SOURCE_DIR}/res\"")
 endif()
 
+# Production default; optional cmake/local.cmake for dev overrides (see cmake/local.cmake.example).
+set(MEDICAT_SESSIONS_URL "https://telemetry.medicatusb.com/v1/sessions")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/local.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/local.cmake")
+endif()
+
+set(MEDICAT_INGEST_TOKEN_VALUE "")
+if(DEFINED MEDICAT_INGEST_TOKEN)
+    set(MEDICAT_INGEST_TOKEN_VALUE "${MEDICAT_INGEST_TOKEN}")
+elseif(DEFINED ENV{MEDICAT_INGEST_TOKEN})
+    set(MEDICAT_INGEST_TOKEN_VALUE "$ENV{MEDICAT_INGEST_TOKEN}")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ingest.token")
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ingest.token" MEDICAT_INGEST_TOKEN_VALUE)
+    string(STRIP "${MEDICAT_INGEST_TOKEN_VALUE}" MEDICAT_INGEST_TOKEN_VALUE)
+endif()
+
+set(_INGEST_TOKEN_DEPS "${GENERATE_INGEST_SCRIPT}")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ingest.token")
+    list(APPEND _INGEST_TOKEN_DEPS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ingest.token")
+endif()
+
+add_custom_command(
+    OUTPUT "${INGEST_TOKEN_CPP}"
+    COMMAND python "${GENERATE_INGEST_SCRIPT}" "${MEDICAT_INGEST_TOKEN_VALUE}" "${INGEST_TOKEN_CPP}"
+    DEPENDS ${_INGEST_TOKEN_DEPS}
+    COMMENT "Generating obfuscated ingest token"
+    WORKING_DIRECTORY "${REPO_ROOT}"
+)
+
 target_compile_definitions(MedicatInstaller PRIVATE
     UNICODE
     _UNICODE
     WIN32_LEAN_AND_MEAN
     NOMINMAX
     MEDICAT_USB_VERSION="21.12"
+    MEDICAT_SESSIONS_URL="${MEDICAT_SESSIONS_URL}"
 )
 
 target_link_libraries(MedicatInstaller PRIVATE
@@ -132,6 +170,7 @@ target_link_libraries(MedicatInstaller PRIVATE
     ole32
     uuid
     winhttp
+    rpcrt4
     windowscodecs
     dwmapi
     uxtheme

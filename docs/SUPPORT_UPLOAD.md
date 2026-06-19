@@ -5,8 +5,8 @@ Two-tier reporting from the C++ installer:
 1. **Session report (automatic)** — small JSON at end of every install/verify: success/failure, installer version, OS summary. **No prompt.** No log files.
 2. **Failure bundle (on error only)** — zip of `.log` / `.txt` beside the exe when something fails; user consent before files leave the machine; returns a **support keyword** for Discord.
 
-**Status:** Not implemented (design only).  
-**Related:** [`TODO.md`](../TODO.md) · [`debug.cpp`](../src/debug.cpp)
+**Status:** Tier A session reports implemented in C++. Tier B (failure log upload) not yet implemented.  
+**Related:** [`TODO.md`](../TODO.md) · [`SUPPORT_SERVER.md`](SUPPORT_SERVER.md) · [`debug.cpp`](../src/debug.cpp)
 
 ---
 
@@ -164,7 +164,7 @@ Or `200` with empty body. No keyword. Idempotent on `session_id` (server dedupes
 - Alert on spike in `ventoy_install_failed` for a new build.
 - Join to Tier B via `session_id` when user uploads logs.
 
-**Server design (Flask, subdomain, security):** [`SUPPORT_SERVER.md`](SUPPORT_SERVER.md)
+**What the server stores:** [`SUPPORT_SERVER.md`](SUPPORT_SERVER.md)
 
 ---
 
@@ -376,7 +376,7 @@ Tier B: consent required (except optional `auto_on_failure` Advanced); logs may 
 1. Is Tier A acceptable with **opt-out only** (no opt-in), given no PII? Legal/privacy review for EU users.
 2. **`auto_on_failure`** for Tier B — ship in v1 or wait?
 3. Include coarse **failure_class** in Tier A (`ventoy`, `extract`, `verify`, `format`) without message text?
-4. Hosting: see [`SUPPORT_SERVER.md`](SUPPORT_SERVER.md) — `telemetry.medicatusb.com` + Flask on VPS vs Cloudflare Worker.
+4. Hosting: **`telemetry.medicatusb.com`** — see [`SUPPORT_SERVER.md`](SUPPORT_SERVER.md) for uploaded data; server repo is private.
 
 ---
 

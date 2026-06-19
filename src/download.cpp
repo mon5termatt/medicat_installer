@@ -312,7 +312,71 @@ std::wstring BytesToWide(const std::vector<BYTE>& bytes) {
     return out;
 }
 
+int HttpPostJsonInternal(const std::wstring& url, const std::string& jsonBody, const std::wstring& bearerToken,
+                         std::wstring& error) {
+    error.clear();
+    UrlParts parts;
+    if (!ParseUrl(url, parts, error)) {
+        return 0;
+    }
+
+    HINTERNET session = WinHttpOpen(L"MedicatInstaller/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!session) {
+        error = L"WinHttpOpen failed";
+        return 0;
+    }
+    WinHttpSetTimeouts(session, 5000, 5000, 5000, 5000);
+
+    HINTERNET connect = WinHttpConnect(session, parts.host.c_str(), parts.port, 0);
+    if (!connect) {
+        error = L"WinHttpConnect failed";
+        WinHttpCloseHandle(session);
+        return 0;
+    }
+
+    const DWORD flags = parts.https ? WINHTTP_FLAG_SECURE : 0;
+    HINTERNET request =
+        WinHttpOpenRequest(connect, L"POST", parts.path.c_str(), nullptr, WINHTTP_NO_REFERER,
+                           WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
+    if (!request) {
+        error = L"WinHttpOpenRequest failed";
+        CloseHttpHandles(nullptr, connect, session);
+        return 0;
+    }
+
+    const std::wstring authHeader = L"Authorization: Bearer " + bearerToken;
+    const std::wstring contentType = L"Content-Type: application/json";
+    WinHttpAddRequestHeaders(request, authHeader.c_str(), static_cast<DWORD>(-1), WINHTTP_ADDREQ_FLAG_ADD);
+    WinHttpAddRequestHeaders(request, contentType.c_str(), static_cast<DWORD>(-1), WINHTTP_ADDREQ_FLAG_ADD);
+
+    const BOOL sent = WinHttpSendRequest(
+        request, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+        jsonBody.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(jsonBody.data()),
+        static_cast<DWORD>(jsonBody.size()), static_cast<DWORD>(jsonBody.size()), 0);
+    if (!sent || !WinHttpReceiveResponse(request, nullptr)) {
+        error = L"HTTP POST failed";
+        CloseHttpHandles(request, connect, session);
+        return 0;
+    }
+
+    DWORD statusCode = 0;
+    DWORD statusSize = sizeof(statusCode);
+    WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                        WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX);
+
+    std::vector<BYTE> ignored;
+    ReadResponse(request, ignored, error);
+    CloseHttpHandles(request, connect, session);
+    return static_cast<int>(statusCode);
+}
+
 }  // namespace
+
+int HttpPostJson(const std::wstring& url, const std::string& jsonBody, const std::wstring& bearerToken,
+                 std::wstring& error) {
+    return HttpPostJsonInternal(url, jsonBody, bearerToken, error);
+}
 
 bool HttpGet(const std::wstring& url, std::wstring& body, std::wstring& error) {
     std::vector<BYTE> bytes;

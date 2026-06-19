@@ -62,5 +62,9 @@ build-ninja/
 build_number.txt
 generated/
 
+# Local CMake overrides (optional) and ingest token file — never commit
+cmake/local.cmake
+cmake/ingest.token
+
 # Support server (private repo — see docs/SUPPORT_SERVER.md)
 support-server/

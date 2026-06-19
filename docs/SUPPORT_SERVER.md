@@ -1,341 +1,164 @@
-# Support server — subdomain ideas & Flask app design
+# Support server — what gets uploaded
 
-Backend for MediCat installer telemetry ([`SUPPORT_UPLOAD.md`](SUPPORT_UPLOAD.md)): ingest Tier A session JSON, store Tier B log zips, staff dashboard with stats.
+The telemetry backend runs at **`telemetry.medicatusb.com`**. Implementation and deployment live in the private repo **[medicat-support-server](https://github.com/mon5termatt/medicat-support-server)**.
 
-**Status:** Flask implementation lives in the private repo **[mon5termatt/medicat-support-server](https://github.com/mon5termatt/medicat-support-server)** (not in this public tree). Design and API contract remain documented here.
-
----
-
-
-| Host | Role |
-|------|------|
-| `telemetry.medicatusb.com` | Public ingest API (`POST /v1/sessions`, `POST /v1/support/uploads`) |
-| `telemetry.medicatusb.com/admin` | Staff dashboard (Flask, login required) |
-
-Single app behind one subdomain is fine for v1. Use Cloudflare (or similar) for TLS, WAF, and rate limits in front of Flask.
-
-**DNS:** `A`/`AAAA` or `CNAME` → VPS, or `CNAME` → tunnel (Cloudflare Tunnel, Tailscale Funnel) if no public IP.
+This doc describes **what data leaves the installer** and **what the server stores**. Client behavior, consent, and opt-out are in [`SUPPORT_UPLOAD.md`](SUPPORT_UPLOAD.md).
 
 ---
 
-## High-level architecture
+## Two tiers
 
-```mermaid
-flowchart LR
-    Installer[MedicatInstaller.exe] -->|HTTPS JSON| API[Flask API]
-    Installer -->|HTTPS multipart| API
-    API --> DB[(SQLite / Postgres)]
-    API --> Blobs[Log storage disk or S3/R2]
-    Staff[Staff browser] -->|HTTPS + login| Admin[Flask admin blueprint]
-    Admin --> DB
-    Admin --> Blobs
-    CF[Cloudflare WAF] --> API
-    CF --> Admin
-```
+| Tier | When | User prompt? | Payload |
+|------|------|--------------|---------|
+| **A — Session report** | End of every install/verify (if enabled) | No | Small JSON (~1 KB) |
+| **B — Failure bundle** | Install/verify failure only | Yes | Zip of allowlisted log files |
 
-| Component | v1 suggestion |
-|-----------|----------------|
-| App | Flask 3.x + Gunicorn |
-| DB | SQLite (single VPS) → Postgres when traffic grows |
-| Log blobs | Local `data/uploads/` → S3-compatible (R2) later |
-| Reverse proxy | Caddy or nginx → Gunicorn unix socket |
-| Process manager | systemd |
+Tier A has **no log files**. Tier B may contain **paths and usernames inside log text** — only sent with explicit consent.
 
 ---
 
-## Flask app layout
+## Tier A — Session report (`POST /v1/sessions`)
 
-```
-support-server/
-├── app/
-│   ├── __init__.py          # create_app(), extensions
-│   ├── config.py            # env-based settings
-│   ├── models.py            # SQLAlchemy: SessionReport, Upload
-│   ├── api/
-│   │   ├── __init__.py
-│   │   ├── sessions.py      # POST /v1/sessions
-│   │   └── uploads.py       # POST /v1/support/uploads
-│   ├── admin/
-│   │   ├── __init__.py
-│   │   ├── routes.py        # dashboard, lookup, download
-│   │   ├── auth.py          # login, session
-│   │   └── templates/       # Jinja2 (auto-escaped)
-│   └── security/
-│       ├── ingest_auth.py   # Bearer token for installer
-│       ├── rate_limit.py
-│       └── upload_validate.py
-├── migrations/              # Flask-Migrate
-├── data/uploads/            # gitignored blob store (v1)
-├── requirements.txt
-├── wsgi.py
-└── README.md
-```
+Automatic JSON at session end. Fire-and-forget; server responds `204 No Content`.
 
-Run: `gunicorn -w 2 -b 127.0.0.1:8000 wsgi:app`
+### Required fields
 
----
-
-## Data model
-
-### `session_reports`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `session_id` | UUID PK | From installer |
-| `created_at` | datetime | Server UTC |
-| `outcome` | string | Indexed |
-| `exit_code` | int | |
+| Field | Type | Example |
+|-------|------|---------|
+| `session_id` | string (UUID) | `7c9e6679-7425-40de-944b-e07fc1f90ae7` |
+| `client` | string | `MedicatInstaller` |
 | `operation` | string | `install`, `verify` |
-| `installer_version` | string | |
-| `installer_build` | int | Indexed |
+| `outcome` | string | `success`, `verify_failed`, `cancelled`, … |
+
+### Optional fields (stored if present)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `exit_code` | int | CLI/GUI exit code |
+| `installer_version` | string | e.g. `1.0.6` |
+| `installer_build` | int | Build number |
 | `installer_arch` | string | `x64`, `x86` |
-| `windows_build` | int | Indexed |
-| `payload_json` | JSON/text | Full Tier A body |
-| `client_ip_hash` | string | Optional SHA256(IP + salt) for abuse only |
+| `system` | object | See below |
 
-### `uploads`
+`system` object (all optional):
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `upload_id` | UUID PK | |
-| `keyword` | string UNIQUE | `MEDICAT-XXXXXX`, indexed |
-| `session_id` | UUID FK | Nullable if orphan upload |
-| `created_at` | datetime | |
-| `expires_at` | datetime | 30-day TTL |
-| `storage_path` | string | Relative path to zip |
-| `size_bytes` | int | |
-| `manifest_json` | JSON | From zip or form field |
-| `file_count` | int | |
+| Field | Type | Example |
+|-------|------|---------|
+| `windows_build` | int | `26100` |
 
-Cron job (or `flask cleanup-expired`) deletes expired rows + zip files.
+Additional keys in the JSON body are kept in the stored payload but are not required by the server today. Planned client fields (see [`SUPPORT_UPLOAD.md`](SUPPORT_UPLOAD.md)) include `medicat_usb_version`, `release_tag`, `duration_ms`, `locale`, `elevated`, and an `options` object — the server accepts and stores the full JSON as-is.
 
----
+### Not included in Tier A (by design)
 
-## API routes (installer-facing)
+- Usernames, computer names
+- Drive letters or USB paths
+- Failure message text
+- Log file contents
+- IP address (client does not send IP)
 
-Base URL: `https://telemetry.medicatusb.com`
+### Server-side additions (not from installer)
 
-### `POST /v1/sessions`
+| Field | Purpose |
+|-------|---------|
+| `created_at` | UTC timestamp when received |
+| `client_ip_hash` | SHA256(IP + salt) for abuse/rate limits only |
 
-- **Auth:** `Authorization: Bearer <INGEST_TOKEN>` (public tier key in installer)
-- **Body:** JSON per [`SUPPORT_UPLOAD.md`](SUPPORT_UPLOAD.md)
-- **Response:** `204 No Content`
-- **Idempotent:** same `session_id` → upsert or ignore duplicate
-
-### `POST /v1/support/uploads`
-
-- **Auth:** same Bearer token
-- **Body:** `multipart/form-data` — `bundle` (zip), `session_id`, optional `manifest`
-- **Validation:** see [Upload security](#upload-security-tier-b)
-- **Response:** `201` + `{ "upload_id", "keyword", "expires_at" }`
-
-Rate limits (app or Cloudflare): 60 sessions/hour/IP, 10 uploads/hour/IP.
+Retention: **90 days** (configurable on server).
 
 ---
 
-## Admin dashboard (staff)
+## Tier B — Failure bundle (`POST /v1/support/uploads`)
 
-Login required — no public registration. Routes under `/admin`:
+Multipart upload after user confirms on a failure dialog. Server responds `201` with a support keyword.
 
-| Page | Purpose |
-|------|---------|
-| `/admin/` | **Dashboard** — KPI cards + charts |
-| `/admin/sessions` | Paginated session list, filters |
-| `/admin/uploads` | Paginated uploads, keyword search |
-| `/admin/uploads/<keyword>` | Detail: manifest summary, file list, **Download zip** |
-| `/admin/sessions/<uuid>` | Session detail + linked upload if any |
+### Form fields
 
-### Dashboard widgets (v1)
+| Part | Required | Description |
+|------|----------|-------------|
+| `bundle` | yes | Zip file |
+| `session_id` | no | Links to Tier A row if present |
+| `manifest` | no | JSON copy for indexing (optional duplicate of manifest in zip) |
 
-- **Sessions (24h / 7d / 30d)** — total count
-- **Success rate** — `outcome == success` / total
-- **Failure breakdown** — pie/bar by `outcome` (`verify_failed`, `ventoy_install_failed`, …)
-- **By installer build** — table: build → sessions, success %, top failure outcome
-- **By Windows build** — top 10 `windows_build` values
-- **Arch split** — x64 vs x86
-- **Uploads (7d)** — Tier B count, avg bundle size
-- **Recent failures** — last 20 non-success sessions with link to upload if exists
+### Allowed files inside the zip
 
-Charts: Chart.js loaded from **static vendor file** (subresource integrity) or server-side SVG — avoid inline JS with user data.
+Basename allowlist (plus any file ending in `.log`, `.txt`, or `.json`):
 
-### Keyword lookup
-
-Staff pastes `MEDICAT-A7X9K2` → redirect to upload detail. Discord bot can hit internal API or same page with API token later.
-
----
-
-## Security
-
-### XSS (cross-site scripting)
-
-Dashboard renders staff-only data, but uploads contain **user-supplied log text** — treat as hostile.
-
-| Rule | Implementation |
+| File | Typical source |
 |------|----------------|
-| **Auto-escape templates** | Jinja2 default (`{{ var }}` never `\| safe` on upload content) |
-| **No raw log inline** | Download zip only; preview shows **manifest fields** parsed server-side, not raw log body in HTML |
-| **Content-Type** | Admin pages: `Content-Type: text/html; charset=utf-8` |
-| **Content-Security-Policy** | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'` |
-| **X-Content-Type-Options** | `nosniff` |
-| **X-Frame-Options** | `DENY` or CSP `frame-ancestors 'none'` |
+| `medicat_installer.log` | Every session |
+| `extract.log` | After full extract |
+| `reextract.log` | After selective re-extract |
+| `check.log` | After verify |
+| `failed_files.txt` | Verify failures |
+| `support_manifest.json` | Generated at upload time |
+| `support_manifest.txt` | Alternative manifest format |
 
-If you add a log **text preview** later: serve as `text/plain` download, or escape + `<pre>` with escaped content only — never inject into `<script>` or `onclick`.
+**Rejected:** executables, archives, `.7z`, path traversal entries, zip bombs.
 
-Use **Flask-Talisman** (or manual headers) for CSP + HSTS.
+**Limits:** 10 MB zip, 25 MB uncompressed total, 20 files max.
 
-### CSRF
+### What log files may contain
 
-- All admin **POST** forms (login, delete, settings): **Flask-WTF** CSRF token
-- Ingest API routes (`/v1/*`): **no cookies** — Bearer token only → CSRF N/A for installer POSTs
-- Admin session cookie: `SameSite=Lax`, `HttpOnly`, `Secure`
+Plain-text diagnostics beside the installer. May include:
 
-### Authentication (admin)
+- Windows username or profile paths (in log lines)
+- Drive letters and volume paths
+- Installer options and error details
+- Ventoy / 7za command output
 
-| Approach | v1 |
-|----------|-----|
-| Users | 1–3 staff accounts in DB (`werkzeug.security.generate_password_hash`) |
-| Session | Flask-Login + signed cookie (`SECRET_KEY` from env) |
-| Brute force | Flask-Limiter on `/admin/login` (5/min per IP) |
-| 2FA | Optional phase 2 (TOTP) |
+`support_manifest.json` (Tier B only) may add structured context such as drive letter and checkbox state — **not** sent in Tier A.
 
-Do **not** reuse the installer ingest token for admin.
+### Server response
 
-### Upload security (Tier B)
-
-```python
-# Pseudocode — upload_validate.py
-MAX_ZIP_BYTES = 10 * 1024 * 1024
-ALLOWED_EXTENSIONS = {".log", ".txt", ".json"}
-ALLOWED_NAMES = {"medicat_installer.log", "extract.log", ...}
-
-def validate_bundle(file_storage) -> None:
-    # 1. Size cap before full read into memory (stream to temp file)
-    # 2. zipfile.is_zipfile + ZipFile.testzip()
-    # 3. For each entry: no path traversal (.., absolute paths)
-    # 4. Extension + basename allowlist
-    # 5. Reject zip bombs: max uncompressed total 25 MB, max file count 20
-    # 6. Store outside web root with random UUID filename
+```json
+{
+  "upload_id": "550e8400-e29b-41d4-a716-446655440000",
+  "keyword": "MEDICAT-A7X9K2",
+  "expires_at": "2026-07-18T04:12:00Z",
+  "retention_days": 30
+}
 ```
 
-Store uploads as `data/uploads/{upload_id}.zip` — never serve directly from static; only via authenticated `/admin/.../download` with `Content-Disposition: attachment`.
+User shares **`keyword`** in Discord for staff lookup.
 
-### Ingest API auth
+### Server-side storage
 
-- `INGEST_TOKEN` in server env; installer embeds same token (rotatable per release)
-- Reject missing/wrong token with `401` (no hint which part failed)
-- Optional: Cloudflare IP allowlist if installer IPs are unpredictable — usually not needed
+| Stored | Notes |
+|--------|-------|
+| Zip blob | `{upload_id}.zip` on disk |
+| `keyword` | Staff lookup (`MEDICAT-XXXXXX`) |
+| `session_id` | Optional link to Tier A |
+| `manifest_json` | Parsed manifest if provided |
+| `file_count`, `size_bytes` | Metadata |
+| `client_ip_hash` | Abuse tracking (hashed IP) |
+| `expires_at` | **30-day** TTL; deleted by cleanup job |
 
-### Other hardening
-
-| Item | Action |
-|------|--------|
-| HTTPS | Enforced at proxy; HSTS |
-| Secrets | `.env` not in git; use `FLASK_SECRET_KEY`, `INGEST_TOKEN`, `DATABASE_URL` |
-| SQL injection | SQLAlchemy ORM only; no raw SQL with user input |
-| Path traversal | Sanitize keyword lookup (regex `^MEDICAT-[A-Z0-9]{6,8}$`) |
-| Dependency audit | `pip-audit` in CI |
-| Logging | Log ingest counts, not full JSON bodies in prod |
+Staff download the zip via the admin dashboard. Log text is **not** rendered inline in HTML (download only).
 
 ---
 
-## Example Flask snippets
+## Rate limits
 
-### App factory + Talisman
+| Endpoint | Limit |
+|----------|-------|
+| `POST /v1/sessions` | 60 per hour per IP |
+| `POST /v1/support/uploads` | 5 per hour per IP |
 
-```python
-# app/__init__.py
-from flask import Flask
-from flask_talisman import Talisman
-from flask_wtf.csrf import CSRFProtect
-
-csrf = CSRFProtect()
-
-def create_app():
-    app = Flask(__name__)
-    app.config.from_object("app.config.Config")
-    csrf.init_app(app)
-    Talisman(app, force_https=True, content_security_policy=csp_dict)
-    csrf.exempt(api_bp)  # Bearer-auth API only — no cookie session
-    app.register_blueprint(api_bp, url_prefix="/v1")
-    app.register_blueprint(admin_bp, url_prefix="/admin")
-    return app
-```
-
-### Session ingest
-
-```python
-# app/api/sessions.py
-@api_bp.post("/sessions")
-@require_ingest_token
-@limiter.limit("60 per hour")
-def post_session():
-    data = request.get_json(force=True, silent=False)
-    validate_session_schema(data)  # jsonschema or pydantic
-    upsert_session_report(data)
-    return "", 204
-```
-
-### Admin dashboard query
-
-```python
-# app/admin/routes.py
-@admin_bp.get("/")
-@login_required
-def dashboard():
-    stats = {
-        "sessions_24h": count_sessions(since=hours(24)),
-        "success_rate_7d": success_rate(since=days(7)),
-        "by_outcome": group_by_outcome(since=days(7)),
-        "by_build": group_by_installer_build(since=days(30)),
-    }
-    return render_template("admin/dashboard.html", stats=stats)
-```
-
-Templates: all dynamic text via `{{ stats.sessions_24h }}` — never `|safe` on upload-derived strings.
+Lifetime upload count per IP is logged as a warning after **20** total uploads (not blocked).
 
 ---
 
-## Deployment checklist
+## Public vs staff views
 
-- [ ] DNS: `telemetry.medicatusb.com` → server
-- [ ] TLS cert (Let’s Encrypt via Caddy/Certbot)
-- [ ] `INGEST_TOKEN`, `SECRET_KEY`, admin password in env
-- [ ] Gunicorn + systemd unit
-- [ ] `data/uploads/` permissions `750`, not web-accessible
-- [ ] Daily backup: DB + uploads (or R2 versioning)
-- [ ] Expiry cron: `flask cleanup-expired` daily
-- [ ] Cloudflare: rate limit `/v1/*`, bot fight optional
-- [ ] Privacy page on `medicatusb.com` linking to opt-out explanation
-
----
-
-## Environment variables
-
-| Variable | Example | Purpose |
-|----------|---------|---------|
-| `FLASK_SECRET_KEY` | random 32+ bytes | Session signing |
-| `INGEST_TOKEN` | random hex | Installer API auth |
-| `DATABASE_URL` | `sqlite:///data/app.db` | SQLAlchemy |
-| `UPLOAD_DIR` | `/var/lib/medicat-support/uploads` | Zip storage |
-| `ADMIN_USERNAME` | (optional bootstrap) | First staff user |
-| `SESSION_RETENTION_DAYS` | `90` | Tier A row TTL |
-| `UPLOAD_RETENTION_DAYS` | `30` | Tier B blob TTL |
-
-Installer config (C++ side): point `sessions_url` and `uploads_url` at `https://telemetry.medicatusb.com/v1/...`.
-
----
-
-## Future extensions
-
-- Discord bot (`/medicat-logs KEYWORD`) calling internal JSON API
-- Postgres + read replica for heavy analytics
-- R2/S3 for uploads; presigned download links
-- Staff 2FA (Flask-Security or custom TOTP)
-- Public status page (uptime only, no data)
+| Audience | URL | Data shown |
+|----------|-----|------------|
+| Public | `/` | Aggregate counts only (runs, success rate, builds) — no session IDs or logs |
+| Staff | `/admin` | Session list, upload lookup by keyword, zip download |
 
 ---
 
 ## References
 
-- Client design: [`SUPPORT_UPLOAD.md`](SUPPORT_UPLOAD.md)
+- Client design & consent: [`SUPPORT_UPLOAD.md`](SUPPORT_UPLOAD.md)
 - Installer tasks: [`TODO.md`](../TODO.md)
+- Server ops (Docker, env): [medicat-support-server README](https://github.com/mon5termatt/medicat-support-server)

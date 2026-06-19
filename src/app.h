@@ -7,6 +7,7 @@
 #include "ventoy.h"
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
@@ -42,6 +43,10 @@ private:
                              const wchar_t* cliTipKey = nullptr);
     void PostStatusBar(const std::wstring& text);  // Thread-safe; updates Gui::SetStatusBar on the UI thread.
     void PostDone(bool success, const std::wstring& message, const std::wstring& title = L"");
+    void BeginAppSession();
+    void MarkOperationStart();
+    void SubmitLaunchSessionReport();
+    void SubmitSessionReport(bool success, const std::wstring& message, const std::wstring& title, int exitCode);
     void LogOperationFailure(const std::wstring& message, const std::wstring& title);
     DiagnosticContext BuildDiagnosticContext() const;
     VerificationOutcome VerifyDriveFiles(const std::wstring& drive, bool showFileProgress = true);
@@ -79,6 +84,8 @@ private:
     std::wstring cliProgressFile_;
     std::optional<CliOptions> cliOptions_;
     HeadlessResult headlessResult_;
+    std::string sessionId_;
+    std::chrono::steady_clock::time_point sessionStart_{};
 };
 
 }  // namespace medicat

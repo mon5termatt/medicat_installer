@@ -14,6 +14,7 @@
 #include "extract.h"
 #include "i18n.h"
 #include "offline.h"
+#include "support.h"
 #include "util.h"
 #include "ventoy.h"
 #include "verify.h"
@@ -281,6 +282,13 @@ int App::RunParsed(const CliParseResult& parsed, int argc, wchar_t** argv) {
         return 0;
     }
 
+    if (parsed.options.action == CliAction::Install || parsed.options.action == CliAction::Verify) {
+        headless_ = true;
+    }
+
+    BeginAppSession();
+    SubmitLaunchSessionReport();
+
     if (sevenZa_.empty()) {
         currentOperation_ = L"startup";
         LogOperationFailure(i18n::Tr(L"messages.7zip_not_found"), i18n::Tr(L"titles.7zip_not_found"));
@@ -340,6 +348,7 @@ int App::RunHeadless(const CliOptions& cli) {
 int App::RunHeadlessVerify(const CliOptions& cli) {
     installing_ = true;
     currentOperation_ = L"verify";
+    MarkOperationStart();
     log_->Info(L"Headless verify started on " + cli.drive);
     RunVerifyThread(cli.drive);
     return headlessResult_.completed ? headlessResult_.exitCode : 1;
@@ -382,6 +391,7 @@ int App::RunHeadlessInstall(const CliOptions& cli) {
 
     installing_ = true;
     currentOperation_ = L"install";
+    MarkOperationStart();
     log_->Info(L"Headless install started on " + cli.drive);
     RunInstallThread(cli.drive, format, runVentoy, std::move(pinVersion), ventoyInstall, nullptr);
     return headlessResult_.completed ? headlessResult_.exitCode : 1;
@@ -471,14 +481,88 @@ void App::PostStatusBar(const std::wstring& text) {
     PostToGui(gui_.Hwnd(), WM_MEDICAT_PROGRESS, reinterpret_cast<LPARAM>(payload));
 }
 
+void App::BeginAppSession() {
+    if (sessionId_.empty()) {
+        sessionId_ = GenerateSessionId();
+        sessionStart_ = std::chrono::steady_clock::now();
+    }
+}
+
+void App::MarkOperationStart() {
+    BeginAppSession();
+    sessionStart_ = std::chrono::steady_clock::now();
+}
+
+void App::SubmitLaunchSessionReport() {
+    if (sessionId_.empty()) {
+        return;
+    }
+
+    SessionReportRequest request;
+    request.sessionId = sessionId_;
+    request.operation = "launch";
+    request.outcome = "opened";
+    request.exitCode = 0;
+    request.durationMs = 0;
+    request.headless = headless_;
+    request.diagnostic = BuildDiagnosticContext();
+
+    SendSessionReport(request, false, [this](const std::wstring& line, const bool isError) {
+        const std::wstring prefixed = L"[Telemetry] " + line;
+        if (isError) {
+            log_->Error(prefixed);
+        } else {
+            log_->Info(prefixed);
+        }
+    });
+}
+
+void App::SubmitSessionReport(const bool success, const std::wstring& message, const std::wstring& title,
+                              const int exitCode) {
+    if (sessionId_.empty()) {
+        return;
+    }
+
+    int64_t durationMs = 0;
+    if (sessionStart_.time_since_epoch().count() != 0) {
+        durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() -
+                                                                           sessionStart_)
+                         .count();
+    }
+
+    SessionReportRequest request;
+    request.sessionId = sessionId_;
+    request.operation = WideToUtf8(currentOperation_);
+    request.outcome = DeriveSessionOutcome(success, message, title, currentOperation_);
+    request.exitCode = exitCode;
+    request.durationMs = durationMs;
+    request.headless = headless_;
+    request.diagnostic = BuildDiagnosticContext();
+
+    SendSessionReport(request, headless_, [this](const std::wstring& line, const bool isError) {
+        const std::wstring prefixed = L"[Telemetry] " + line;
+        if (isError) {
+            log_->Error(prefixed);
+        } else {
+            log_->Info(prefixed);
+        }
+    });
+    sessionId_.clear();
+    sessionStart_ = {};
+}
+
 void App::PostDone(const bool success, const std::wstring& message, const std::wstring& title) {
     installing_ = false;
     if (!success && !message.empty()) {
         LogOperationFailure(message, title);
     }
+    const int exitCode = headless_ ? MapHeadlessExitCode(success, message, title) : (success ? 0 : 1);
     if (headless_) {
         headlessResult_.completed = true;
-        headlessResult_.exitCode = MapHeadlessExitCode(success, message, title);
+        headlessResult_.exitCode = exitCode;
+    }
+    SubmitSessionReport(success, message, title, exitCode);
+    if (headless_) {
         return;
     }
     auto* payload = new DonePayload{success, message, title};
@@ -708,6 +792,7 @@ void App::OnVerify() {
     gui_.SetProgress(0);
     gui_.SetStatusBar(i18n::Tr(L"status.verifying_files"));
     currentOperation_ = L"verify";
+    MarkOperationStart();
     log_->Info(L"File verification started on " + drive);
 
     std::thread worker(&App::RunVerifyThread, this, drive);
@@ -820,6 +905,7 @@ void App::OnInstall() {
         return;
     }
 
+    MarkOperationStart();
     const std::wstring pinVersion = gui_.PinnedVentoyVersion();
     VentoyInstallOptions ventoyInstall;
     ventoyInstall.enableSecureBoot = gui_.VentoySecureBootChecked();
