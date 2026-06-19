@@ -43,9 +43,17 @@ if errorlevel 1 (
     exit /b 1
 )
 
+python "tools\publish_update_manifest.py" --tag "%TAG%" --build-version "generated\build_version.cpp" --output "installer\update.json"
+if errorlevel 1 (
+    echo Update manifest generation failed.
+    exit /b 1
+)
+
 echo.
 echo Uploaded:
 echo   %X64_EXE%
 echo   %X86_EXE%
+echo   installer\update.json
 echo Release: https://github.com/mon5termatt/medicat_installer/releases/tag/%TAG%
+echo Commit installer\update.json to the cpp branch so clients can detect the new build.
 exit /b 0

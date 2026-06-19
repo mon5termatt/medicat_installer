@@ -4,6 +4,7 @@
 #include "debug.h"
 #include "gui.h"
 #include "log.h"
+#include "update.h"
 #include "ventoy.h"
 
 #include <atomic>
@@ -47,11 +48,14 @@ private:
     void MarkOperationStart();
     void SubmitLaunchSessionReport();
     void SubmitSessionReport(bool success, const std::wstring& message, const std::wstring& title, int exitCode);
+    void QueueFailureLogUpload(const std::string& sessionId, const std::wstring& message, const std::wstring& title);
+    void StartUpdateCheck();
     void LogOperationFailure(const std::wstring& message, const std::wstring& title);
     DiagnosticContext BuildDiagnosticContext() const;
     VerificationOutcome VerifyDriveFiles(const std::wstring& drive, bool showFileProgress = true);
     bool TryReExtractFailedFiles(const std::wstring& drive, const std::wstring& archive,
-                                 const std::vector<std::wstring>& failureDetails);
+                                 const std::vector<std::wstring>& failureDetails,
+                                 std::wstring* errorDetail = nullptr);
     bool PromptReExtract(const VerificationOutcome& outcome);
     void RunInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
                           VentoyInstallOptions ventoyInstall, HWND hwnd);
@@ -86,6 +90,7 @@ private:
     HeadlessResult headlessResult_;
     std::string sessionId_;
     std::chrono::steady_clock::time_point sessionStart_{};
+    std::atomic<bool> updateCheckStarted_{false};
 };
 
 }  // namespace medicat

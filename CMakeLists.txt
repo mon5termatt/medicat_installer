@@ -125,6 +125,7 @@ endif()
 
 # Production default; optional cmake/local.cmake for dev overrides (see cmake/local.cmake.example).
 set(MEDICAT_SESSIONS_URL "https://telemetry.medicatusb.com/v1/sessions")
+set(MEDICAT_UPLOADS_URL "https://telemetry.medicatusb.com/v1/support/uploads")
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/local.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/local.cmake")
 endif()
@@ -152,6 +153,12 @@ add_custom_command(
     WORKING_DIRECTORY "${REPO_ROOT}"
 )
 
+set(INSTALLER_RELEASE_TAG "unknown")
+if(EXISTS "${REPO_ROOT}/release_tag.txt")
+    file(READ "${REPO_ROOT}/release_tag.txt" INSTALLER_RELEASE_TAG)
+    string(STRIP "${INSTALLER_RELEASE_TAG}" INSTALLER_RELEASE_TAG)
+endif()
+
 target_compile_definitions(MedicatInstaller PRIVATE
     UNICODE
     _UNICODE
@@ -159,6 +166,8 @@ target_compile_definitions(MedicatInstaller PRIVATE
     NOMINMAX
     MEDICAT_USB_VERSION="21.12"
     MEDICAT_SESSIONS_URL="${MEDICAT_SESSIONS_URL}"
+    MEDICAT_UPLOADS_URL="${MEDICAT_UPLOADS_URL}"
+    INSTALLER_RELEASE_TAG="${INSTALLER_RELEASE_TAG}"
 )
 
 target_link_libraries(MedicatInstaller PRIVATE

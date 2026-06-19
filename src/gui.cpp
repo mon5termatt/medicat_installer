@@ -62,6 +62,8 @@ constexpr int kCreditsBtnGap = 8;
 constexpr int kFooterBtnGap = 8;
 constexpr int kActionRowGap = 12;
 constexpr int kStatusBarHeight = 20;
+constexpr int kBetaNoticeMinHeight = 20;
+constexpr int kBetaNoticeGap = 4;
 constexpr int kCheckboxRowHeight = kCheckboxHeight + 8;
 constexpr int kProgressRowHeight = std::max(kProgressHeight, kOpenLogBtnHeight);
 constexpr int kBottomChrome = 28;
@@ -84,12 +86,15 @@ struct MainContentLayout {
     int progressY = 0;
     int openLogY = 0;
     int statusBarY = 0;
+    int betaNoticeY = 0;
+    int betaNoticeHeight = kBetaNoticeMinHeight;
     int manualInstallY = 0;
     int creditsBtnY = 0;
     int requiredClientHeight = 0;
 };
 
-MainContentLayout ComputeMainContentLayout(const bool expanded, const bool archiveMissing) {
+MainContentLayout ComputeMainContentLayout(const bool expanded, const bool archiveMissing,
+                                           const int betaNoticeHeight = kBetaNoticeMinHeight) {
     MainContentLayout layout{};
     layout.contentTop = archiveMissing ? (kContentTop + kArchivePanelHeight) : kContentTop;
     layout.driveComboY = layout.contentTop + 22;
@@ -107,7 +112,9 @@ MainContentLayout ComputeMainContentLayout(const bool expanded, const bool archi
     layout.progressY = layout.installY + kInstallBtnHeight + kActionRowGap;
     layout.openLogY = layout.progressY + (kProgressHeight - kOpenLogBtnHeight) / 2;
     layout.statusBarY = layout.progressY + kProgressRowHeight + 8;
-    layout.manualInstallY = layout.statusBarY + kStatusBarHeight + kManualInstallGap;
+    layout.betaNoticeY = layout.statusBarY + kStatusBarHeight + kBetaNoticeGap;
+    layout.betaNoticeHeight = betaNoticeHeight;
+    layout.manualInstallY = layout.betaNoticeY + betaNoticeHeight + kManualInstallGap;
     layout.creditsBtnY = layout.manualInstallY + kManualInstallBtnHeight + kCreditsBtnGap;
     layout.requiredClientHeight = layout.creditsBtnY + kCreditsBtnHeight + kBottomChrome;
     return layout;
@@ -184,6 +191,8 @@ constexpr int kReExtractCloseBtnId = 1104;
 constexpr UINT_PTR kUiRefreshTimerId = 1;
 constexpr UINT_PTR kArchiveCheckTimerId = 2;
 constexpr UINT_PTR kDriveRefreshTimerId = 3;
+constexpr UINT_PTR kUpdateCheckTimerId = 4;
+constexpr UINT kUpdateCheckDelayMs = 2000;
 constexpr UINT kUiRefreshIntervalMs = 250;
 constexpr UINT kArchiveCheckIntervalMs = 3000;
 constexpr UINT kDriveDebounceMs = 500;
@@ -290,14 +299,15 @@ bool DriveLetterStillPresent(const std::wstring& driveLetter) {
     return (mask & (1u << bit)) != 0;
 }
 
-int MeasureWrappedStaticHeight(HWND hwnd, const std::wstring& text, const int width) {
+int MeasureWrappedStaticHeight(HWND hwnd, const std::wstring& text, const int width,
+                               const int minHeight = 32) {
     if (!hwnd || text.empty() || width <= 0) {
-        return 40;
+        return minHeight;
     }
 
     const HDC hdc = GetDC(hwnd);
     if (!hdc) {
-        return 40;
+        return minHeight;
     }
 
     const HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
@@ -313,7 +323,61 @@ int MeasureWrappedStaticHeight(HWND hwnd, const std::wstring& text, const int wi
         SelectObject(hdc, oldFont);
     }
     ReleaseDC(hwnd, hdc);
-    return std::max(32, static_cast<int>(rc.bottom - rc.top) + 4);
+    return std::max(minHeight, static_cast<int>(rc.bottom - rc.top) + 4);
+}
+
+struct WrappedStaticState {
+    WNDPROC original = nullptr;
+    bool muted = false;
+};
+
+LRESULT CALLBACK WrappedStaticProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp) {
+    auto* state = reinterpret_cast<WrappedStaticState*>(GetPropW(hwnd, L"MedicatWrappedStatic"));
+    if (!state || !state->original) {
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    }
+
+    if (msg == WM_PAINT) {
+        PAINTSTRUCT ps{};
+        const HDC hdc = BeginPaint(hwnd, &ps);
+        RECT rc{};
+        GetClientRect(hwnd, &rc);
+
+        wchar_t text[1024]{};
+        GetWindowTextW(hwnd, text, static_cast<int>(std::size(text)));
+
+        const HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
+        HFONT oldFont = nullptr;
+        if (font) {
+            oldFont = reinterpret_cast<HFONT>(SelectObject(hdc, font));
+        }
+
+        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hdc, state->muted ? theme::Colors().muted : theme::Colors().text);
+        DrawTextW(hdc, text, -1, &rc, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+
+        if (oldFont) {
+            SelectObject(hdc, oldFont);
+        }
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+    if (msg == WM_ERASEBKGND) {
+        return 1;
+    }
+    if (msg == WM_NCDESTROY) {
+        RemovePropW(hwnd, L"MedicatWrappedStatic");
+        delete state;
+    }
+    return CallWindowProcW(state->original, hwnd, msg, wp, lp);
+}
+
+void SubclassWrappedStatic(const HWND hwnd, const bool muted) {
+    auto* state = new WrappedStaticState{};
+    state->original = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
+        hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(WrappedStaticProc)));
+    state->muted = muted;
+    SetPropW(hwnd, L"MedicatWrappedStatic", state);
 }
 
 struct GlowButtonState {
@@ -657,6 +721,51 @@ void Gui::SetInstallHandler(InstallHandler handler) { onInstall_ = std::move(han
 void Gui::SetVerifyHandler(InstallHandler handler) { onVerify_ = std::move(handler); }
 
 void Gui::SetLogHandler(std::function<void(const std::wstring&)> handler) { onLog_ = std::move(handler); }
+
+void Gui::SetUpdateCheckHandler(std::function<void()> handler) { onUpdateCheck_ = std::move(handler); }
+
+void Gui::ScheduleUpdateCheck() {
+    if (!hwnd_ || !IsWindow(hwnd_) || updateCheckScheduled_) {
+        return;
+    }
+    updateCheckScheduled_ = true;
+    SetTimer(hwnd_, kUpdateCheckTimerId, kUpdateCheckDelayMs, nullptr);
+}
+
+void Gui::ShowUpdatePrompt(const InstallerUpdateInfo& info) {
+    if (!hwnd_ || !IsWindow(hwnd_) || updatePromptShownThisSession_) {
+        return;
+    }
+    updatePromptShownThisSession_ = true;
+
+#ifndef INSTALLER_RELEASE_TAG
+#define INSTALLER_RELEASE_TAG "unknown"
+#endif
+
+    const std::wstring localVersion = [&]() {
+        wchar_t buffer[32]{};
+        swprintf_s(buffer, L"v%hs", kInstallerVersion);
+        return std::wstring(buffer);
+    }();
+    const std::wstring localTag = [&]() {
+        wchar_t buffer[64]{};
+        swprintf_s(buffer, L"%hs", INSTALLER_RELEASE_TAG);
+        return std::wstring(buffer);
+    }();
+    const std::wstring remoteVersion =
+        info.version.empty() ? info.releaseTag : (info.version.rfind(L'v', 0) == 0 ? info.version : L"v" + info.version);
+
+    const std::wstring message =
+        i18n::Tr(L"update.available_message", localVersion, localTag, remoteVersion, info.releaseTag);
+    const std::wstring title = i18n::Tr(L"update.available_title");
+    const int result = MessageBoxW(hwnd_, message.c_str(), title.c_str(), MB_YESNO | MB_ICONINFORMATION);
+    if (result == IDYES) {
+        const std::wstring& url = !info.downloadUrl.empty() ? info.downloadUrl : info.releaseUrl;
+        if (!url.empty()) {
+            OpenBrowserUrl(url.c_str());
+        }
+    }
+}
 
 void Gui::LogVentoyDetection(const std::wstring& drive, const VentoyDetectionResult& detection) {
     if (!onLog_ || drive.empty()) {
@@ -1692,7 +1801,14 @@ void Gui::UpdateArchivePanel() {
 
 void Gui::LayoutMainContent() {
     const bool expanded = AdvancedChecked();
-    const MainContentLayout layout = ComputeMainContentLayout(expanded, archiveMissing_);
+
+    int betaNoticeHeight = kBetaNoticeMinHeight;
+    if (betaNoticeLabel_ && IsWindow(betaNoticeLabel_)) {
+        betaNoticeHeight = MeasureWrappedStaticHeight(betaNoticeLabel_, i18n::Tr(L"ui.beta_telemetry_notice"),
+                                                      kContentWidth, kBetaNoticeMinHeight);
+    }
+
+    const MainContentLayout layout = ComputeMainContentLayout(expanded, archiveMissing_, betaNoticeHeight);
 
     RECT clientRect{};
     GetClientRect(hwnd_, &clientRect);
@@ -1787,6 +1903,10 @@ void Gui::LayoutMainContent() {
     }
     if (statusBar_ && IsWindow(statusBar_)) {
         SetWindowPos(statusBar_, nullptr, contentLeft, layout.statusBarY, kContentWidth, kStatusBarHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    if (betaNoticeLabel_ && IsWindow(betaNoticeLabel_)) {
+        SetWindowPos(betaNoticeLabel_, nullptr, contentLeft, layout.betaNoticeY, kContentWidth, layout.betaNoticeHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (manualInstallBtn_ && IsWindow(manualInstallBtn_)) {
@@ -1887,6 +2007,11 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             } else if (wp == kDriveRefreshTimerId) {
                 KillTimer(hwnd, kDriveRefreshTimerId);
                 self->OnDebouncedDriveChange();
+            } else if (wp == kUpdateCheckTimerId) {
+                KillTimer(hwnd, kUpdateCheckTimerId);
+                if (self->onUpdateCheck_) {
+                    self->onUpdateCheck_();
+                }
             }
             return 0;
         case WM_SIZE:
@@ -1925,7 +2050,7 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 SetTextColor(hdc, theme::Colors().text);
                 return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
             }
-            if (ctl == self->versionLabel_ || ctl == self->statusBar_) {
+            if (ctl == self->versionLabel_ || ctl == self->statusBar_ || ctl == self->betaNoticeLabel_) {
                 SetTextColor(hdc, theme::Colors().muted);
                 return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
             }
@@ -1978,9 +2103,20 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             }
             return 0;
         }
+        case WM_MEDICAT_UPDATE_RESULT: {
+            auto* payload = reinterpret_cast<UpdateResultPayload*>(lp);
+            if (payload) {
+                if (payload->info.updateAvailable) {
+                    self->ShowUpdatePrompt(payload->info);
+                }
+                delete payload;
+            }
+            return 0;
+        }
         case WM_DESTROY:
             KillTimer(hwnd, kArchiveCheckTimerId);
             KillTimer(hwnd, kDriveRefreshTimerId);
+            KillTimer(hwnd, kUpdateCheckTimerId);
             if (self->fileLogWindow_ && IsWindow(self->fileLogWindow_)) {
                 DestroyWindow(self->fileLogWindow_);
             }
@@ -2162,6 +2298,11 @@ void Gui::OnCreate(HWND hwnd) {
         kMargin, initialLayout.statusBarY, kContentWidth, kStatusBarHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kStatusBarId)), instance_, nullptr);
 
+    betaNoticeLabel_ = CreateWindowW(
+        L"STATIC", i18n::Tr(L"ui.beta_telemetry_notice").c_str(),
+        WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
+        kMargin, initialLayout.betaNoticeY, kContentWidth, kBetaNoticeMinHeight, hwnd, nullptr, instance_, nullptr);
+
     manualInstallBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.manual_install_button").c_str(),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
@@ -2191,13 +2332,15 @@ void Gui::OnCreate(HWND hwnd) {
          {languageCombo_, titleLabel_, versionLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_,
           altDownloadCombo_, altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_, ventoyActionCheck_, advancedCheck_,
           pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_, verifyFilesBtn_,
-          openLogBtn_, manualInstallBtn_, creditsBtn_, feedbackBtn_, progressBar_, statusBar_}) {
+          openLogBtn_, manualInstallBtn_, creditsBtn_, feedbackBtn_, progressBar_, statusBar_, betaNoticeLabel_}) {
         if (child && IsWindow(child)) {
             SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
         }
     }
     SendMessageW(titleLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(titleFont), TRUE);
     SendMessageW(versionLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(subtitleFont), TRUE);
+    SendMessageW(betaNoticeLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(subtitleFont), TRUE);
+    SubclassWrappedStatic(betaNoticeLabel_, true);
 
     theme::EnableDarkMode(hwnd);
     theme::EnableDarkModeRecursive(hwnd);
@@ -2357,6 +2500,9 @@ void Gui::RefreshTranslatedUi() {
     if (feedbackBtn_ && IsWindow(feedbackBtn_)) {
         SetWindowTextW(feedbackBtn_, i18n::Tr(L"ui.feedback_button").c_str());
     }
+    if (betaNoticeLabel_ && IsWindow(betaNoticeLabel_)) {
+        SetWindowTextW(betaNoticeLabel_, i18n::Tr(L"ui.beta_telemetry_notice").c_str());
+    }
     RefreshCreditsWindowText();
     if (archiveMissingLabel_ && IsWindow(archiveMissingLabel_)) {
         SetWindowTextW(archiveMissingLabel_, i18n::Tr(L"ui.archive_missing", kMediCatArchiveFileName).c_str());
@@ -2384,9 +2530,10 @@ void Gui::RefreshTranslatedUi() {
                        altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_,
                        ventoyActionCheck_, advancedCheck_, pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_,
                        installBtn_, verifyFilesBtn_, openLogBtn_, manualInstallBtn_, creditsBtn_, progressBar_, statusBar_,
-                       languageCombo_, versionLabel_}) {
+                       betaNoticeLabel_, languageCombo_, versionLabel_}) {
         refreshControl(child);
     }
+    LayoutMainContent();
 }
 
 void Gui::RefreshDrives(const bool fromDeviceChange) {

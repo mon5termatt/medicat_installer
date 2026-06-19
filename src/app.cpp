@@ -49,6 +49,8 @@ void PostToGui(HWND hwnd, UINT msg, LPARAM payload) {
             delete reinterpret_cast<DonePayload*>(payload);
         } else if (msg == WM_MEDICAT_REEXTRACT_PROMPT) {
             delete reinterpret_cast<ReExtractPromptPayload*>(payload);
+        } else if (msg == WM_MEDICAT_UPDATE_RESULT) {
+            delete reinterpret_cast<UpdateResultPayload*>(payload);
         }
     }
 }
@@ -324,6 +326,8 @@ int App::RunGui() {
 
     gui_.SetInstallHandler([this] { OnInstall(); });
     gui_.SetVerifyHandler([this] { OnVerify(); });
+    gui_.SetUpdateCheckHandler([this] { StartUpdateCheck(); });
+    gui_.ScheduleUpdateCheck();
     LogInstallerDiagnostics(BuildDiagnosticContext(),
                             [this](const std::wstring& line) { log_->Info(line); });
     return gui_.Run();
@@ -539,6 +543,16 @@ void App::SubmitSessionReport(const bool success, const std::wstring& message, c
     request.headless = headless_;
     request.diagnostic = BuildDiagnosticContext();
 
+    if (!success && !message.empty()) {
+        std::wstring errorTitle = title;
+        if (errorTitle.empty()) {
+            errorTitle = currentOperation_ == L"verify" ? i18n::Tr(L"titles.verification_failed")
+                                                        : i18n::Tr(L"titles.installation_error");
+        }
+        request.errorTitle = SanitizeTelemetryText(errorTitle, 128);
+        request.errorDetail = SanitizeTelemetryText(message);
+    }
+
     SendSessionReport(request, headless_, [this](const std::wstring& line, const bool isError) {
         const std::wstring prefixed = L"[Telemetry] " + line;
         if (isError) {
@@ -551,6 +565,73 @@ void App::SubmitSessionReport(const bool success, const std::wstring& message, c
     sessionStart_ = {};
 }
 
+void App::QueueFailureLogUpload(const std::string& sessionId, const std::wstring& message,
+                                const std::wstring& title) {
+    if (sessionId.empty() || sevenZa_.empty()) {
+        return;
+    }
+
+    FailureLogUploadRequest request;
+    request.sessionId = sessionId;
+    request.operation = WideToUtf8(currentOperation_);
+    request.installerRoot = root_;
+    request.sevenZa = sevenZa_;
+    request.diagnostic = BuildDiagnosticContext();
+    if (!message.empty() || !title.empty()) {
+        std::wstring errorTitle = title;
+        if (errorTitle.empty()) {
+            errorTitle = currentOperation_ == L"verify" ? i18n::Tr(L"titles.verification_failed")
+                                                        : i18n::Tr(L"titles.installation_error");
+        }
+        request.errorTitle = SanitizeTelemetryText(errorTitle, 128);
+        request.errorDetail = SanitizeTelemetryText(message);
+    }
+
+    SendFailureLogUpload(request, [this](const std::wstring& line, const bool isError) {
+        const std::wstring prefixed = L"[Telemetry] " + line;
+        if (isError) {
+            log_->Error(prefixed);
+        } else {
+            log_->Info(prefixed);
+        }
+    });
+}
+
+void App::StartUpdateCheck() {
+    bool expected = false;
+    if (!updateCheckStarted_.compare_exchange_strong(expected, true)) {
+        return;
+    }
+    if (installing_.load()) {
+        return;
+    }
+
+    HWND hwnd = gui_.Hwnd();
+    std::thread([this, hwnd]() {
+        std::wstring connectionError;
+        if (!TestInternetConnection(connectionError)) {
+            log_->Debug(L"[Update] Skipped — offline");
+            return;
+        }
+
+        log_->Info(i18n::Tr(L"update.checking"));
+        const UpdateCheckResult result = CheckForInstallerUpdate();
+        if (!result.success) {
+            log_->Debug(L"[Update] Check failed — " + result.error);
+            return;
+        }
+        if (!result.info.updateAvailable) {
+            log_->Debug(L"[Update] Installer is up to date");
+            return;
+        }
+
+        log_->Info(L"[Update] Newer installer available — v" + result.info.version + L" (" + result.info.releaseTag +
+                   L")");
+        auto* payload = new UpdateResultPayload{result.info};
+        PostToGui(hwnd, WM_MEDICAT_UPDATE_RESULT, reinterpret_cast<LPARAM>(payload));
+    }).detach();
+}
+
 void App::PostDone(const bool success, const std::wstring& message, const std::wstring& title) {
     installing_ = false;
     if (!success && !message.empty()) {
@@ -561,11 +642,20 @@ void App::PostDone(const bool success, const std::wstring& message, const std::w
         headlessResult_.completed = true;
         headlessResult_.exitCode = exitCode;
     }
+    const std::string failureSessionId = sessionId_;
     SubmitSessionReport(success, message, title, exitCode);
+    if (!success && !message.empty()) {
+        QueueFailureLogUpload(failureSessionId, message, title);
+    }
     if (headless_) {
         return;
     }
-    auto* payload = new DonePayload{success, message, title};
+
+    std::wstring userMessage = message;
+    if (!success && !message.empty()) {
+        userMessage += L"\n\n" + i18n::Tr(L"messages.beta_failure_logs_notice");
+    }
+    auto* payload = new DonePayload{success, userMessage, title};
     PostToGui(gui_.Hwnd(), WM_MEDICAT_DONE, reinterpret_cast<LPARAM>(payload));
 }
 
@@ -687,7 +777,8 @@ std::wstring RelativePathFromFailureDetail(const std::wstring& detail) {
 }  // namespace
 
 bool App::TryReExtractFailedFiles(const std::wstring& drive, const std::wstring& archive,
-                                  const std::vector<std::wstring>& failureDetails) {
+                                  const std::vector<std::wstring>& failureDetails,
+                                  std::wstring* errorDetail) {
     if (drive.empty() || archive.empty() || failureDetails.empty()) {
         return false;
     }
@@ -729,6 +820,9 @@ bool App::TryReExtractFailedFiles(const std::wstring& drive, const std::wstring&
             return false;
         }
         log_->Error(L"Selective re-extract failed: " + (extract.error.empty() ? L"unknown error" : extract.error));
+        if (errorDetail) {
+            *errorDetail = extract.error.empty() ? L"unknown error" : extract.error;
+        }
         return false;
     }
 
@@ -816,14 +910,18 @@ void App::RunVerifyThread(std::wstring drive) {
             if (outcome.failedFiles > 0 && !outcome.failures.empty()) {
                 const std::wstring archive = ResolveArchivePath(cliOptions_.has_value() ? cliOptions_->archivePath : L"");
                 if (FileExists(archive) && PromptReExtract(outcome)) {
-                    const bool reextractOk = TryReExtractFailedFiles(drive, archive, outcome.failures);
+                    std::wstring reextractError;
+                    const bool reextractOk =
+                        TryReExtractFailedFiles(drive, archive, outcome.failures, &reextractError);
                     if (!reextractOk) {
                         if (IsCancelRequested()) {
                             log_->Info(i18n::Tr(L"log.user_cancelled"));
                             PostDone(false, L"");
                             return;
                         }
-                        PostDone(false, i18n::Tr(L"messages.re_extraction_error", L"selective extract failed"),
+                        const std::wstring detail =
+                            reextractError.empty() ? L"selective extract failed" : reextractError;
+                        PostDone(false, i18n::Tr(L"messages.re_extraction_error", detail),
                                  i18n::Tr(L"titles.re_extraction_error"));
                         return;
                     }
@@ -974,9 +1072,9 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
     const bool autoYes = ShouldAutoConfirm();
     const bool quiet = IsQuiet();
 
-    auto fail = [&](const std::wstring& msg) {
+    auto fail = [&](const std::wstring& msg, const std::wstring& title = L"") {
         log_->Error(msg);
-        PostDone(false, msg);
+        PostDone(false, msg, title);
     };
 
     auto cancel = [&] {
@@ -1005,7 +1103,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
         std::wstring netError;
         if (!CanInstallVentoyOffline(root, pinVersion) && !TestInternetConnection(netError)) {
             log_->Error(L"Internet check failed: " + netError);
-            fail(i18n::Tr(L"messages.no_internet"));
+            fail(FormatDetailedError(i18n::Tr(L"messages.no_internet"), netError), i18n::Tr(L"titles.download_failed"));
             return;
         }
 
@@ -1022,7 +1120,8 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
                 cancel();
                 return;
             }
-            fail(ready.error.empty() ? i18n::Tr(L"errors.ventoy_download_failed") : ready.error);
+            fail(FormatDetailedError(i18n::Tr(L"errors.ventoy_download_failed"), ready.error),
+                 i18n::Tr(L"titles.download_failed"));
             return;
         }
         ventoyExe = ready.ventoyExe;
@@ -1061,8 +1160,11 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
                    (ventoyInstall.enableSecureBoot ? L"enabled" : L"disabled"));
         const VentoyResult ventoy = RunVentoyInstall(ventoyExe, drive, upgrade, ventoyInstall);
         if (!ventoy.success) {
-            fail(upgrade ? i18n::Tr(L"messages.ventoy_upgrade_failed")
-                         : i18n::Tr(L"messages.ventoy_install_failed"));
+            const std::wstring summary =
+                upgrade ? i18n::Tr(L"messages.ventoy_upgrade_failed") : i18n::Tr(L"messages.ventoy_install_failed");
+            const std::wstring title =
+                upgrade ? i18n::Tr(L"titles.ventoy_upgrade_failed") : i18n::Tr(L"titles.ventoy_install_failed");
+            fail(FormatDetailedError(summary, ventoy.error), title);
             return;
         }
 
@@ -1085,7 +1187,8 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
         PostProgress(0);
         log_->Info(L"Formatting " + drive);
         if (!FormatDriveNtfs(drive)) {
-            fail(i18n::Tr(L"errors.format_failed", drive));
+            fail(FormatDetailedError(i18n::Tr(L"errors.format_failed", drive), L"NTFS format command failed."),
+                 i18n::Tr(L"titles.installation_error"));
             return;
         }
     }
@@ -1130,7 +1233,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
             cancel();
             return;
         }
-        fail(i18n::Tr(L"messages.extraction_failed", extract.error));
+        fail(i18n::Tr(L"messages.extraction_failed", extract.error), i18n::Tr(L"titles.extraction_failed"));
         return;
     }
 
@@ -1143,13 +1246,17 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
     if (!outcome.success) {
         if (outcome.failedFiles > 0 && !outcome.failures.empty()) {
             if (PromptReExtract(outcome)) {
-                const bool reextractOk = TryReExtractFailedFiles(drive, archive, outcome.failures);
+                std::wstring reextractError;
+                const bool reextractOk =
+                    TryReExtractFailedFiles(drive, archive, outcome.failures, &reextractError);
                 if (!reextractOk) {
                     if (IsCancelRequested()) {
                         cancel();
                         return;
                     }
-                    fail(i18n::Tr(L"messages.re_extraction_error", L"selective extract failed"));
+                    const std::wstring detail =
+                        reextractError.empty() ? L"selective extract failed" : reextractError;
+                    fail(i18n::Tr(L"messages.re_extraction_error", detail), i18n::Tr(L"titles.re_extraction_error"));
                     return;
                 }
 

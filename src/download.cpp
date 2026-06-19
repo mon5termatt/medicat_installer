@@ -6,6 +6,7 @@
 #include <winhttp.h>
 
 #include <fstream>
+#include <sstream>
 #include <vector>
 
 #pragma comment(lib, "winhttp.lib")
@@ -376,6 +377,139 @@ int HttpPostJsonInternal(const std::wstring& url, const std::string& jsonBody, c
 int HttpPostJson(const std::wstring& url, const std::string& jsonBody, const std::wstring& bearerToken,
                  std::wstring& error) {
     return HttpPostJsonInternal(url, jsonBody, bearerToken, error);
+}
+
+std::wstring ExtractJsonStringField(const std::string& json, const char* field) {
+    const std::string needle = std::string("\"") + field + "\":\"";
+    const size_t pos = json.find(needle);
+    if (pos == std::string::npos) {
+        return {};
+    }
+    const size_t start = pos + needle.size();
+    const size_t end = json.find('"', start);
+    if (end == std::string::npos || end <= start) {
+        return {};
+    }
+    const int len = MultiByteToWideChar(CP_UTF8, 0, json.data() + static_cast<int>(start),
+                                        static_cast<int>(end - start), nullptr, 0);
+    if (len <= 0) {
+        return {};
+    }
+    std::wstring wide(static_cast<size_t>(len), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, json.data() + static_cast<int>(start), static_cast<int>(end - start),
+                        wide.data(), len);
+    return wide;
+}
+
+HttpMultipartResult HttpPostMultipartUpload(const std::wstring& url, const std::wstring& bearerToken,
+                                            const std::wstring& sessionId, const std::string& manifestJson,
+                                            const std::wstring& zipPath) {
+    HttpMultipartResult result;
+    if (!FileExists(zipPath)) {
+        result.error = L"Upload zip not found";
+        return result;
+    }
+
+    std::ifstream zipIn(zipPath, std::ios::binary);
+    if (!zipIn) {
+        result.error = L"Could not read upload zip";
+        return result;
+    }
+    std::vector<char> zipBytes((std::istreambuf_iterator<char>(zipIn)), std::istreambuf_iterator<char>());
+    if (zipBytes.empty()) {
+        result.error = L"Upload zip is empty";
+        return result;
+    }
+
+    const std::string boundary = "----MedicatFormBoundary9f2c1a7e";
+    const std::string sessionUtf8 = medicat::WideToUtf8(sessionId);
+    std::ostringstream body;
+    auto writeField = [&](const char* name, const std::string& value) {
+        body << "--" << boundary << "\r\n";
+        body << "Content-Disposition: form-data; name=\"" << name << "\"\r\n\r\n";
+        body << value << "\r\n";
+    };
+
+    writeField("session_id", sessionUtf8);
+    writeField("manifest", manifestJson);
+    body << "--" << boundary << "\r\n";
+    body << "Content-Disposition: form-data; name=\"bundle\"; filename=\"support_upload.zip\"\r\n";
+    body << "Content-Type: application/zip\r\n\r\n";
+    const std::string prefix = body.str();
+    const std::string suffix = "\r\n--" + boundary + "--\r\n";
+
+    std::vector<char> payload;
+    payload.reserve(prefix.size() + zipBytes.size() + suffix.size());
+    payload.insert(payload.end(), prefix.begin(), prefix.end());
+    payload.insert(payload.end(), zipBytes.begin(), zipBytes.end());
+    payload.insert(payload.end(), suffix.begin(), suffix.end());
+
+    UrlParts parts;
+    if (!ParseUrl(url, parts, result.error)) {
+        return result;
+    }
+
+    HINTERNET session = WinHttpOpen(L"MedicatInstaller/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!session) {
+        result.error = L"WinHttpOpen failed";
+        return result;
+    }
+    WinHttpSetTimeouts(session, 30000, 30000, 120000, 120000);
+
+    HINTERNET connect = WinHttpConnect(session, parts.host.c_str(), parts.port, 0);
+    if (!connect) {
+        result.error = L"WinHttpConnect failed";
+        WinHttpCloseHandle(session);
+        return result;
+    }
+
+    const DWORD flags = parts.https ? WINHTTP_FLAG_SECURE : 0;
+    HINTERNET request =
+        WinHttpOpenRequest(connect, L"POST", parts.path.c_str(), nullptr, WINHTTP_NO_REFERER,
+                           WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
+    if (!request) {
+        result.error = L"WinHttpOpenRequest failed";
+        CloseHttpHandles(nullptr, connect, session);
+        return result;
+    }
+
+    const std::wstring authHeader = L"Authorization: Bearer " + bearerToken;
+    const std::wstring contentType = L"Content-Type: multipart/form-data; boundary=----MedicatFormBoundary9f2c1a7e";
+    WinHttpAddRequestHeaders(request, authHeader.c_str(), static_cast<DWORD>(-1), WINHTTP_ADDREQ_FLAG_ADD);
+    WinHttpAddRequestHeaders(request, contentType.c_str(), static_cast<DWORD>(-1), WINHTTP_ADDREQ_FLAG_ADD);
+
+    const BOOL sent = WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, payload.data(),
+                                         static_cast<DWORD>(payload.size()),
+                                         static_cast<DWORD>(payload.size()), 0);
+    if (!sent || !WinHttpReceiveResponse(request, nullptr)) {
+        result.error = L"HTTP multipart upload failed";
+        CloseHttpHandles(request, connect, session);
+        return result;
+    }
+
+    DWORD statusCode = 0;
+    DWORD statusSize = sizeof(statusCode);
+    WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                        WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX);
+    result.statusCode = static_cast<int>(statusCode);
+
+    std::vector<BYTE> responseBytes;
+    std::wstring readError;
+    ReadResponse(request, responseBytes, readError);
+    CloseHttpHandles(request, connect, session);
+
+    if (result.statusCode >= 200 && result.statusCode < 300 && !responseBytes.empty()) {
+        const std::string responseJson(reinterpret_cast<const char*>(responseBytes.data()), responseBytes.size());
+        result.keyword = ExtractJsonStringField(responseJson, "keyword");
+        result.uploadId = ExtractJsonStringField(responseJson, "upload_id");
+    } else if (!readError.empty()) {
+        result.error = readError;
+    } else if (result.statusCode == 0) {
+        result.error = L"HTTP upload failed";
+    }
+
+    return result;
 }
 
 bool HttpGet(const std::wstring& url, std::wstring& body, std::wstring& error) {

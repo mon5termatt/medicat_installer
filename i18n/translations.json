@@ -31,6 +31,7 @@
       "credits_open_ventoy": "Ventoy project",
       "credits_close_button": "Close",
       "feedback_button": "Bug report & feedback",
+      "beta_telemetry_notice": "Beta: anonymous usage stats and failure logs may be sent automatically to help debug issues.",
       "file_log_title": "Extraction File Log",
       "re_extract_window_title": "Verification Failed",
       "re_extract_summary": "{0} file(s) failed verification.",
@@ -104,6 +105,7 @@
       "re_extract_complete": "Re-extraction completed. You may want to run file verification again to confirm.",
       "re_extract_failed": "Re-extraction completed with errors.\n\nExtracted: {0}/{1}\nFailed: {2}\n\nCheck the log for details.",
       "verify_still_failed_after_reextract": "Verification still found {0} file(s) that do not match after re-extraction.\n\nCheck your antivirus, firewall, or other security software. They can block, quarantine, or delete files while extracting to a USB drive.\n\nLogs are saved beside this installer (medicat_installer.log, check.log, reextract.log). A future update will let you upload logs with a support keyword for Discord help.",
+      "beta_failure_logs_notice": "Diagnostic log files were uploaded automatically to help fix this issue (beta debugging).",
       "download_failed": "Failed to download the verification file. Please check your internet connection.",
       "verification_error": "An error occurred during file verification: {0}",
       "md5_manifest_missing": "The bundled MD5 verification manifest could not be loaded. Reinstall MedicatInstaller.exe or check medicat_installer.log for details.",
@@ -205,6 +207,12 @@
       "extraction_exception": "Exception during extraction: {0}",
       "module_check_failed": "Extraction library check failed: {0}",
       "internet_check_failed": "Error checking internet connection: {0}"
+    },
+    "update": {
+      "available_title": "Update Available",
+      "available_message": "A newer MediCat Installer is available.\n\nYou have: {0} ({1})\nLatest: {2} ({3})\n\nOpen the download page now?",
+      "checking": "Checking for installer updates...",
+      "up_to_date": "Installer is up to date."
     }
   },
   "es": {
@@ -239,6 +247,7 @@
       "credits_open_ventoy": "Proyecto Ventoy",
       "credits_close_button": "Cerrar",
       "feedback_button": "Informe de errores y sugerencias",
+      "beta_telemetry_notice": "Beta: las estadísticas de uso anónimas y los registros de fallos pueden enviarse automáticamente para ayudar a depurar problemas.",
       "file_log_title": "Registro de extracción",
       "re_extract_window_title": "Verificación fallida",
       "re_extract_summary": "{0} archivo(s) fallaron la verificación.",
@@ -312,6 +321,7 @@
       "re_extract_complete": "Re-extracción completada. Puede querer ejecutar la verificación de archivos nuevamente para confirmar.",
       "re_extract_failed": "Re-extracción completada con errores.\n\nExtraídos: {0}/{1}\nFallaron: {2}\n\nRevise el registro para más detalles.",
       "verify_still_failed_after_reextract": "La verificación aún encontró {0} archivo(s) que no coinciden después de la re-extracción.\n\nRevise su antivirus, firewall u otro software de seguridad. Pueden bloquear, poner en cuarentena o eliminar archivos al extraer a una unidad USB.\n\nLos registros se guardan junto a este instalador (medicat_installer.log, check.log, reextract.log). Una actualización futura permitirá subir registros con una palabra clave de soporte para ayuda en Discord.",
+      "beta_failure_logs_notice": "Los archivos de registro de diagnóstico se subieron automáticamente para ayudar a corregir este problema (depuración beta).",
       "download_failed": "Falló al descargar el archivo de verificación. Por favor verifique su conexión a internet.",
       "verification_error": "Ocurrió un error durante la verificación de archivos: {0}",
       "re_extraction_error": "Ocurrió un error durante la re-extracción: {0}",
@@ -411,6 +421,12 @@
       "extraction_exception": "Excepción durante la extracción: {0}",
       "module_check_failed": "Error al verificar bibliotecas de extracción: {0}",
       "internet_check_failed": "Error al verificar conexión a internet: {0}"
+    },
+    "update": {
+      "available_title": "Actualización disponible",
+      "available_message": "Hay una versión más reciente del instalador MediCat.\n\nTiene: {0} ({1})\nÚltima: {2} ({3})\n\n¿Abrir la página de descarga ahora?",
+      "checking": "Buscando actualizaciones del instalador...",
+      "up_to_date": "El instalador está actualizado."
     }
   },
   "fr": {
@@ -446,6 +462,7 @@
       "credits_open_ventoy": "Projet Ventoy",
       "credits_close_button": "Fermer",
       "feedback_button": "Signaler un bug ou une demande",
+      "beta_telemetry_notice": "Bêta : des statistiques d'utilisation anonymes et des journaux d'échec peuvent être envoyés automatiquement pour le débogage.",
       "file_log_title": "Journal d'extraction",
       "re_extract_window_title": "Vérification échouée",
       "re_extract_summary": "{0} fichier(s) ont échoué la vérification.",
@@ -519,6 +536,7 @@
       "re_extract_complete": "Ré-extraction terminée. Vous pouvez vouloir exécuter la vérification des fichiers à nouveau pour confirmer.",
       "re_extract_failed": "Ré-extraction terminée avec des erreurs.\n\nExtraits: {0}/{1}\nÉchoués: {2}\n\nConsultez le journal pour plus de détails.",
       "verify_still_failed_after_reextract": "La vérification a encore trouvé {0} fichier(s) qui ne correspondent pas après la ré-extraction.\n\nVérifiez votre antivirus, pare-feu ou autre logiciel de sécurité. Ils peuvent bloquer, mettre en quarantaine ou supprimer des fichiers lors de l'extraction sur une clé USB.\n\nLes journaux sont enregistrés à côté de cet installateur (medicat_installer.log, check.log, reextract.log). Une future mise à jour permettra d'envoyer les journaux avec un mot-clé de support pour l'aide Discord.",
+      "beta_failure_logs_notice": "Les fichiers journaux de diagnostic ont été envoyés automatiquement pour aider à corriger ce problème (débogage bêta).",
       "download_failed": "Échec du téléchargement du fichier de vérification. Veuillez vérifier votre connexion Internet.",
       "verification_error": "Une erreur s'est produite lors de la vérification des fichiers: {0}",
       "re_extraction_error": "Une erreur s'est produite lors de la ré-extraction: {0}",
@@ -618,6 +636,12 @@
       "extraction_exception": "Exception pendant l'extraction: {0}",
       "module_check_failed": "Échec de la vérification des bibliothèques d'extraction: {0}",
       "internet_check_failed": "Erreur lors de la vérification de la connexion Internet: {0}"
+    },
+    "update": {
+      "available_title": "Mise à jour disponible",
+      "available_message": "Une version plus récente de l'installateur MediCat est disponible.\n\nVous avez : {0} ({1})\nDernière : {2} ({3})\n\nOuvrir la page de téléchargement maintenant ?",
+      "checking": "Recherche de mises à jour de l'installateur...",
+      "up_to_date": "L'installateur est à jour."
     }
   },
   "pl": {
@@ -653,6 +677,7 @@
       "credits_open_ventoy": "Projekt Ventoy",
       "credits_close_button": "Zamknij",
       "feedback_button": "Zgłoś błąd lub pomysł",
+      "beta_telemetry_notice": "Beta: anonimowe statystyki użycia i dzienniki błędów mogą być wysyłane automatycznie w celu debugowania.",
       "file_log_title": "Dziennik rozpakowywania",
       "re_extract_window_title": "Weryfikacja nie powiodła się",
       "re_extract_summary": "{0} plików nie przeszło weryfikacji.",
@@ -726,6 +751,7 @@
       "re_extract_complete": "Ponowne wyodrębnianie zakończone. Możesz ponownie uruchomić weryfikację plików, aby to potwierdzić.",
       "re_extract_failed": "Ponowne wyodrębnianie zakończone z błędami.\n\nWyodrębniono: {0}/{1}\nNiepowodzenie: {2}\n\nSzczegółowe informacje znajdziesz w dzienniku.",
       "verify_still_failed_after_reextract": "Weryfikacja nadal wykryła {0} plików, które nie pasują po ponownym rozpakowaniu.\n\nSprawdź program antywirusowy, zaporę sieciową lub inne oprogramowanie zabezpieczające. Mogą blokować, kwarantannować lub usuwać pliki podczas rozpakowywania na dysk USB.\n\nDzienniki są zapisywane obok tego instalatora (medicat_installer.log, check.log, reextract.log). W przyszłej aktualizacji będzie można przesłać dzienniki z hasłem wsparcia, aby uzyskać pomoc na Discordzie.",
+      "beta_failure_logs_notice": "Pliki dziennika diagnostycznego zostały przesłane automatycznie, aby pomóc naprawić ten problem (debugowanie beta).",
       "download_failed": "Nie udało się pobrać pliku weryfikacyjnego. Sprawdź połączenie internetowe.",
       "verification_error": "Wystąpił błąd podczas weryfikacji plików: {0}",
       "re_extraction_error": "Wystąpił błąd podczas ponownego rozpakowywania: {0}",
@@ -825,6 +851,12 @@
       "extraction_exception": "Wyjątek podczas rozpakowywania: {0}",
       "module_check_failed": "Sprawdzanie bibliotek rozpakowywania nie powiodło się: {0}",
       "internet_check_failed": "Błąd podczas sprawdzania połączenia internetowego: {0}"
+    },
+    "update": {
+      "available_title": "Dostępna aktualizacja",
+      "available_message": "Dostępna jest nowsza wersja instalatora MediCat.\n\nMasz: {0} ({1})\nNajnowsza: {2} ({3})\n\nOtworzyć stronę pobierania teraz?",
+      "checking": "Sprawdzanie aktualizacji instalatora...",
+      "up_to_date": "Instalator jest aktualny."
     }
   },
   "tr": {
@@ -872,7 +904,8 @@
       "credits_open_7zip": "7-Zip projesi",
       "credits_open_ventoy": "Ventoy projesi",
       "credits_close_button": "Kapat",
-      "feedback_button": "Hata bildirimi ve öneri"
+      "feedback_button": "Hata bildirimi ve öneri",
+      "beta_telemetry_notice": "Beta: anonim kullanım istatistikleri ve hata günlükleri hata ayıklamaya yardımcı olmak için otomatik gönderilebilir."
     },
     "status": {
       "status_ready": "MediCat kurulumu için hazır",
@@ -933,6 +966,7 @@
       "re_extract_complete": "Yeniden çıkarma tamamlandı. Onaylamak için dosya doğrulamasını tekrar çalıştırmak isteyebilirsiniz.",
       "re_extract_failed": "Yeniden çıkarma işlemi hatalarla tamamlandı.\n\nÇıkarılan: {0}/{1}\nBaşarısız: {2}\n\nDetaylar için günlüğü kontrol edin.",
       "verify_still_failed_after_reextract": "Yeniden çıkarma işleminden sonra bile doğrulama {0} dosyanın eşleşmediğini tespit etti.\n\nAntivirüs, güvenlik duvarı veya diğer güvenlik yazılımlarınızı kontrol edin. Bir USB sürücüye çıkarma yaparken dosyaları engelleyebilir, karantinaya alabilir veya silebilirler.\n\nGünlükler bu kurulumcunun yanına kaydedilir (medicat_installer.log, check.log, reextract.log). Gelecekteki bir güncelleme, Discord yardımı için bir destek anahtar kelimesiyle günlükleri yüklemenize izin verecektir.",
+      "beta_failure_logs_notice": "Tanı günlük dosyaları bu sorunu düzeltmeye yardımcı olmak için otomatik olarak yüklendi (beta hata ayıklama).",
       "download_failed": "Doğrulama dosyası indirilemedi. Lütfen internet bağlantınızı kontrol edin.",
       "verification_error": "Dosya doğrulaması sırasında bir hata oluştu: {0}",
       "md5_manifest_missing": "Pakete dahil edilmiş MD5 doğrulama listesi yüklenemedi. MedicatInstaller.exe'yi yeniden yükleyin veya detaylar için medicat_installer.log dosyasını kontrol edin.",
@@ -1034,6 +1068,12 @@
       "extraction_exception": "Çıkarma sırasında istisna oluştu: {0}",
       "module_check_failed": "Çıkarma kitaplığı kontrolü başarısız oldu: {0}",
       "internet_check_failed": "İnternet bağlantısı kontrol edilirken hata oluştu: {0}"
+    },
+    "update": {
+      "available_title": "Güncelleme Mevcut",
+      "available_message": "Daha yeni bir MediCat Kurulumcu sürümü mevcut.\n\nSizde: {0} ({1})\nEn son: {2} ({3})\n\nİndirme sayfasını şimdi açmak ister misiniz?",
+      "checking": "Kurulumcu güncellemeleri kontrol ediliyor...",
+      "up_to_date": "Kurulumcu güncel."
     }
   }
 }

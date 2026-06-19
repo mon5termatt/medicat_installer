@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drives.h"
+#include "update.h"
 #include "ventoy.h"
 
 #include <windows.h>
@@ -21,6 +22,7 @@ constexpr UINT WM_MEDICAT_VENTOY_VERSIONS = WM_APP + 3;
 constexpr UINT WM_MEDICAT_REEXTRACT_PROMPT = WM_APP + 4;
 constexpr UINT WM_MEDICAT_DRIVE_LIST = WM_APP + 5;
 constexpr UINT WM_MEDICAT_VENTOY_STATUS = WM_APP + 6;
+constexpr UINT WM_MEDICAT_UPDATE_RESULT = WM_APP + 7;
 
 struct ReExtractPromptState {
     HANDLE doneEvent = nullptr;
@@ -70,6 +72,10 @@ struct VentoyStatusPayload {
     uint64_t generation = 0;
 };
 
+struct UpdateResultPayload {
+    InstallerUpdateInfo info;
+};
+
 enum class BusyProgressMode { FileLog, Verify, Download, None };
 
 class Gui {
@@ -81,6 +87,8 @@ public:
     void SetInstallHandler(InstallHandler handler);
     void SetVerifyHandler(InstallHandler handler);
     void SetLogHandler(std::function<void(const std::wstring&)> handler);
+    void SetUpdateCheckHandler(std::function<void()> handler);
+    void ScheduleUpdateCheck();
     void SetBusy(bool busy, BusyProgressMode progressMode = BusyProgressMode::FileLog);
     void SetProgress(int percent, bool clearLog = false);
     void SetDownloadProgress(int percent, const std::wstring& barText, const std::wstring& labelText);
@@ -154,6 +162,7 @@ private:
     void SetDownloadControlsEnabled(bool enabled);
     void PopulateAlternativeDownloadCombo();
     void OpenSelectedAlternativeDownload();
+    void ShowUpdatePrompt(const InstallerUpdateInfo& info);
 
     HINSTANCE instance_ = nullptr;
     HWND hwnd_ = nullptr;
@@ -179,6 +188,7 @@ private:
     HWND feedbackBtn_ = nullptr;
     HWND progressBar_ = nullptr;
     HWND statusBar_ = nullptr;
+    HWND betaNoticeLabel_ = nullptr;
     HWND archiveMissingLabel_ = nullptr;
     HWND downloadMirror1Btn_ = nullptr;
     HWND downloadMirror2Btn_ = nullptr;
@@ -209,6 +219,9 @@ private:
     InstallHandler onInstall_;
     InstallHandler onVerify_;
     std::function<void(const std::wstring&)> onLog_;
+    std::function<void()> onUpdateCheck_;
+    bool updateCheckScheduled_ = false;
+    bool updatePromptShownThisSession_ = false;
     bool hasLastVentoyLog_ = false;
     std::wstring lastVentoyLogDrive_;
     bool lastVentoyLogFound_ = false;
