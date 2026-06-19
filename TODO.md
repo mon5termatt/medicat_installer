@@ -6,7 +6,9 @@ Tracked future work and planned features not yet implemented.
 
 ## Support log upload (Discord keyword)
 
-**Goal:** Let users upload diagnostic **log files only** to a server after install/verify failures. Staff look up the upload in Discord using a short **support keyword** the user provides.
+**Design doc:** [`docs/SUPPORT_UPLOAD.md`](docs/SUPPORT_UPLOAD.md) — **Tier A:** automatic session reports (success/fail, OS, no prompt). **Tier B:** log file upload on failure only (consent + keyword).
+
+**Goal:** Tier A gives aggregate success/failure stats without user prompts. Tier B lets users upload diagnostic **log files only** after failures; staff look up bundles in Discord via a **support keyword**.
 
 **Upload policy:** Only plain-text diagnostics beside the installer — `*.log` and `*.txt`. No archives, executables, or user media. If extra context is needed (installer version, drive letter, checkbox state), generate a small `support_manifest.txt` at upload time rather than uploading non-log artifacts.
 

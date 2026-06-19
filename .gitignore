@@ -61,3 +61,6 @@ desktop.ini
 build-ninja/
 build_number.txt
 generated/
+
+# Support server (private repo — see docs/SUPPORT_SERVER.md)
+support-server/
