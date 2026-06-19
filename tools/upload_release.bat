@@ -55,5 +55,5 @@ echo   %X64_EXE%
 echo   %X86_EXE%
 echo   installer\update.json
 echo Release: https://github.com/mon5termatt/medicat_installer/releases/tag/%TAG%
-echo Commit installer\update.json to the cpp branch so clients can detect the new build.
+echo rebuild.bat will push installer\update.json to origin/cpp after upload.
 exit /b 0

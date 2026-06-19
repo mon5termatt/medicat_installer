@@ -20,9 +20,22 @@ def read_build_version(path: Path) -> tuple[str, int]:
     return version, build
 
 
+def read_release_tag(explicit: str | None) -> str:
+    if explicit and explicit.strip():
+        return explicit.strip()
+
+    tag_file = Path("release_tag.txt")
+    if tag_file.exists():
+        tag = tag_file.read_text(encoding="utf-8").strip()
+        if tag:
+            return tag
+
+    raise SystemExit("Release tag required: pass --tag or set release_tag.txt")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Publish installer update manifest")
-    parser.add_argument("--tag", required=True, help="GitHub release tag, e.g. 3521-BETA")
+    parser.add_argument("--tag", help="GitHub release tag, e.g. 3521-BETA (default: release_tag.txt)")
     parser.add_argument(
         "--build-version",
         type=Path,
@@ -38,7 +51,7 @@ def main() -> int:
     args = parser.parse_args()
 
     version, build = read_build_version(args.build_version)
-    tag = args.tag.strip()
+    tag = read_release_tag(args.tag)
     base = f"https://github.com/{REPO}/releases/download/{tag}"
     manifest = {
         "channel": "prerelease",

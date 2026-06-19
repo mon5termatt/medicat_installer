@@ -65,6 +65,16 @@ echo   %~dp0build-x86\Release\MedicatInstaller-x86.exe
 if "%UPLOAD_RELEASE%"=="1" (
     call "tools\upload_release.bat" "%RELEASE_TAG%"
     if errorlevel 1 goto fail
+) else (
+    echo Publishing update manifest...
+    python "tools\publish_update_manifest.py" --build-version "generated\build_version.cpp" --output "installer\update.json"
+    if errorlevel 1 goto fail
+)
+
+echo Pushing update manifest to origin/cpp...
+call "tools\push_update_manifest.bat"
+if errorlevel 1 (
+    echo Warning: update manifest push failed.
 )
 
 exit /b 0
