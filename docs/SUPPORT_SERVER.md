@@ -133,7 +133,7 @@ User shares **`keyword`** in Discord for staff lookup.
 | `client_ip_hash` | Abuse tracking (hashed IP) |
 | `expires_at` | **30-day** TTL; deleted by cleanup job |
 
-Staff can view log text inline on the upload detail page (first 256 KB per file) or download the zip via the admin dashboard. Anyone with the keyword can look it up from the public dashboard form and view logs on `/support/MEDICAT-…`.
+Staff can view log text inline on the upload detail page (first 256 KB per file) or download the zip via the admin dashboard. Anyone with the keyword can look it up from the public dashboard form and view logs on `/support/MEDICAT-…`. Failure uploads show a **failure summary** (error title/detail from `support_manifest.json`, 7za stderr excerpt, key log lines) and open the most relevant log tab; long `extract.log` / `medicat_installer.log` previews show the **last** 256 KB.
 
 ---
 
