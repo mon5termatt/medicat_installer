@@ -133,7 +133,7 @@ User shares **`keyword`** in Discord for staff lookup.
 | `client_ip_hash` | Abuse tracking (hashed IP) |
 | `expires_at` | **30-day** TTL; deleted by cleanup job |
 
-Staff download the zip via the admin dashboard. Log text is **not** rendered inline in HTML (download only).
+Staff can view log text inline on the upload detail page (first 256 KB per file) or download the zip via the admin dashboard. Anyone with the keyword can look it up from the public dashboard form and view logs on `/support/MEDICAT-…`.
 
 ---
 
@@ -152,7 +152,8 @@ Lifetime upload count per IP is logged as a warning after **20** total uploads (
 
 | Audience | URL | Data shown |
 |----------|-----|------------|
-| Public | `/` | Aggregate counts only (runs, success rate, builds) — no session IDs or logs |
+| Public | `/` | Aggregate stats with inline support keyword form (`#support`) |
+| Public | `/support/<keyword>` | Support log bundle detail (after lookup) |
 | Staff | `/admin` | Session list, upload lookup by keyword, zip download |
 
 ---
