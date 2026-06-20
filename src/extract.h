@@ -18,9 +18,13 @@ struct ExtractResult {
     bool cancelled = false;
     int exitCode = -1;
     std::wstring error;
+    std::wstring detail;
 };
 
 using ProgressCallback = std::function<void(const ExtractProgress&)>;
+
+// User-facing text: exit code line plus a short detail excerpt (for dialogs).
+std::wstring FormatExtractFailureMessage(const ExtractResult& result);
 
 ExtractResult Extract7zArchive(
     const std::wstring& sevenZipExe,

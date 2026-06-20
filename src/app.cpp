@@ -327,6 +327,7 @@ int App::RunGui() {
     gui_.SetInstallHandler([this] { OnInstall(); });
     gui_.SetVerifyHandler([this] { OnVerify(); });
     gui_.SetUpdateCheckHandler([this] { StartUpdateCheck(); });
+    gui_.SetApplyInstallerUpdateHandler([this](const InstallerUpdateInfo& info) { ApplyInstallerUpdate(info); });
     gui_.ScheduleUpdateCheck();
     LogInstallerDiagnostics(BuildDiagnosticContext(),
                             [this](const std::wstring& line) { log_->Info(line); });
@@ -567,7 +568,12 @@ void App::SubmitSessionReport(const bool success, const std::wstring& message, c
 
 void App::QueueFailureLogUpload(const std::string& sessionId, const std::wstring& message,
                                 const std::wstring& title) {
-    if (sessionId.empty() || sevenZa_.empty()) {
+    if (sessionId.empty()) {
+        log_->Debug(L"[Telemetry] Failure log upload skipped — no session id");
+        return;
+    }
+    if (sevenZa_.empty()) {
+        log_->Debug(L"[Telemetry] Failure log upload skipped — 7za not available");
         return;
     }
 
@@ -632,6 +638,58 @@ void App::StartUpdateCheck() {
     }).detach();
 }
 
+void App::ApplyInstallerUpdate(const InstallerUpdateInfo& info) {
+    if (installing_.load()) {
+        return;
+    }
+    installing_ = true;
+    gui_.SetBusy(true, BusyProgressMode::Download);
+    gui_.SetDownloadProgress(0, FormatProgressBytes(0), i18n::Tr(L"update.downloading"));
+
+    HWND hwnd = gui_.Hwnd();
+    std::thread([this, hwnd, info]() {
+        uint64_t lastUiTick = 0;
+        std::wstring error;
+        const bool ok = DownloadAndRelaunchInstallerUpdate(
+            info,
+            [&](const uint64_t downloaded, const uint64_t total) {
+                const uint64_t now = GetTickCount64();
+                if (lastUiTick != 0 && now - lastUiTick < 200) {
+                    return;
+                }
+                lastUiTick = now;
+
+                int percent = 0;
+                if (total > 0) {
+                    percent = static_cast<int>((downloaded * 100) / total);
+                }
+                std::wstring sizeText = FormatProgressBytes(downloaded);
+                if (total > 0) {
+                    sizeText += L" / " + FormatProgressBytes(total);
+                }
+
+                auto* progress = new ProgressPayload{};
+                progress->downloadUpdate = true;
+                progress->percent = percent;
+                progress->statusText = sizeText;
+                progress->file = i18n::Tr(L"update.downloading");
+                PostToGui(hwnd, WM_MEDICAT_PROGRESS, reinterpret_cast<LPARAM>(progress));
+            },
+            [this](const std::wstring& line) { log_->Info(line); }, error);
+
+        if (!ok) {
+            installing_ = false;
+            auto* payload = new DonePayload{false, i18n::Tr(L"update.download_failed", error),
+                                             i18n::Tr(L"update.download_failed_title")};
+            PostToGui(hwnd, WM_MEDICAT_DONE, reinterpret_cast<LPARAM>(payload));
+            return;
+        }
+
+        log_->Info(i18n::Tr(L"update.restarting"));
+        ExitProcess(0);
+    }).detach();
+}
+
 void App::PostDone(const bool success, const std::wstring& message, const std::wstring& title) {
     installing_ = false;
     if (!success && !message.empty()) {
@@ -643,10 +701,10 @@ void App::PostDone(const bool success, const std::wstring& message, const std::w
         headlessResult_.exitCode = exitCode;
     }
     const std::string failureSessionId = sessionId_;
-    SubmitSessionReport(success, message, title, exitCode);
     if (!success && !message.empty()) {
         QueueFailureLogUpload(failureSessionId, message, title);
     }
+    SubmitSessionReport(success, message, title, exitCode);
     if (headless_) {
         return;
     }
@@ -819,9 +877,10 @@ bool App::TryReExtractFailedFiles(const std::wstring& drive, const std::wstring&
             log_->Info(i18n::Tr(L"log.user_cancelled"));
             return false;
         }
-        log_->Error(L"Selective re-extract failed: " + (extract.error.empty() ? L"unknown error" : extract.error));
+        const std::wstring failureMessage = FormatExtractFailureMessage(extract);
+        log_->Error(L"Selective re-extract failed: " + extract.error);
         if (errorDetail) {
-            *errorDetail = extract.error.empty() ? L"unknown error" : extract.error;
+            *errorDetail = failureMessage;
         }
         return false;
     }
@@ -1160,11 +1219,13 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
                    (ventoyInstall.enableSecureBoot ? L"enabled" : L"disabled"));
         const VentoyResult ventoy = RunVentoyInstall(ventoyExe, drive, upgrade, ventoyInstall);
         if (!ventoy.success) {
-            const std::wstring summary =
-                upgrade ? i18n::Tr(L"messages.ventoy_upgrade_failed") : i18n::Tr(L"messages.ventoy_install_failed");
+            const std::wstring exitLine =
+                i18n::Tr(L"messages.process_exit_code", L"Ventoy2Disk", std::to_wstring(ventoy.exitCode));
+            const std::wstring summary = upgrade ? i18n::Tr(L"messages.ventoy_upgrade_failed", exitLine)
+                                                 : i18n::Tr(L"messages.ventoy_install_failed", exitLine);
             const std::wstring title =
                 upgrade ? i18n::Tr(L"titles.ventoy_upgrade_failed") : i18n::Tr(L"titles.ventoy_install_failed");
-            fail(FormatDetailedError(summary, ventoy.error), title);
+            fail(summary, title);
             return;
         }
 
@@ -1233,7 +1294,8 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
             cancel();
             return;
         }
-        fail(i18n::Tr(L"messages.extraction_failed", extract.error), i18n::Tr(L"titles.extraction_failed"));
+        fail(i18n::Tr(L"messages.extraction_failed", FormatExtractFailureMessage(extract)),
+             i18n::Tr(L"titles.extraction_failed"));
         return;
     }
 

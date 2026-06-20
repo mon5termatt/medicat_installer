@@ -2,6 +2,7 @@
 
 #include "cancel.h"
 #include "drives.h"
+#include "i18n.h"
 #include "util.h"
 
 #include <windows.h>
@@ -15,8 +16,6 @@
 #include <vector>
 
 namespace medicat {
-
-namespace {
 
 bool IsBannerLine(const std::wstring& line) {
     if (line.empty()) {
@@ -91,19 +90,6 @@ int PercentFromBytes(uint64_t written, uint64_t total) {
         return 99;
     }
     return static_cast<int>(pct);
-}
-
-std::string WideToUtf8(const std::wstring& text) {
-    if (text.empty()) {
-        return {};
-    }
-    const int size = WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    if (size <= 1) {
-        return {};
-    }
-    std::string out(static_cast<size_t>(size - 1), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, out.data(), size, nullptr, nullptr);
-    return out;
 }
 
 bool WriteUtf8ListFile(const std::wstring& path, const std::vector<std::wstring>& lines) {
@@ -267,7 +253,117 @@ void DrainStdout(HANDLE stdoutRead, std::wstring& lineBuffer, std::wstring& last
     }
 }
 
-}  // namespace
+std::wstring TrimWide(const std::wstring& text) {
+    const size_t start = text.find_first_not_of(L" \t\r\n");
+    if (start == std::wstring::npos) {
+        return {};
+    }
+    const size_t end = text.find_last_not_of(L" \t\r\n");
+    return text.substr(start, end - start + 1);
+}
+
+bool IsUsefulErrorLine(const std::wstring& line) {
+    if (line.empty()) {
+        return false;
+    }
+    std::wstring upper = line;
+    for (wchar_t& ch : upper) {
+        if (ch >= L'a' && ch <= L'z') {
+            ch = static_cast<wchar_t>(ch - L'a' + L'A');
+        }
+    }
+    static const wchar_t* kMarkers[] = {
+        L"ERROR:", L"OPEN ERROR:", L"SYSTEM ERROR:", L"FATAL ERROR", L"CANNOT OPEN", L"WRONG PASSWORD",
+        L"NOT ENOUGH SPACE", L"DISK FULL", L"FILE NOT FOUND", L"DATA ERROR", L"UNSUPPORTED",
+    };
+    for (const wchar_t* marker : kMarkers) {
+        if (upper.find(marker) != std::wstring::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::wstring SummarizeProcessOutput(const std::wstring& text) {
+    if (text.empty()) {
+        return {};
+    }
+
+    std::vector<std::wstring> useful;
+    useful.reserve(8);
+    std::wstring line;
+    for (const wchar_t ch : text) {
+        if (ch == L'\r') {
+            continue;
+        }
+        if (ch == L'\n') {
+            const std::wstring trimmed = TrimWide(line);
+            line.clear();
+            if (trimmed.empty()) {
+                continue;
+            }
+            if (IsUsefulErrorLine(trimmed)) {
+                if (useful.empty() || useful.back() != trimmed) {
+                    useful.push_back(trimmed);
+                }
+            }
+            continue;
+        }
+        line.push_back(ch);
+    }
+    const std::wstring trimmed = TrimWide(line);
+    if (!trimmed.empty() && IsUsefulErrorLine(trimmed)) {
+        if (useful.empty() || useful.back() != trimmed) {
+            useful.push_back(trimmed);
+        }
+    }
+
+    if (useful.empty()) {
+        const std::wstring compact = TrimWide(text);
+        if (compact.size() <= 400) {
+            return compact;
+        }
+        return compact.substr(0, 400) + L"...";
+    }
+
+    if (useful.size() > 6) {
+        useful.erase(useful.begin(), useful.end() - 6);
+    }
+
+    std::wstring out;
+    for (size_t i = 0; i < useful.size(); ++i) {
+        if (i > 0) {
+            out += L"\n";
+        }
+        out += useful[i];
+    }
+    if (out.size() > 500) {
+        out.resize(500);
+        out += L"...";
+    }
+    return out;
+}
+
+void SetExtractFailure(ExtractResult& result, const DWORD exitCode, const std::wstring& stderrText) {
+    result.exitCode = static_cast<int>(exitCode);
+    result.success = false;
+    result.detail = SummarizeProcessOutput(stderrText);
+
+    std::wostringstream err;
+    err << L"7za exited with code " << exitCode;
+    if (!stderrText.empty()) {
+        err << L": " << stderrText.substr(0, 500);
+    }
+    result.error = err.str();
+}
+
+std::wstring FormatExtractFailureMessage(const ExtractResult& result) {
+    std::wstring message = i18n::Tr(L"messages.process_exit_code", L"7za", std::to_wstring(result.exitCode));
+    if (!result.detail.empty()) {
+        message += L"\n\n" + result.detail;
+    }
+    return message;
+}
 
 ExtractResult Extract7zArchive(
     const std::wstring& sevenZipExe,
@@ -465,12 +561,7 @@ ExtractResult Extract7zArchive(
     }
 
     if (!result.success) {
-        std::wostringstream err;
-        err << L"7za exited with code " << exitCode;
-        if (!stderrText.empty()) {
-            err << L": " << stderrText.substr(0, 500);
-        }
-        result.error = err.str();
+        SetExtractFailure(result, exitCode, stderrText);
     }
 
     return result;
@@ -670,12 +761,7 @@ ExtractResult Extract7zArchiveSelective(
     }
 
     if (!result.success) {
-        std::wostringstream err;
-        err << L"7za exited with code " << exitCode;
-        if (!stderrText.empty()) {
-            err << L": " << stderrText.substr(0, 500);
-        }
-        result.error = err.str();
+        SetExtractFailure(result, exitCode, stderrText);
     }
 
     return result;
