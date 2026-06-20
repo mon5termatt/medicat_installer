@@ -344,7 +344,7 @@ bool LaunchUpdateReplacer(const std::wstring& downloadedPath, const std::wstring
     inner += L"ping 127.0.0.1 -n 3 >nul\r\n";
     inner += L"set RETRIES=0\r\n";
     inner += L":retry\r\n";
-    inner += L"move /Y " + quotedNew + L" " + quotedTarget + L"\r\n";
+    inner += L"move /Y " + quotedNew + L" " + quotedTarget + L" >nul 2>&1\r\n";
     inner += L"if not errorlevel 1 goto launch\r\n";
     inner += L"set /a RETRIES+=1\r\n";
     inner += L"if !RETRIES! geq 15 exit /b 1\r\n";
@@ -352,7 +352,7 @@ bool LaunchUpdateReplacer(const std::wstring& downloadedPath, const std::wstring
     inner += L"goto retry\r\n";
     inner += L":launch\r\n";
     inner += L"start \"\" /D " + quotedExeDir + L" " + quotedTarget + L"\r\n";
-    inner += L"del \"%~f0\"\r\n";
+    inner += L"exit /b 0\r\n";
 
     const std::wstring batchPath = JoinPath(tempDir, L"apply_update.cmd");
     if (!WriteUtf8TextFile(batchPath, WideToUtf8(inner))) {
@@ -360,7 +360,7 @@ bool LaunchUpdateReplacer(const std::wstring& downloadedPath, const std::wstring
         return false;
     }
 
-    std::wstring command = L"cmd.exe /c start \"MedicatUpdate\" /b /min " + QuoteCmdArgument(batchPath);
+    std::wstring command = L"cmd.exe /c " + QuoteCmdArgument(batchPath);
 
     if (onLog) {
         onLog(L"[Update] Launching helper: " + command);
@@ -374,9 +374,8 @@ bool LaunchUpdateReplacer(const std::wstring& downloadedPath, const std::wstring
     startupInfo.dwFlags = STARTF_USESHOWWINDOW;
     startupInfo.wShowWindow = SW_HIDE;
     PROCESS_INFORMATION processInfo{};
-    if (!CreateProcessW(nullptr, commandBuffer.data(), nullptr, nullptr, FALSE,
-                        CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS | CREATE_NO_WINDOW, nullptr, exeDir.c_str(),
-                        &startupInfo, &processInfo)) {
+    if (!CreateProcessW(nullptr, commandBuffer.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
+                        exeDir.c_str(), &startupInfo, &processInfo)) {
         DeleteFileW(batchPath.c_str());
         error = L"Could not launch update helper (error " + std::to_wstring(GetLastError()) + L")";
         return false;
