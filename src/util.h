@@ -23,6 +23,8 @@ bool IsProcessElevated();
 
 std::string WideToUtf8(const std::wstring& text);
 
+std::wstring Utf8ToWide(const std::string& text);
+
 extern const char kInstallerVersion[];
 extern const int kInstallerBuildNumber;
 

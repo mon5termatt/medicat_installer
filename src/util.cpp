@@ -292,6 +292,19 @@ std::string WideToUtf8(const std::wstring& text) {
     return out;
 }
 
+std::wstring Utf8ToWide(const std::string& text) {
+    if (text.empty()) {
+        return {};
+    }
+    const int len = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, nullptr, 0);
+    if (len <= 1) {
+        return {};
+    }
+    std::wstring out(static_cast<size_t>(len - 1), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, out.data(), len);
+    return out;
+}
+
 std::wstring InstallerVersionWide() {
     if (kInstallerVersion[0] == '\0') {
         return L"0.0.0";
