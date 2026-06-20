@@ -341,6 +341,10 @@ std::string BuildSessionReportJson(const SessionReportRequest& request) {
         systemSep();
         AppendJsonInt(json, "windows_build", system.windowsBuild);
     }
+    if (system.windowsUbr > 0) {
+        systemSep();
+        AppendJsonInt(json, "windows_ubr", system.windowsUbr);
+    }
     if (!system.windowsMajorMinor.empty()) {
         systemSep();
         AppendJsonString(json, "windows_major_minor", system.windowsMajorMinor);

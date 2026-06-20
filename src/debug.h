@@ -31,6 +31,7 @@ void LogInstallerDiagnostics(const DiagnosticContext& context,
 
 struct SessionSystemSnapshot {
     int windowsBuild = 0;
+    int windowsUbr = 0;
     std::string windowsMajorMinor;
     std::string editionId;
     std::string installationType;

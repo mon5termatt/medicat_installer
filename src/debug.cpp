@@ -604,6 +604,7 @@ SessionSystemSnapshot BuildSessionSystemSnapshot() {
     SessionSystemSnapshot snapshot;
     const WindowsVersionInfo win = GetWindowsVersionInfo();
     snapshot.windowsBuild = static_cast<int>(win.build);
+    snapshot.windowsUbr = static_cast<int>(win.ubr);
     if (win.ntMajor != 0 || win.ntMinor != 0) {
         snapshot.windowsMajorMinor = std::to_string(win.ntMajor) + "." + std::to_string(win.ntMinor);
     }
