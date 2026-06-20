@@ -488,8 +488,7 @@ void WriteApplicationSection(const DiagnosticContext& context,
 
     write(kDiagnosticSeparator);
     write(L"[Application]");
-    field(L"Installer version: ", Utf8ToWide(kInstallerVersion));
-    field(L"Installer build: ", std::to_wstring(kInstallerBuildNumber));
+    field(L"Installer version: ", InstallerVersionLabel());
     field(L"MediCat USB version: ", Utf8ToWide(MEDICAT_USB_VERSION));
     field(L"Executable directory: ", context.outputDir);
     field(L"Process architecture: ", GetProcessorArchitecture());

@@ -292,4 +292,22 @@ std::string WideToUtf8(const std::wstring& text) {
     return out;
 }
 
+std::wstring InstallerVersionWide() {
+    if (kInstallerVersion[0] == '\0') {
+        return L"0.0.0";
+    }
+    return Utf8ToWide(kInstallerVersion);
+}
+
+std::wstring InstallerVersionLabel() {
+    const std::wstring version = InstallerVersionWide();
+    if (version.empty()) {
+        return L"v0.0.0";
+    }
+    if (version.front() == L'v' || version.front() == L'V') {
+        return version;
+    }
+    return L"v" + version;
+}
+
 }  // namespace medicat

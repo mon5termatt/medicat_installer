@@ -26,4 +26,7 @@ std::string WideToUtf8(const std::wstring& text);
 extern const char kInstallerVersion[];
 extern const int kInstallerBuildNumber;
 
+std::wstring InstallerVersionWide();
+std::wstring InstallerVersionLabel();
+
 }  // namespace medicat

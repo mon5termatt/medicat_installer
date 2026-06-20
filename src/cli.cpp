@@ -126,7 +126,7 @@ bool AttachCliConsole() {
     }
 
     wchar_t title[128];
-    swprintf_s(title, L"MediCat Installer v%hs", kInstallerVersion);
+    swprintf_s(title, L"MediCat Installer %ls", InstallerVersionLabel().c_str());
     SetConsoleTitleW(title);
 
     FILE* dummy = nullptr;
@@ -285,9 +285,9 @@ void PrintCliVersion() {
     AttachCliConsole();
     std::ostringstream out;
 #if defined(_WIN64)
-    out << "MedicatInstaller " << kInstallerVersion << " (build " << kInstallerBuildNumber << ") x64\n";
+    out << "MedicatInstaller " << kInstallerVersion << " x64\n";
 #else
-    out << "MedicatInstaller " << kInstallerVersion << " (build " << kInstallerBuildNumber << ") x86\n";
+    out << "MedicatInstaller " << kInstallerVersion << " x86\n";
 #endif
     out << "Release tag: (not embedded)\n";
     out << "MediCat USB: v" << MEDICAT_USB_VERSION;

@@ -681,8 +681,9 @@ bool Gui::Create(HINSTANCE instance) {
     reExtractWc.lpszClassName = kReExtractWindowClass;
     RegisterClassExW(&reExtractWc);
 
+    const std::wstring windowTitle = i18n::Tr(L"ui.form_title", InstallerVersionWide());
     hwnd_ = CreateWindowExW(
-        0, cls, i18n::Tr(L"ui.title_label").c_str(),
+        0, cls, windowTitle.c_str(),
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, EstimateInitialOuterWidth(), EstimateInitialOuterHeight(false),
         nullptr, nullptr, instance, this);
@@ -731,11 +732,7 @@ void Gui::ShowUpdatePrompt(const InstallerUpdateInfo& info) {
 #define INSTALLER_RELEASE_TAG "unknown"
 #endif
 
-    const std::wstring localVersion = [&]() {
-        wchar_t buffer[32]{};
-        swprintf_s(buffer, L"v%hs", kInstallerVersion);
-        return std::wstring(buffer);
-    }();
+    const std::wstring localVersion = InstallerVersionLabel();
     const std::wstring localTag = [&]() {
         wchar_t buffer[64]{};
         swprintf_s(buffer, L"%hs", INSTALLER_RELEASE_TAG);
@@ -2191,8 +2188,7 @@ void Gui::OnCreate(HWND hwnd) {
     altDownloadOpenBtn_ =
         createDownloadBtn(kAltDownloadOpenBtnId, i18n::Tr(L"ui.alt_download_open").c_str(), kAltOpenBtnWidth);
 
-    wchar_t versionText[32]{};
-    swprintf_s(versionText, L"v%hs", kInstallerVersion);
+    const std::wstring versionText = InstallerVersionLabel();
     const MainContentLayout initialLayout = ComputeMainContentLayout(false, false);
     driveLabel_ = CreateWindowW(
         L"STATIC", i18n::Tr(L"ui.drive_label").c_str(),
@@ -2316,7 +2312,7 @@ void Gui::OnCreate(HWND hwnd) {
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFeedbackBtnId)), instance_, nullptr);
 
     versionLabel_ = CreateWindowW(
-        L"STATIC", versionText,
+        L"STATIC", versionText.c_str(),
         WS_CHILD | WS_VISIBLE | SS_RIGHT | SS_NOPREFIX,
         kLanguageComboX, kVersionLabelY, kVersionLabelWidth, kVersionLabelHeight, hwnd, nullptr, instance_, nullptr);
 
@@ -2442,6 +2438,10 @@ void Gui::RefreshTranslatedUi() {
         }
     };
 
+    if (hwnd_ && IsWindow(hwnd_)) {
+        SetWindowTextW(hwnd_, i18n::Tr(L"ui.form_title", InstallerVersionWide()).c_str());
+    }
+
     if (titleLabel_ && IsWindow(titleLabel_)) {
         SetWindowTextW(titleLabel_, i18n::Tr(L"ui.title_label").c_str());
     }
@@ -2513,9 +2513,7 @@ void Gui::RefreshTranslatedUi() {
         SetWindowTextW(fileLogWindow_, i18n::Tr(L"ui.file_log_title").c_str());
     }
     if (versionLabel_ && IsWindow(versionLabel_)) {
-        wchar_t versionText[32]{};
-        swprintf_s(versionText, L"v%hs", kInstallerVersion);
-        SetWindowTextW(versionLabel_, versionText);
+        SetWindowTextW(versionLabel_, InstallerVersionLabel().c_str());
     }
 
     for (HWND child : {titleLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_, altDownloadCombo_,

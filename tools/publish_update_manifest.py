@@ -9,6 +9,24 @@ import re
 from pathlib import Path
 
 REPO = "mon5termatt/medicat_installer"
+_VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+
+
+def parse_version_text(text: str) -> tuple[str, int] | None:
+    cleaned = text.strip()
+    if not cleaned:
+        return None
+
+    match = _VERSION_RE.match(cleaned)
+    if match:
+        major, minor, build = match.groups()
+        return f"{major}.{minor}.{build}", int(build)
+
+    if cleaned.isdigit():
+        build = int(cleaned)
+        return f"1.0.{build}", build
+
+    return None
 
 
 def read_build_version(path: Path) -> tuple[str, int]:
@@ -18,6 +36,12 @@ def read_build_version(path: Path) -> tuple[str, int]:
     version = version_match.group(1) if version_match else "0.0.0"
     build = int(build_match.group(1)) if build_match else 0
     return version, build
+
+
+def read_build_number_file(path: Path) -> tuple[str, int] | None:
+    if not path.is_file():
+        return None
+    return parse_version_text(path.read_text(encoding="utf-8"))
 
 
 def read_release_tag(explicit: str | None) -> str:
@@ -37,10 +61,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Publish installer update manifest")
     parser.add_argument("--tag", help="GitHub release tag, e.g. 3521-BETA (default: release_tag.txt)")
     parser.add_argument(
+        "--build-number",
+        type=Path,
+        default=Path("build_number.txt"),
+        help="Version counter file (e.g. 1.0.19)",
+    )
+    parser.add_argument(
         "--build-version",
         type=Path,
         default=Path("generated/build_version.cpp"),
-        help="Generated build_version.cpp path",
+        help="Generated build_version.cpp fallback",
     )
     parser.add_argument(
         "--output",
@@ -50,7 +80,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    version, build = read_build_version(args.build_version)
+    parsed = read_build_number_file(args.build_number)
+    if parsed is not None:
+        version, build = parsed
+    else:
+        version, build = read_build_version(args.build_version)
+
     tag = read_release_tag(args.tag)
     base = f"https://github.com/{REPO}/releases/download/{tag}"
     manifest = {
