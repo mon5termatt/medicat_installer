@@ -16,6 +16,8 @@ struct ExtractProgress {
 struct ExtractResult {
     bool success = false;
     bool cancelled = false;
+    bool driveRemoved = false;
+    bool ioError = false;
     int exitCode = -1;
     std::wstring error;
     std::wstring detail;

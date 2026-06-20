@@ -422,6 +422,98 @@ uint64_t GetDriveFreeBytes(const std::wstring& root) {
     return QueryFreeBytes(normalized).QuadPart;
 }
 
+bool IsDriveLetterPresent(const std::wstring& driveLetter) {
+    if (driveLetter.size() < 2 || driveLetter[1] != L':') {
+        return false;
+    }
+
+    wchar_t letter = driveLetter[0];
+    if (letter >= L'a' && letter <= L'z') {
+        letter = static_cast<wchar_t>(letter - L'a' + L'A');
+    }
+    if (letter < L'A' || letter > L'Z') {
+        return false;
+    }
+
+    const int bit = letter - L'A';
+    const DWORD mask = GetLogicalDrives();
+    return (mask & (1u << bit)) != 0;
+}
+
+std::wstring FormatWindowsError(const DWORD error) {
+    if (error == 0) {
+        return L"Unknown error";
+    }
+
+    wchar_t* message = nullptr;
+    const DWORD len = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                                         FORMAT_MESSAGE_IGNORE_INSERTS,
+                                     nullptr, error, 0, reinterpret_cast<LPWSTR>(&message), 0, nullptr);
+    std::wstring out;
+    if (len != 0 && message) {
+        out.assign(message, len);
+        while (!out.empty() && (out.back() == L'\r' || out.back() == L'\n')) {
+            out.pop_back();
+        }
+    } else {
+        out = L"Windows error " + std::to_wstring(error);
+    }
+    if (message) {
+        LocalFree(message);
+    }
+    return out;
+}
+
+DestinationDriveStatus CheckDestinationDrive(const std::wstring& root, std::wstring* errorDetail) {
+    if (root.size() < 2 || root[1] != L':') {
+        return DestinationDriveStatus::Ok;
+    }
+
+    wchar_t letter = root[0];
+    if (letter >= L'a' && letter <= L'z') {
+        letter = static_cast<wchar_t>(letter - L'a' + L'A');
+    }
+    const std::wstring driveLetter = std::wstring(1, letter) + L":";
+    if (!IsDriveLetterPresent(driveLetter)) {
+        return DestinationDriveStatus::Removed;
+    }
+
+    std::wstring normalized = root;
+    if (normalized.size() == 2 && normalized[1] == L':') {
+        normalized += L'\\';
+    }
+
+    if (!GetVolumeInformationW(normalized.c_str(), nullptr, 0, nullptr, nullptr, nullptr, nullptr, 0)) {
+        if (errorDetail) {
+            *errorDetail = FormatWindowsError(GetLastError());
+        }
+        return DestinationDriveStatus::IoError;
+    }
+
+    ULARGE_INTEGER freeBytesAvailable{};
+    ULARGE_INTEGER totalBytes{};
+    ULARGE_INTEGER totalFree{};
+    if (!GetDiskFreeSpaceExW(normalized.c_str(), &freeBytesAvailable, &totalBytes, &totalFree)) {
+        if (errorDetail) {
+            *errorDetail = FormatWindowsError(GetLastError());
+        }
+        return DestinationDriveStatus::IoError;
+    }
+
+    const HANDLE rootDir =
+        CreateFileW(normalized.c_str(), FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                    OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (rootDir == INVALID_HANDLE_VALUE) {
+        if (errorDetail) {
+            *errorDetail = FormatWindowsError(GetLastError());
+        }
+        return DestinationDriveStatus::IoError;
+    }
+    CloseHandle(rootDir);
+
+    return DestinationDriveStatus::Ok;
+}
+
 uint64_t GetArchiveUncompressedSize(const std::wstring& sevenZipExe, const std::wstring& archivePath) {
     const std::wstring listOut = JoinPath(GetExeDirectory(), L"_7za_list_tmp.txt");
     DeleteFileW(listOut.c_str());

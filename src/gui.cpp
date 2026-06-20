@@ -284,21 +284,6 @@ std::vector<std::wstring> CollectComboDriveLetters(const HWND combo) {
     return letters;
 }
 
-bool DriveLetterStillPresent(const std::wstring& driveLetter) {
-    if (driveLetter.size() < 2 || driveLetter[1] != L':') {
-        return false;
-    }
-
-    const wchar_t letter = driveLetter[0];
-    if (letter < L'A' || letter > L'Z') {
-        return false;
-    }
-
-    const int bit = letter - L'A';
-    const DWORD mask = GetLogicalDrives();
-    return (mask & (1u << bit)) != 0;
-}
-
 int MeasureWrappedStaticHeight(HWND hwnd, const std::wstring& text, const int width,
                                const int minHeight = 32) {
     if (!hwnd || text.empty() || width <= 0) {
@@ -2678,7 +2663,7 @@ void Gui::ScheduleDriveChangeRefresh() {
 void Gui::OnDebouncedDriveChange() {
     if (busyProgressMode_ != BusyProgressMode::None) {
         const std::wstring selected = SelectedDrive();
-        if (!selected.empty() && !DriveLetterStillPresent(selected)) {
+        if (!selected.empty() && !IsDriveLetterPresent(selected)) {
             pendingDriveRefresh_ = true;
             SetStatusBar(i18n::Tr(L"status.selected_drive_removed", selected));
             if (onLog_) {

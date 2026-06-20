@@ -37,4 +37,16 @@ bool MeetsMinimumDriveCapacity(uint64_t totalBytes);
 uint64_t GetDriveFreeBytes(const std::wstring& root);
 uint64_t GetArchiveUncompressedSize(const std::wstring& sevenZipExe, const std::wstring& archivePath);
 
+// True when the drive letter is still assigned (GetLogicalDrives bit set).
+bool IsDriveLetterPresent(const std::wstring& driveLetter);
+
+enum class DestinationDriveStatus {
+    Ok,
+    Removed,
+    IoError,
+};
+
+// Checks that a destination root (e.g. E:\) is still mounted and readable.
+DestinationDriveStatus CheckDestinationDrive(const std::wstring& root, std::wstring* errorDetail = nullptr);
+
 }  // namespace medicat

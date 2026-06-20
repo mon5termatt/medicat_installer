@@ -832,6 +832,20 @@ std::wstring RelativePathFromFailureDetail(const std::wstring& detail) {
     return detail.substr(0, pos);
 }
 
+std::wstring ExtractDestinationFailureMessage(const ExtractResult& extract, const std::wstring& drive) {
+    if (extract.driveRemoved) {
+        return i18n::Tr(L"messages.drive_removed_during_operation", drive);
+    }
+    if (extract.ioError) {
+        std::wstring msg = i18n::Tr(L"messages.drive_io_error_during_operation", drive);
+        if (!extract.detail.empty()) {
+            msg += L"\n\n" + extract.detail;
+        }
+        return msg;
+    }
+    return {};
+}
+
 }  // namespace
 
 bool App::TryReExtractFailedFiles(const std::wstring& drive, const std::wstring& archive,
@@ -873,6 +887,14 @@ bool App::TryReExtractFailedFiles(const std::wstring& drive, const std::wstring&
     }
 
     if (!extract.success) {
+        if (const std::wstring destinationFailure = ExtractDestinationFailureMessage(extract, drive);
+            !destinationFailure.empty()) {
+            log_->Error(destinationFailure);
+            if (errorDetail) {
+                *errorDetail = destinationFailure;
+            }
+            return false;
+        }
         if (extract.cancelled || IsCancelRequested()) {
             log_->Info(i18n::Tr(L"log.user_cancelled"));
             return false;
@@ -1290,6 +1312,11 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
     }
 
     if (!extract.success) {
+        if (const std::wstring destinationFailure = ExtractDestinationFailureMessage(extract, drive);
+            !destinationFailure.empty()) {
+            fail(destinationFailure, i18n::Tr(L"titles.extraction_failed"));
+            return;
+        }
         if (extract.cancelled || IsCancelRequested()) {
             cancel();
             return;

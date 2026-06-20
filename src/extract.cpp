@@ -273,8 +273,10 @@ bool IsUsefulErrorLine(const std::wstring& line) {
         }
     }
     static const wchar_t* kMarkers[] = {
-        L"ERROR:", L"OPEN ERROR:", L"SYSTEM ERROR:", L"FATAL ERROR", L"CANNOT OPEN", L"WRONG PASSWORD",
-        L"NOT ENOUGH SPACE", L"DISK FULL", L"FILE NOT FOUND", L"DATA ERROR", L"UNSUPPORTED",
+        L"ERROR:", L"OPEN ERROR:", L"SYSTEM ERROR:", L"FATAL ERROR", L"CANNOT OPEN", L"CANNOT CREATE",
+        L"CANNOT WRITE", L"CANNOT OPEN OUTPUT", L"WRONG PASSWORD", L"NOT ENOUGH SPACE", L"DISK FULL",
+        L"FILE NOT FOUND", L"DATA ERROR", L"UNSUPPORTED", L"DEVICE IS NOT READY", L"I/O DEVICE",
+        L"WRITE PROTECTED", L"MEDIA IS WRITE", L"READ ERROR", L"WRITE ERROR", L"ERRORS:",
     };
     for (const wchar_t* marker : kMarkers) {
         if (upper.find(marker) != std::wstring::npos) {
@@ -344,6 +346,28 @@ std::wstring SummarizeProcessOutput(const std::wstring& text) {
     return out;
 }
 
+bool ContainsFatalExtractOutput(const std::wstring& text) {
+    if (text.empty()) {
+        return false;
+    }
+
+    std::wstring line;
+    for (const wchar_t ch : text) {
+        if (ch == L'\r') {
+            continue;
+        }
+        if (ch == L'\n') {
+            if (IsUsefulErrorLine(TrimWide(line))) {
+                return true;
+            }
+            line.clear();
+            continue;
+        }
+        line.push_back(ch);
+    }
+    return IsUsefulErrorLine(TrimWide(line));
+}
+
 void SetExtractFailure(ExtractResult& result, const DWORD exitCode, const std::wstring& stderrText) {
     result.exitCode = static_cast<int>(exitCode);
     result.success = false;
@@ -363,6 +387,46 @@ std::wstring FormatExtractFailureMessage(const ExtractResult& result) {
         message += L"\n\n" + result.detail;
     }
     return message;
+}
+
+struct ExtractMonitorState {
+    bool driveRemoved = false;
+    bool ioError = false;
+    std::wstring ioDetail;
+};
+
+bool PollExtractHealth(const std::wstring& destinationRoot, const std::wstring& stderrText,
+                       ExtractMonitorState& state) {
+    const DestinationDriveStatus status = CheckDestinationDrive(destinationRoot, &state.ioDetail);
+    if (status == DestinationDriveStatus::Removed) {
+        state.driveRemoved = true;
+        return true;
+    }
+    if (status == DestinationDriveStatus::IoError) {
+        state.ioError = true;
+        return true;
+    }
+    if (ContainsFatalExtractOutput(stderrText)) {
+        state.ioError = true;
+        state.ioDetail = SummarizeProcessOutput(stderrText);
+        return true;
+    }
+    return false;
+}
+
+void ApplyExtractMonitorFailure(ExtractResult& result, const ExtractMonitorState& state, const DWORD exitCode) {
+    result.success = false;
+    result.exitCode = static_cast<int>(exitCode);
+    if (state.driveRemoved) {
+        result.driveRemoved = true;
+        result.error = L"Drive removed during extraction";
+        return;
+    }
+    if (state.ioError) {
+        result.ioError = true;
+        result.detail = state.ioDetail;
+        result.error = L"Drive I/O error during extraction";
+    }
 }
 
 ExtractResult Extract7zArchive(
@@ -439,6 +503,7 @@ ExtractResult Extract7zArchive(
     std::wstring lastFile;
     int lastPercent = -1;
     std::wstring stderrText;
+    std::mutex stderrMutex;
 
     std::thread stderrThread([&] {
         char buf[4096];
@@ -453,6 +518,7 @@ ExtractResult Extract7zArchive(
             const int wlen = MultiByteToWideChar(CP_UTF8, 0, buf, static_cast<int>(n), nullptr, 0);
             std::wstring chunk(static_cast<size_t>(wlen), L'\0');
             MultiByteToWideChar(CP_UTF8, 0, buf, static_cast<int>(n), chunk.data(), wlen);
+            std::lock_guard lock(stderrMutex);
             stderrText += chunk;
         }
     });
@@ -460,9 +526,20 @@ ExtractResult Extract7zArchive(
     RawLogTee* logPtr = logging ? &logTee : nullptr;
     auto lastPoll = std::chrono::steady_clock::now();
     std::wstring lineBuffer;
+    ExtractMonitorState monitor;
 
     while (true) {
         if (IsCancelRequested()) {
+            TerminateProcess(pi.hProcess, 1);
+            break;
+        }
+
+        std::wstring stderrSnapshot;
+        {
+            std::lock_guard lock(stderrMutex);
+            stderrSnapshot = stderrText;
+        }
+        if (PollExtractHealth(dest, stderrSnapshot, monitor)) {
             TerminateProcess(pi.hProcess, 1);
             break;
         }
@@ -539,6 +616,11 @@ ExtractResult Extract7zArchive(
     CloseHandle(stderrRead);
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
+
+    if (monitor.driveRemoved || monitor.ioError) {
+        ApplyExtractMonitorFailure(result, monitor, exitCode);
+        return result;
+    }
 
     if (IsCancelRequested()) {
         result.cancelled = true;
@@ -654,6 +736,7 @@ ExtractResult Extract7zArchiveSelective(
     std::wstring lastFile;
     int lastPercent = -1;
     std::wstring stderrText;
+    std::mutex stderrMutex;
 
     std::thread stderrThread([&] {
         char buf[4096];
@@ -668,6 +751,7 @@ ExtractResult Extract7zArchiveSelective(
             const int wlen = MultiByteToWideChar(CP_UTF8, 0, buf, static_cast<int>(n), nullptr, 0);
             std::wstring chunk(static_cast<size_t>(wlen), L'\0');
             MultiByteToWideChar(CP_UTF8, 0, buf, static_cast<int>(n), chunk.data(), wlen);
+            std::lock_guard lock(stderrMutex);
             stderrText += chunk;
         }
     });
@@ -675,9 +759,20 @@ ExtractResult Extract7zArchiveSelective(
     RawLogTee* logPtr = logging ? &logTee : nullptr;
     auto lastPoll = std::chrono::steady_clock::now();
     std::wstring lineBuffer;
+    ExtractMonitorState monitor;
 
     while (true) {
         if (IsCancelRequested()) {
+            TerminateProcess(pi.hProcess, 1);
+            break;
+        }
+
+        std::wstring stderrSnapshot;
+        {
+            std::lock_guard lock(stderrMutex);
+            stderrSnapshot = stderrText;
+        }
+        if (PollExtractHealth(dest, stderrSnapshot, monitor)) {
             TerminateProcess(pi.hProcess, 1);
             break;
         }
@@ -739,6 +834,11 @@ ExtractResult Extract7zArchiveSelective(
     CloseHandle(stderrRead);
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
+
+    if (monitor.driveRemoved || monitor.ioError) {
+        ApplyExtractMonitorFailure(result, monitor, exitCode);
+        return result;
+    }
 
     if (IsCancelRequested()) {
         result.cancelled = true;
