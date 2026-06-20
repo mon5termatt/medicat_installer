@@ -165,6 +165,92 @@ int RunHiddenZipCommand(const std::wstring& commandLine, const std::wstring& wor
     return static_cast<int>(exitCode);
 }
 
+bool CopyFileShared(const std::wstring& sourcePath, const std::wstring& destinationPath) {
+    const HANDLE input = CreateFileW(sourcePath.c_str(), GENERIC_READ,
+                                     FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+                                     FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (input == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    const HANDLE output = CreateFileW(destinationPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                                    FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (output == INVALID_HANDLE_VALUE) {
+        CloseHandle(input);
+        return false;
+    }
+
+    std::vector<BYTE> buffer(64 * 1024);
+    bool ok = true;
+    for (;;) {
+        DWORD read = 0;
+        if (!ReadFile(input, buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr)) {
+            ok = false;
+            break;
+        }
+        if (read == 0) {
+            break;
+        }
+
+        DWORD written = 0;
+        if (!WriteFile(output, buffer.data(), read, &written, nullptr) || written != read) {
+            ok = false;
+            break;
+        }
+    }
+
+    CloseHandle(output);
+    CloseHandle(input);
+    return ok;
+}
+
+bool ClearDirectoryFiles(const std::wstring& directory) {
+    const std::wstring pattern = JoinPath(directory, L"*");
+    WIN32_FIND_DATAW fd{};
+    const HANDLE find = FindFirstFileW(pattern.c_str(), &fd);
+    if (find == INVALID_HANDLE_VALUE) {
+        return GetLastError() == ERROR_FILE_NOT_FOUND;
+    }
+
+    do {
+        const std::wstring name = fd.cFileName;
+        if (name == L"." || name == L"..") {
+            continue;
+        }
+        const std::wstring fullPath = JoinPath(directory, name);
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            continue;
+        }
+        SetFileAttributesW(fullPath.c_str(), FILE_ATTRIBUTE_NORMAL);
+        DeleteFileW(fullPath.c_str());
+    } while (FindNextFileW(find, &fd));
+
+    FindClose(find);
+    return true;
+}
+
+bool StageSupportLogFiles(const std::wstring& installerRoot, const std::vector<std::wstring>& logFiles,
+                          const std::wstring& stagingDir, std::vector<std::wstring>& stagedFiles) {
+    CreateDirectoryW(stagingDir.c_str(), nullptr);
+    ClearDirectoryFiles(stagingDir);
+    stagedFiles.clear();
+
+    for (const std::wstring& name : logFiles) {
+        const std::wstring sourcePath = JoinPath(installerRoot, name);
+        const std::wstring destinationPath = JoinPath(stagingDir, name);
+        if (!CopyFileShared(sourcePath, destinationPath)) {
+            continue;
+        }
+        stagedFiles.push_back(name);
+    }
+
+    return !stagedFiles.empty();
+}
+
+bool ZipCommandSucceeded(const int exitCode, const std::wstring& zipPath) {
+    return FileExists(zipPath) && GetFileSizeBytes(zipPath) > 0 && (exitCode == 0 || exitCode == 1);
+}
+
 std::string InstallerArchLabel() {
 #if defined(_M_X64)
     return "x64";
@@ -446,24 +532,25 @@ std::string BuildSupportManifestJson(const FailureLogUploadRequest& request,
     return json.str();
 }
 
-bool CreateSupportLogZip(const FailureLogUploadRequest& request, const std::vector<std::wstring>& logFiles,
-                         const std::wstring& manifestPath, const std::wstring& zipPath) {
-    (void)manifestPath;
-    if (request.sevenZa.empty() || logFiles.empty()) {
+bool CreateSupportLogZip(const FailureLogUploadRequest& request, const std::wstring& stagingDir,
+                         const std::vector<std::wstring>& stagedFiles, const std::wstring& zipPath,
+                         int& exitCodeOut) {
+    exitCodeOut = -1;
+    if (request.sevenZa.empty() || stagedFiles.empty()) {
         return false;
     }
 
     std::wstring command = L"\"" + request.sevenZa + L"\" a -tzip -y \"" + zipPath + L"\"";
-    for (const std::wstring& name : logFiles) {
-        command += L" \"" + name + L"\"";
+    for (const std::wstring& name : stagedFiles) {
+        command += L" \"" + JoinPath(stagingDir, name) + L"\"";
     }
-    command += L" \"support_manifest.json\"";
+    command += L" \"" + JoinPath(stagingDir, L"support_manifest.json") + L"\"";
 
-    const int exitCode = RunHiddenZipCommand(command, request.installerRoot);
-    return exitCode == 0 && FileExists(zipPath) && GetFileSizeBytes(zipPath) > 0;
+    exitCodeOut = RunHiddenZipCommand(command, stagingDir);
+    return ZipCommandSucceeded(exitCodeOut, zipPath);
 }
 
-void UploadFailureLogsOnce(const FailureLogUploadRequest& request, const SessionReportLogger& logLine) {
+void UploadFailureLogsOnce(const FailureLogUploadRequest& request, SessionReportLogger logLine) {
     if (!HasIngestToken()) {
         LogTelemetry(logLine, L"Failure log upload skipped — no ingest token configured at build time");
         return;
@@ -483,8 +570,15 @@ void UploadFailureLogsOnce(const FailureLogUploadRequest& request, const Session
         return;
     }
 
-    const std::string manifestJson = BuildSupportManifestJson(request, logFiles);
-    const std::wstring manifestPath = JoinPath(request.installerRoot, L"support_manifest.json");
+    const std::wstring stagingDir = JoinPath(GetMedicatTempDir(), L"support_upload_staging");
+    std::vector<std::wstring> stagedFiles;
+    if (!StageSupportLogFiles(request.installerRoot, logFiles, stagingDir, stagedFiles)) {
+        LogTelemetry(logLine, L"Failure log upload skipped — could not stage log files for upload", true);
+        return;
+    }
+
+    const std::string manifestJson = BuildSupportManifestJson(request, stagedFiles);
+    const std::wstring manifestPath = JoinPath(stagingDir, L"support_manifest.json");
     {
         std::ofstream manifestOut(WideToUtf8(manifestPath), std::ios::binary);
         if (!manifestOut) {
@@ -496,19 +590,24 @@ void UploadFailureLogsOnce(const FailureLogUploadRequest& request, const Session
 
     const std::wstring zipPath = JoinPath(GetMedicatTempDir(), L"support_upload.zip");
     DeleteFileW(zipPath.c_str());
-    if (!CreateSupportLogZip(request, logFiles, manifestPath, zipPath)) {
-        DeleteFileW(manifestPath.c_str());
-        LogTelemetry(logLine, L"Failure log upload skipped — could not create zip bundle", true);
+    int zipExitCode = -1;
+    if (!CreateSupportLogZip(request, stagingDir, stagedFiles, zipPath, zipExitCode)) {
+        LogTelemetry(logLine, L"Failure log upload skipped — could not create zip bundle (7za exit " +
+                                   std::to_wstring(zipExitCode) + L")",
+                     true);
         return;
     }
 
-    LogTelemetry(logLine, L"Failure log upload attempted — " + std::to_wstring(logFiles.size()) + L" file(s)");
+    const uint64_t zipBytes = GetFileSizeBytes(zipPath);
+    LogTelemetry(logLine, L"Failure log upload attempted — " + std::to_wstring(stagedFiles.size()) +
+                               L" file(s), " + std::to_wstring(zipBytes) + L" bytes, target " +
+                               Utf8ToWide(MEDICAT_UPLOADS_URL));
     const HttpMultipartResult upload = HttpPostMultipartUpload(
         Utf8ToWide(MEDICAT_UPLOADS_URL), Utf8ToWide(GetIngestToken()), Utf8ToWide(request.sessionId), manifestJson,
         zipPath);
 
-    DeleteFileW(manifestPath.c_str());
     DeleteFileW(zipPath.c_str());
+    ClearDirectoryFiles(stagingDir);
 
     if (upload.statusCode >= 200 && upload.statusCode < 300) {
         LogTelemetry(logLine, L"Failure logs accepted by server (HTTP " + std::to_wstring(upload.statusCode) +
@@ -652,7 +751,11 @@ bool FailureLogAutoUploadEnabled() {
 
 void SendFailureLogUpload(const FailureLogUploadRequest& request, SessionReportLogger logLine) {
     LogTelemetry(logLine, L"Failure log upload queued (background upload)");
-    std::thread worker(UploadFailureLogsOnce, request, logLine);
+    std::thread worker(
+        [](FailureLogUploadRequest uploadRequest, SessionReportLogger uploadLogLine) {
+            UploadFailureLogsOnce(uploadRequest, std::move(uploadLogLine));
+        },
+        request, std::move(logLine));
     worker.detach();
 }
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
 
@@ -35,7 +36,30 @@ def main() -> int:
         default="",
         help="Skip bump when this environment variable is set (regenerate output only)",
     )
+    parser.add_argument(
+        "--set",
+        type=int,
+        default=0,
+        help="Force a specific build number in build_version.cpp without incrementing build_number.txt",
+    )
     args = parser.parse_args()
+
+    pin_from_env = os.environ.get("MEDICAT_PIN_BUILD", "").strip()
+    if pin_from_env:
+        try:
+            build = int(pin_from_env)
+        except ValueError:
+            print(f"Invalid MEDICAT_PIN_BUILD: {pin_from_env}", file=sys.stderr)
+            return 1
+        if build > 0:
+            version = write_build_version(args.output, args.major, args.minor, build)
+            print(f"Build number pinned (env): {build} ({version})")
+            return 0
+
+    if args.set and args.set > 0:
+        version = write_build_version(args.output, args.major, args.minor, args.set)
+        print(f"Build number pinned: {args.set} ({version})")
+        return 0
 
     if args.skip_if_env and os.environ.get(args.skip_if_env):
         counter_path: Path = args.counter

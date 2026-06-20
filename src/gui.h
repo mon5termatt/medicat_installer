@@ -88,6 +88,7 @@ public:
     void SetVerifyHandler(InstallHandler handler);
     void SetLogHandler(std::function<void(const std::wstring&)> handler);
     void SetUpdateCheckHandler(std::function<void()> handler);
+    void SetApplyInstallerUpdateHandler(std::function<void(const InstallerUpdateInfo&)> handler);
     void ScheduleUpdateCheck();
     void SetBusy(bool busy, BusyProgressMode progressMode = BusyProgressMode::FileLog);
     void SetProgress(int percent, bool clearLog = false);
@@ -220,6 +221,7 @@ private:
     InstallHandler onVerify_;
     std::function<void(const std::wstring&)> onLog_;
     std::function<void()> onUpdateCheck_;
+    std::function<void(const InstallerUpdateInfo&)> onApplyInstallerUpdate_;
     bool updateCheckScheduled_ = false;
     bool updatePromptShownThisSession_ = false;
     bool hasLastVentoyLog_ = false;

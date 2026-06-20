@@ -503,6 +503,17 @@ HttpMultipartResult HttpPostMultipartUpload(const std::wstring& url, const std::
         const std::string responseJson(reinterpret_cast<const char*>(responseBytes.data()), responseBytes.size());
         result.keyword = ExtractJsonStringField(responseJson, "keyword");
         result.uploadId = ExtractJsonStringField(responseJson, "upload_id");
+    } else if (!responseBytes.empty()) {
+        const std::string responseJson(reinterpret_cast<const char*>(responseBytes.data()), responseBytes.size());
+        const std::wstring apiError = ExtractJsonStringField(responseJson, "error");
+        const std::wstring apiMessage = ExtractJsonStringField(responseJson, "message");
+        if (!apiMessage.empty()) {
+            result.error = apiMessage;
+        } else if (!apiError.empty()) {
+            result.error = apiError;
+        } else if (!readError.empty()) {
+            result.error = readError;
+        }
     } else if (!readError.empty()) {
         result.error = readError;
     } else if (result.statusCode == 0) {

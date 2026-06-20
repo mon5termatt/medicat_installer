@@ -724,6 +724,10 @@ void Gui::SetLogHandler(std::function<void(const std::wstring&)> handler) { onLo
 
 void Gui::SetUpdateCheckHandler(std::function<void()> handler) { onUpdateCheck_ = std::move(handler); }
 
+void Gui::SetApplyInstallerUpdateHandler(std::function<void(const InstallerUpdateInfo&)> handler) {
+    onApplyInstallerUpdate_ = std::move(handler);
+}
+
 void Gui::ScheduleUpdateCheck() {
     if (!hwnd_ || !IsWindow(hwnd_) || updateCheckScheduled_) {
         return;
@@ -760,9 +764,12 @@ void Gui::ShowUpdatePrompt(const InstallerUpdateInfo& info) {
     const std::wstring title = i18n::Tr(L"update.available_title");
     const int result = MessageBoxW(hwnd_, message.c_str(), title.c_str(), MB_YESNO | MB_ICONINFORMATION);
     if (result == IDYES) {
-        const std::wstring& url = !info.downloadUrl.empty() ? info.downloadUrl : info.releaseUrl;
-        if (!url.empty()) {
-            OpenBrowserUrl(url.c_str());
+        if (info.downloadUrl.empty()) {
+            MessageBoxW(hwnd_, i18n::Tr(L"update.download_unavailable").c_str(), title.c_str(), MB_OK | MB_ICONWARNING);
+            return;
+        }
+        if (onApplyInstallerUpdate_) {
+            onApplyInstallerUpdate_(info);
         }
     }
 }

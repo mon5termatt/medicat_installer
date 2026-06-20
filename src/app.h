@@ -50,6 +50,7 @@ private:
     void SubmitSessionReport(bool success, const std::wstring& message, const std::wstring& title, int exitCode);
     void QueueFailureLogUpload(const std::string& sessionId, const std::wstring& message, const std::wstring& title);
     void StartUpdateCheck();
+    void ApplyInstallerUpdate(const InstallerUpdateInfo& info);
     void LogOperationFailure(const std::wstring& message, const std::wstring& title);
     DiagnosticContext BuildDiagnosticContext() const;
     VerificationOutcome VerifyDriveFiles(const std::wstring& drive, bool showFileProgress = true);

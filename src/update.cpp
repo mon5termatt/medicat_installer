@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cwctype>
+#include <vector>
 
 #ifndef INSTALLER_RELEASE_TAG
 #define INSTALLER_RELEASE_TAG "unknown"
@@ -42,19 +43,65 @@ std::wstring Utf8ToWide(const std::string& text) {
     return wide;
 }
 
-std::wstring ParseJsonStringField(const std::wstring& json, const std::wstring& key) {
-    const std::wstring needle = L"\"" + key + L"\":\"";
-    const size_t pos = json.find(needle);
+std::wstring ParseJsonStringField(const std::wstring& json, const std::wstring& key, const size_t from = 0) {
+    const std::wstring needle = L"\"" + key + L"\"";
+    const size_t pos = json.find(needle, from);
     if (pos == std::wstring::npos) {
         return {};
     }
 
-    const size_t start = pos + needle.size();
+    size_t index = pos + needle.size();
+    while (index < json.size() && iswspace(json[index])) {
+        ++index;
+    }
+    if (index >= json.size() || json[index] != L':') {
+        return {};
+    }
+    ++index;
+    while (index < json.size() && iswspace(json[index])) {
+        ++index;
+    }
+    if (index >= json.size() || json[index] != L'"') {
+        return {};
+    }
+    ++index;
+
+    const size_t start = index;
     const size_t end = json.find(L'"', start);
     if (end == std::wstring::npos || end <= start) {
         return {};
     }
     return json.substr(start, end - start);
+}
+
+bool ParseJsonBoolField(const std::wstring& json, const std::wstring& key, bool& value) {
+    const std::wstring needle = L"\"" + key + L"\"";
+    const size_t pos = json.find(needle);
+    if (pos == std::wstring::npos) {
+        return false;
+    }
+
+    size_t index = pos + needle.size();
+    while (index < json.size() && iswspace(json[index])) {
+        ++index;
+    }
+    if (index >= json.size() || json[index] != L':') {
+        return false;
+    }
+    ++index;
+    while (index < json.size() && iswspace(json[index])) {
+        ++index;
+    }
+
+    if (json.compare(index, 4, L"true") == 0) {
+        value = true;
+        return true;
+    }
+    if (json.compare(index, 5, L"false") == 0) {
+        value = false;
+        return true;
+    }
+    return false;
 }
 
 int ParseJsonIntField(const std::wstring& json, const std::wstring& key) {
@@ -133,38 +180,58 @@ bool ParseManifestUpdate(const std::wstring& json, InstallerUpdateInfo& info) {
     return true;
 }
 
+std::wstring FindAssetDownloadUrl(const std::wstring& block, const std::wstring& assetName) {
+    size_t from = 0;
+    while (from < block.size()) {
+        const size_t pos = block.find(L"\"name\"", from);
+        if (pos == std::wstring::npos) {
+            break;
+        }
+
+        const std::wstring name = ParseJsonStringField(block, L"name", pos);
+        if (name == assetName) {
+            const size_t assetStart = block.rfind(L'{', pos);
+            const size_t searchEnd = std::min(block.size(), pos + 6000);
+            const std::wstring section = block.substr(assetStart, searchEnd - assetStart);
+            const std::wstring url = ParseJsonStringField(section, L"browser_download_url");
+            if (!url.empty()) {
+                return url;
+            }
+        }
+
+        from = pos + 6;
+    }
+    return {};
+}
+
 bool ParseGitHubPrerelease(const std::wstring& json, InstallerUpdateInfo& info) {
-    size_t pos = 0;
-    while ((pos = json.find(L"\"tag_name\":\"", pos)) != std::wstring::npos) {
-        const size_t blockStart = pos > 300 ? pos - 300 : 0;
-        const size_t blockEnd = std::min(json.size(), pos + 4000);
+    size_t from = 0;
+    while (from < json.size()) {
+        const size_t tagKeyPos = json.find(L"\"tag_name\"", from);
+        if (tagKeyPos == std::wstring::npos) {
+            break;
+        }
+
+        const size_t blockStart = tagKeyPos > 0 ? json.rfind(L'{', tagKeyPos) : 0;
+        const size_t nextTag = json.find(L"\"tag_name\"", tagKeyPos + 10);
+        const size_t blockEnd = nextTag == std::wstring::npos ? json.size() : nextTag;
         const std::wstring block = json.substr(blockStart, blockEnd - blockStart);
-        if (block.find(L"\"prerelease\":true") == std::wstring::npos) {
-            pos += 12;
+
+        bool prerelease = false;
+        if (!ParseJsonBoolField(block, L"prerelease", prerelease) || !prerelease) {
+            from = tagKeyPos + 10;
             continue;
         }
 
-        const size_t tagStart = pos + 12;
-        const size_t tagEnd = json.find(L'"', tagStart);
-        if (tagEnd == std::wstring::npos || tagEnd <= tagStart) {
-            return false;
-        }
-
-        info.releaseTag = json.substr(tagStart, tagEnd - tagStart);
+        info.releaseTag = ParseJsonStringField(block, L"tag_name");
         info.version = info.releaseTag;
         info.releaseUrl = ParseJsonStringField(block, L"html_url");
-
-        const std::wstring assetNeedle = L"\"name\":\"" + std::wstring(kInstallerAssetName) + L"\"";
-        const size_t assetPos = block.find(assetNeedle);
-        if (assetPos != std::wstring::npos) {
-            const std::wstring assetSection = block.substr(assetPos, std::min<size_t>(1200, block.size() - assetPos));
-            info.downloadUrl = ParseJsonStringField(assetSection, L"browser_download_url");
-        }
+        info.downloadUrl = FindAssetDownloadUrl(block, kInstallerAssetName);
 
         if (info.releaseUrl.empty() && !info.releaseTag.empty()) {
             info.releaseUrl = L"https://github.com/mon5termatt/medicat_installer/releases/tag/" + info.releaseTag;
         }
-        return !info.releaseTag.empty();
+        return !info.releaseTag.empty() && !info.downloadUrl.empty();
     }
     return false;
 }
@@ -224,19 +291,195 @@ UpdateCheckResult CheckGitHubUpdate() {
 
 }  // namespace
 
+std::wstring GetRunningInstallerExePath() {
+    wchar_t buffer[MAX_PATH]{};
+    const DWORD length = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH) {
+        return {};
+    }
+    return std::wstring(buffer, length);
+}
+
+std::wstring QuoteCmdArgument(const std::wstring& value) {
+    if (value.find_first_of(L" \t\"") == std::wstring::npos) {
+        return value;
+    }
+
+    std::wstring quoted = L"\"";
+    for (const wchar_t ch : value) {
+        if (ch == L'"') {
+            quoted += L"\\\"";
+        } else {
+            quoted.push_back(ch);
+        }
+    }
+    quoted.push_back(L'"');
+    return quoted;
+}
+
+bool WriteUtf8TextFile(const std::wstring& path, const std::string& content) {
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    DWORD written = 0;
+    const BOOL ok = WriteFile(file, content.data(), static_cast<DWORD>(content.size()), &written, nullptr);
+    CloseHandle(file);
+    return ok && written == content.size();
+}
+
+bool LaunchUpdateReplacer(const std::wstring& downloadedPath, const std::wstring& targetPath, DWORD parentPid,
+                          std::wstring& error, const std::function<void(const std::wstring&)>& onLog) {
+    (void)parentPid;
+
+    const std::wstring exeDir = GetExeDirectory();
+    const std::wstring tempDir = GetMedicatTempDir();
+    const std::wstring quotedNew = QuoteCmdArgument(downloadedPath);
+    const std::wstring quotedTarget = QuoteCmdArgument(targetPath);
+    const std::wstring quotedExeDir = QuoteCmdArgument(exeDir);
+
+    std::wstring inner = L"@echo off\r\n";
+    inner += L"setlocal EnableExtensions EnableDelayedExpansion\r\n";
+    inner += L"ping 127.0.0.1 -n 3 >nul\r\n";
+    inner += L"set RETRIES=0\r\n";
+    inner += L":retry\r\n";
+    inner += L"move /Y " + quotedNew + L" " + quotedTarget + L"\r\n";
+    inner += L"if not errorlevel 1 goto launch\r\n";
+    inner += L"set /a RETRIES+=1\r\n";
+    inner += L"if !RETRIES! geq 15 exit /b 1\r\n";
+    inner += L"ping 127.0.0.1 -n 2 >nul\r\n";
+    inner += L"goto retry\r\n";
+    inner += L":launch\r\n";
+    inner += L"start \"\" /D " + quotedExeDir + L" " + quotedTarget + L"\r\n";
+    inner += L"del \"%~f0\"\r\n";
+
+    const std::wstring batchPath = JoinPath(tempDir, L"apply_update.cmd");
+    if (!WriteUtf8TextFile(batchPath, WideToUtf8(inner))) {
+        error = L"Could not create update helper script";
+        return false;
+    }
+
+    std::wstring command = L"cmd.exe /c start \"MedicatUpdate\" /b /min " + QuoteCmdArgument(batchPath);
+
+    if (onLog) {
+        onLog(L"[Update] Launching helper: " + command);
+    }
+
+    std::vector<wchar_t> commandBuffer(command.begin(), command.end());
+    commandBuffer.push_back(L'\0');
+
+    STARTUPINFOW startupInfo{};
+    startupInfo.cb = sizeof(startupInfo);
+    startupInfo.dwFlags = STARTF_USESHOWWINDOW;
+    startupInfo.wShowWindow = SW_HIDE;
+    PROCESS_INFORMATION processInfo{};
+    if (!CreateProcessW(nullptr, commandBuffer.data(), nullptr, nullptr, FALSE,
+                        CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS | CREATE_NO_WINDOW, nullptr, exeDir.c_str(),
+                        &startupInfo, &processInfo)) {
+        DeleteFileW(batchPath.c_str());
+        error = L"Could not launch update helper (error " + std::to_wstring(GetLastError()) + L")";
+        return false;
+    }
+
+    CloseHandle(processInfo.hThread);
+    CloseHandle(processInfo.hProcess);
+
+    if (onLog) {
+        onLog(L"[Update] Helper started (pid " + std::to_wstring(processInfo.dwProcessId) + L")");
+    }
+
+    Sleep(1000);
+    return true;
+}
+
+std::wstring GetInstallerAssetFileName() {
+#if defined(_WIN64)
+    return L"MedicatInstaller.exe";
+#else
+    return L"MedicatInstaller-x86.exe";
+#endif
+}
+
+bool DownloadAndRelaunchInstallerUpdate(
+    const InstallerUpdateInfo& info, const std::function<void(uint64_t downloaded, uint64_t total)>& onProgress,
+    const std::function<void(const std::wstring&)>& onLog, std::wstring& error) {
+    if (info.downloadUrl.empty()) {
+        error = L"No download URL in update manifest";
+        return false;
+    }
+
+    const std::wstring targetPath = GetRunningInstallerExePath();
+    if (targetPath.empty()) {
+        error = L"Could not determine running installer path";
+        return false;
+    }
+
+    const std::wstring downloadedPath = targetPath + L".new";
+    DeleteFileW(downloadedPath.c_str());
+
+    if (onLog) {
+        onLog(L"[Update] Downloading " + info.downloadUrl + L" -> " + downloadedPath);
+    }
+
+    if (!HttpDownloadFileWithProgress(info.downloadUrl, downloadedPath, onProgress, error)) {
+        DeleteFileW(downloadedPath.c_str());
+        if (onLog) {
+            onLog(L"[Update] Download failed — " + error);
+        }
+        return false;
+    }
+
+    constexpr uint64_t kMinInstallerBytes = 256 * 1024;
+    const uint64_t downloadedSize = GetFileSizeBytes(downloadedPath);
+    if (downloadedSize < kMinInstallerBytes) {
+        DeleteFileW(downloadedPath.c_str());
+        error = L"Downloaded file is too small (" + FormatBytes(downloadedSize) + L")";
+        if (onLog) {
+            onLog(L"[Update] " + error);
+        }
+        return false;
+    }
+
+    if (onLog) {
+        onLog(L"[Update] Download complete (" + FormatBytes(downloadedSize) + L") — applying update");
+    }
+
+    const DWORD parentPid = GetCurrentProcessId();
+    if (!LaunchUpdateReplacer(downloadedPath, targetPath, parentPid, error, onLog)) {
+        DeleteFileW(downloadedPath.c_str());
+        if (onLog) {
+            onLog(L"[Update] Relaunch helper failed — " + error);
+        }
+        return false;
+    }
+
+    return true;
+}
+
 UpdateCheckResult CheckForInstallerUpdate() {
+    UpdateCheckResult githubResult = CheckGitHubUpdate();
+    if (githubResult.success && !githubResult.info.downloadUrl.empty()) {
+        const UpdateCheckResult manifestResult = CheckManifestUpdate();
+        if (manifestResult.success) {
+            if (!manifestResult.info.version.empty()) {
+                githubResult.info.version = manifestResult.info.version;
+            }
+            if (manifestResult.info.remoteBuild > 0) {
+                githubResult.info.remoteBuild = manifestResult.info.remoteBuild;
+            }
+            githubResult.info.updateAvailable = IsRemoteUpdateNewer(githubResult.info);
+        }
+        return githubResult;
+    }
+
     UpdateCheckResult manifestResult = CheckManifestUpdate();
     if (manifestResult.success) {
         return manifestResult;
     }
 
-    UpdateCheckResult githubResult = CheckGitHubUpdate();
-    if (githubResult.success) {
-        return githubResult;
-    }
-
     UpdateCheckResult result;
-    result.error = manifestResult.error.empty() ? githubResult.error : manifestResult.error;
+    result.error = githubResult.error.empty() ? manifestResult.error : githubResult.error;
     return result;
 }
 
