@@ -81,19 +81,23 @@ if "%UPLOAD_RELEASE%"=="1" (
     if errorlevel 1 goto fail
 ) else if "%PIN_BUILD%"=="0" (
     echo Publishing update manifest...
-    python "tools\publish_update_manifest.py" --build-version "generated\build_version.cpp" --output "installer\update.json"
+    python "tools\publish_update_manifest.py" --build-number "build_number.txt" --build-version "generated\build_version.cpp" --output "installer\update.json"
     if errorlevel 1 goto fail
-
-    echo Pushing update manifest to origin/cpp...
-    call "tools\push_update_manifest.bat"
-    if errorlevel 1 (
-        echo Warning: update manifest push failed.
-    )
-) else (
-    echo Skipping update manifest publish/push for pinned test build %PIN_BUILD%.
-    set "MEDICAT_PIN_BUILD="
 )
 
+if "%UPLOAD_RELEASE%"=="1" goto push_manifest
+if "%PIN_BUILD%"=="0" goto push_manifest
+echo Skipping update manifest push for pinned test build %PIN_BUILD%.
+set "MEDICAT_PIN_BUILD="
+exit /b 0
+
+:push_manifest
+echo Pushing update manifest to origin/cpp...
+call "tools\push_update_manifest.bat"
+if errorlevel 1 (
+    echo Warning: update manifest push failed.
+)
+if not "%PIN_BUILD%"=="0" set "MEDICAT_PIN_BUILD="
 exit /b 0
 
 :close_running_installer

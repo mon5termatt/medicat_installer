@@ -22,7 +22,12 @@ if not errorlevel 1 (
     exit /b 0
 )
 
-git commit -m "Update installer update manifest." -- "%MANIFEST%"
+for /f "usebackq delims=" %%V in (`python -c "import json;print(json.load(open(r'%MANIFEST%',encoding='utf-8')).get('version',''))"`) do set "VERSION=%%V"
+if defined VERSION (
+    git commit -m "Update installer update manifest to v%VERSION%." -- "%MANIFEST%"
+) else (
+    git commit -m "Update installer update manifest." -- "%MANIFEST%"
+)
 if errorlevel 1 (
     echo Manifest commit failed.
     exit /b 1
