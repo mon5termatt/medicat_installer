@@ -1,5 +1,6 @@
 #include <cwctype>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <sstream>
 
@@ -51,6 +52,10 @@ void PostToGui(HWND hwnd, UINT msg, LPARAM payload) {
             delete reinterpret_cast<ReExtractPromptPayload*>(payload);
         } else if (msg == WM_MEDICAT_UPDATE_RESULT) {
             delete reinterpret_cast<UpdateResultPayload*>(payload);
+        } else if (msg == WM_MEDICAT_FAILURE_DIAG) {
+            delete reinterpret_cast<FailureDiagPayload*>(payload);
+        } else if (msg == WM_MEDICAT_CONFIRM_PROMPT) {
+            delete reinterpret_cast<ConfirmPromptPayload*>(payload);
         }
     }
 }
@@ -69,7 +74,7 @@ std::wstring BuildWipeDetails(const bool format, const bool runVentoy) {
     return details;
 }
 
-bool ConfirmWipeDrive(HWND hwnd, const std::wstring& drive, const bool format, const bool runVentoy,
+bool ConfirmWipeDrive(Gui* gui, HWND hwnd, const std::wstring& drive, const bool format, const bool runVentoy,
                       const bool autoYes, const bool quiet) {
     if (autoYes) {
         return true;
@@ -78,36 +83,13 @@ bool ConfirmWipeDrive(HWND hwnd, const std::wstring& drive, const bool format, c
         return false;
     }
     const std::wstring details = BuildWipeDetails(format, runVentoy);
-    const int result = MessageBoxW(
-        hwnd, i18n::Tr(L"wipe_confirm.message", drive, details).c_str(),
-        i18n::Tr(L"wipe_confirm.title").c_str(), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2);
-    return result == IDYES;
-}
-
-bool ConfirmVentoyCli(HWND hwnd, const std::wstring& drive, const bool autoYes, const bool quiet) {
-    if (autoYes) {
-        return true;
-    }
-    if (quiet) {
-        return false;
+    const std::wstring message = i18n::Tr(L"wipe_confirm.message", drive, details);
+    const std::wstring title = i18n::Tr(L"wipe_confirm.title");
+    if (gui) {
+        return gui->ShowConfirmDialog(message, title, MessageDialogKind::Warning);
     }
     const int result = MessageBoxW(
-        hwnd, i18n::Tr(L"ventoy_warning.message", drive).c_str(),
-        i18n::Tr(L"ventoy_warning.title").c_str(), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2);
-    return result == IDYES;
-}
-
-bool ConfirmDriveLetterChangeCli(HWND hwnd, const std::wstring& originalDrive, const std::wstring& newDrive,
-                                 const bool autoYes, const bool quiet) {
-    if (autoYes) {
-        return true;
-    }
-    if (quiet) {
-        return false;
-    }
-    const int result = MessageBoxW(
-        hwnd, i18n::Tr(L"drive_letter_changed.message", originalDrive, newDrive).c_str(),
-        i18n::Tr(L"drive_letter_changed.title").c_str(), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2);
+        hwnd, message.c_str(), title.c_str(), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2);
     return result == IDYES;
 }
 
@@ -189,6 +171,10 @@ int App::MapHeadlessExitCode(const bool success, const std::wstring& message, co
     }
     if (title == i18n::Tr(L"titles.verification_failed")) {
         return 5;
+    }
+    if (title == i18n::Tr(L"titles.medicat_not_on_drive") ||
+        title == i18n::Tr(L"titles.verification_all_failed_wrong_drive")) {
+        return 7;
     }
     if (title == i18n::Tr(L"titles.verify_still_failed_after_reextract")) {
         return 6;
@@ -389,7 +375,7 @@ int App::RunHeadlessInstall(const CliOptions& cli) {
         return 1;
     }
 
-    if (!ConfirmWipeDrive(nullptr, cli.drive, format, runVentoy, ShouldAutoConfirm(), IsQuiet())) {
+    if (!ConfirmWipeDrive(nullptr, nullptr, cli.drive, format, runVentoy, ShouldAutoConfirm(), IsQuiet())) {
         log_->Info(L"User cancelled at wipe confirmation");
         return 4;
     }
@@ -398,7 +384,7 @@ int App::RunHeadlessInstall(const CliOptions& cli) {
     currentOperation_ = L"install";
     MarkOperationStart();
     log_->Info(L"Headless install started on " + cli.drive);
-    RunInstallThread(cli.drive, format, runVentoy, std::move(pinVersion), ventoyInstall, nullptr);
+    RunInstallThread(cli.drive, format, runVentoy, std::move(pinVersion), ventoyInstall);
     return headlessResult_.completed ? headlessResult_.exitCode : 1;
 }
 
@@ -486,6 +472,28 @@ void App::PostStatusBar(const std::wstring& text) {
     PostToGui(gui_.Hwnd(), WM_MEDICAT_PROGRESS, reinterpret_cast<LPARAM>(payload));
 }
 
+void App::PostOpenFileLog() {
+    if (headless_) {
+        return;
+    }
+    auto* payload = new ProgressPayload{};
+    payload->openFileLog = true;
+    PostToGui(gui_.Hwnd(), WM_MEDICAT_PROGRESS, reinterpret_cast<LPARAM>(payload));
+}
+
+void App::PostFailureDiagCode(const bool uploadSucceeded, const std::wstring& keyword) {
+    if (headless_) {
+        if (uploadSucceeded && !keyword.empty()) {
+            std::wcerr << L"Diag code: " << keyword << L"\n";
+        }
+        return;
+    }
+    auto* payload = new FailureDiagPayload{};
+    payload->uploadSucceeded = uploadSucceeded;
+    payload->keyword = keyword;
+    PostToGui(gui_.Hwnd(), WM_MEDICAT_FAILURE_DIAG, reinterpret_cast<LPARAM>(payload));
+}
+
 void App::BeginAppSession() {
     if (sessionId_.empty()) {
         sessionId_ = GenerateSessionId();
@@ -550,8 +558,8 @@ void App::SubmitSessionReport(const bool success, const std::wstring& message, c
             errorTitle = currentOperation_ == L"verify" ? i18n::Tr(L"titles.verification_failed")
                                                         : i18n::Tr(L"titles.installation_error");
         }
-        request.errorTitle = SanitizeTelemetryText(errorTitle, 128);
-        request.errorDetail = SanitizeTelemetryText(message);
+        request.errorTitle = SanitizeTelemetryTextEnglish(errorTitle, 128);
+        request.errorDetail = SanitizeTelemetryTextEnglish(message);
     }
 
     SendSessionReport(request, headless_, [this](const std::wstring& line, const bool isError) {
@@ -589,18 +597,21 @@ void App::QueueFailureLogUpload(const std::string& sessionId, const std::wstring
             errorTitle = currentOperation_ == L"verify" ? i18n::Tr(L"titles.verification_failed")
                                                         : i18n::Tr(L"titles.installation_error");
         }
-        request.errorTitle = SanitizeTelemetryText(errorTitle, 128);
-        request.errorDetail = SanitizeTelemetryText(message);
+        request.errorTitle = SanitizeTelemetryTextEnglish(errorTitle, 128);
+        request.errorDetail = SanitizeTelemetryTextEnglish(message);
     }
 
-    SendFailureLogUpload(request, [this](const std::wstring& line, const bool isError) {
-        const std::wstring prefixed = L"[Telemetry] " + line;
-        if (isError) {
-            log_->Error(prefixed);
-        } else {
-            log_->Info(prefixed);
-        }
-    });
+    SendFailureLogUpload(
+        request,
+        [this](const std::wstring& line, const bool isError) {
+            const std::wstring prefixed = L"[Telemetry] " + line;
+            if (isError) {
+                log_->Error(prefixed);
+            } else {
+                log_->Info(prefixed);
+            }
+        },
+        [this](const bool success, const std::wstring& keyword) { PostFailureDiagCode(success, keyword); });
 }
 
 void App::StartUpdateCheck() {
@@ -709,6 +720,10 @@ void App::PostDone(const bool success, const std::wstring& message, const std::w
         return;
     }
 
+    if (!success && !message.empty()) {
+        gui_.ResetFailureDiagCode();
+    }
+
     std::wstring userMessage = message;
     if (!success && !message.empty()) {
         userMessage += L"\n\n" + i18n::Tr(L"messages.beta_failure_logs_notice");
@@ -728,6 +743,32 @@ App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const 
     log_->Info(i18n::Tr(L"log.file_check_started", drive));
     if (!md5Manifest_.empty()) {
         log_->Debug(L"Using MD5 manifest: " + md5Manifest_);
+    }
+
+    PostStatusBar(i18n::Tr(L"status.checking_medicat_presence"));
+    log_->Info(i18n::Tr(L"log.medicat_presence_check", drive));
+    const MedicatPresenceResult presence = CheckMedicatPresenceOnDrive(dest);
+    log_->Info(i18n::Tr(L"log.medicat_presence_score", std::to_wstring(presence.scorePercent),
+                        std::to_wstring(presence.markersFound), std::to_wstring(presence.markersTotal)));
+    for (const std::wstring& marker : presence.foundMarkers) {
+        log_->Debug(i18n::Tr(L"log.medicat_presence_marker_found", marker));
+    }
+    for (const std::wstring& marker : presence.missingMarkers) {
+        log_->Debug(i18n::Tr(L"log.medicat_presence_marker_missing", marker));
+    }
+    if (!presence.likelyInstalled) {
+        log_->Error(i18n::Tr(L"log.medicat_presence_too_low", std::to_wstring(presence.scorePercent),
+                             std::to_wstring(kMedicatPresenceProceedThresholdPercent)));
+        outcome.skipReExtract = true;
+        outcome.message =
+            i18n::Tr(L"messages.medicat_not_on_drive", drive, std::to_wstring(presence.scorePercent),
+                     std::to_wstring(presence.markersFound), std::to_wstring(presence.markersTotal));
+        outcome.title = i18n::Tr(L"titles.medicat_not_on_drive");
+        return outcome;
+    }
+    log_->Info(i18n::Tr(L"log.medicat_presence_ok", std::to_wstring(presence.scorePercent)));
+    if (showFileProgress) {
+        PostOpenFileLog();
     }
 
     VerifyOptions verifyOptions;
@@ -804,6 +845,18 @@ App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const 
         }
         outcome.failedFiles = verify.failedFiles;
         outcome.failures = verify.failures;
+
+        const bool allFailed =
+            verify.verifiedFiles == 0 && verify.failedFiles > 0 && verify.failedFiles >= verify.totalFiles;
+        if (allFailed) {
+            outcome.skipReExtract = true;
+            outcome.message = i18n::Tr(L"messages.verification_all_failed_wrong_drive", drive,
+                                        std::to_wstring(verify.failedFiles));
+            outcome.title = i18n::Tr(L"titles.verification_all_failed_wrong_drive");
+            log_->Error(outcome.message);
+            return outcome;
+        }
+
         outcome.message = i18n::Tr(L"messages.verification_failed", std::to_wstring(verify.failedFiles));
         outcome.title = i18n::Tr(L"titles.verification_failed");
         return outcome;
@@ -844,6 +897,29 @@ std::wstring ExtractDestinationFailureMessage(const ExtractResult& extract, cons
         return msg;
     }
     return {};
+}
+
+std::wstring FormatVentoyReadyFailure(const VentoyResult& ready) {
+    switch (ready.failureKind) {
+        case VentoyResult::FailureKind::Download:
+            return FormatDetailedError(i18n::Tr(L"errors.ventoy_download_failed"), ready.error);
+        case VentoyResult::FailureKind::Extract: {
+            const std::wstring summary =
+                i18n::Tr(L"errors.ventoy_extract_failed", std::to_wstring(ready.exitCode >= 0 ? ready.exitCode : 0));
+            return FormatDetailedError(summary, ready.error);
+        }
+        case VentoyResult::FailureKind::Prepare:
+            return FormatDetailedError(i18n::Tr(L"errors.ventoy_not_found"), ready.error);
+        default:
+            return ready.error.empty() ? i18n::Tr(L"errors.ventoy_not_found") : ready.error;
+    }
+}
+
+std::wstring VentoyReadyFailureTitle(const VentoyResult& ready) {
+    if (ready.failureKind == VentoyResult::FailureKind::Extract) {
+        return i18n::Tr(L"titles.extraction_failed");
+    }
+    return i18n::Tr(L"titles.download_failed");
 }
 
 }  // namespace
@@ -941,6 +1017,35 @@ bool App::PromptReExtract(const VerificationOutcome& outcome) {
     return wantReExtract;
 }
 
+bool App::PromptConfirm(const std::wstring& message, const std::wstring& title, const MessageDialogKind kind) {
+    if (headless_) {
+        return false;
+    }
+
+    auto state = std::make_shared<ConfirmPromptState>();
+    state->doneEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (!state->doneEvent) {
+        return false;
+    }
+
+    auto* payload = new ConfirmPromptPayload{};
+    payload->message = message;
+    payload->title = title;
+    payload->kind = kind;
+    payload->state = state;
+
+    if (!PostMessageW(gui_.Hwnd(), WM_MEDICAT_CONFIRM_PROMPT, 0, reinterpret_cast<LPARAM>(payload))) {
+        delete payload;
+        CloseHandle(state->doneEvent);
+        return false;
+    }
+
+    WaitForSingleObject(state->doneEvent, INFINITE);
+    const bool confirmed = state->result.load();
+    CloseHandle(state->doneEvent);
+    return confirmed;
+}
+
 void App::OnVerify() {
     if (installing_.exchange(true)) {
         return;
@@ -948,22 +1053,21 @@ void App::OnVerify() {
 
     const std::wstring drive = gui_.SelectedDrive();
     if (drive.empty()) {
-        MessageBoxW(gui_.Hwnd(), i18n::Tr(L"messages.no_drive_selected").c_str(),
-                    i18n::Tr(L"titles.no_drive_selected").c_str(), MB_ICONWARNING);
+        gui_.ShowMessageDialog(i18n::Tr(L"messages.no_drive_selected"), i18n::Tr(L"titles.no_drive_selected"),
+                               MessageDialogKind::Warning);
         installing_ = false;
         return;
     }
 
     if (!MeetsMinimumDriveCapacity(drive)) {
-        MessageBoxW(gui_.Hwnd(), i18n::Tr(L"messages.drive_under_minimum", drive).c_str(),
-                    i18n::Tr(L"titles.drive_under_minimum").c_str(), MB_ICONWARNING);
+        gui_.ShowMessageDialog(i18n::Tr(L"messages.drive_under_minimum", drive),
+                               i18n::Tr(L"titles.drive_under_minimum"), MessageDialogKind::Warning);
         installing_ = false;
         return;
     }
 
     gui_.SetBusy(true, BusyProgressMode::Verify);
     gui_.ClearFileLog();
-    gui_.OpenFileLogWindow();
     gui_.SetProgress(0);
     gui_.SetStatusBar(i18n::Tr(L"status.verifying_files"));
     currentOperation_ = L"verify";
@@ -988,7 +1092,7 @@ void App::RunVerifyThread(std::wstring drive) {
             log_->Error(outcome.message);
 
             // Offer selective re-extract when we have failures and the source archive is available.
-            if (outcome.failedFiles > 0 && !outcome.failures.empty()) {
+            if (outcome.failedFiles > 0 && !outcome.failures.empty() && !outcome.skipReExtract) {
                 const std::wstring archive = ResolveArchivePath(cliOptions_.has_value() ? cliOptions_->archivePath : L"");
                 if (FileExists(archive) && PromptReExtract(outcome)) {
                     std::wstring reextractError;
@@ -1049,15 +1153,15 @@ void App::OnInstall() {
 
     const std::wstring drive = gui_.SelectedDrive();
     if (drive.empty()) {
-        MessageBoxW(gui_.Hwnd(), i18n::Tr(L"messages.no_drive_selected").c_str(),
-                    i18n::Tr(L"titles.no_drive_selected").c_str(), MB_ICONWARNING);
+        gui_.ShowMessageDialog(i18n::Tr(L"messages.no_drive_selected"), i18n::Tr(L"titles.no_drive_selected"),
+                               MessageDialogKind::Warning);
         installing_ = false;
         return;
     }
 
     if (!MeetsMinimumDriveCapacity(drive)) {
-        MessageBoxW(gui_.Hwnd(), i18n::Tr(L"messages.drive_under_minimum", drive).c_str(),
-                    i18n::Tr(L"titles.drive_under_minimum").c_str(), MB_ICONWARNING);
+        gui_.ShowMessageDialog(i18n::Tr(L"messages.drive_under_minimum", drive),
+                               i18n::Tr(L"titles.drive_under_minimum"), MessageDialogKind::Warning);
         installing_ = false;
         return;
     }
@@ -1077,7 +1181,7 @@ void App::OnInstall() {
     const bool format = gui_.FormatChecked();
     const bool runVentoy = gui_.RunVentoyChecked();
 
-    if (!ConfirmWipeDrive(gui_.Hwnd(), drive, format, runVentoy, false, false)) {
+    if (!ConfirmWipeDrive(&gui_, gui_.Hwnd(), drive, format, runVentoy, false, false)) {
         log_->Info(L"User cancelled at wipe confirmation");
         installing_ = false;
         gui_.SetBusy(false);
@@ -1089,8 +1193,7 @@ void App::OnInstall() {
     VentoyInstallOptions ventoyInstall;
     ventoyInstall.enableSecureBoot = gui_.VentoySecureBootChecked();
     ventoyInstall.useGpt = gui_.VentoyGptChecked();
-    std::thread worker(&App::RunInstallThread, this, drive, format, runVentoy, pinVersion, ventoyInstall,
-                       gui_.Hwnd());
+    std::thread worker(&App::RunInstallThread, this, drive, format, runVentoy, pinVersion, ventoyInstall);
     worker.detach();
 }
 
@@ -1099,15 +1202,6 @@ namespace {
 void PostVentoyStatus(const std::function<void(int, bool)>& postProgress, const std::wstring& key) {
     (void)key;
     postProgress(0, false);
-}
-
-bool ConfirmVentoy(HWND hwnd, const std::wstring& drive, const bool autoYes, const bool quiet) {
-    return ConfirmVentoyCli(hwnd, drive, autoYes, quiet);
-}
-
-bool ConfirmDriveLetterChange(HWND hwnd, const std::wstring& originalDrive, const std::wstring& newDrive,
-                              const bool autoYes, const bool quiet) {
-    return ConfirmDriveLetterChangeCli(hwnd, originalDrive, newDrive, autoYes, quiet);
 }
 
 bool SameDriveLetter(const std::wstring& a, const std::wstring& b) {
@@ -1119,10 +1213,11 @@ bool SameDriveLetter(const std::wstring& a, const std::wstring& b) {
     return letterA == letterB;
 }
 
-bool ReconcileDriveLetter(HWND hwnd, std::wstring& drive, const DriveIdentity& identity,
-                          const std::function<void(const std::wstring&)>& log,
-                          const std::function<void()>& cancel, const std::function<void(const std::wstring&)>& fail,
-                          const wchar_t* contextLabel, const bool autoYes, const bool quiet) {
+bool ReconcileDriveLetter(
+    std::wstring& drive, const DriveIdentity& identity, const std::function<void(const std::wstring&)>& log,
+    const std::function<void()>& cancel, const std::function<void(const std::wstring&)>& fail,
+    const wchar_t* contextLabel,
+    const std::function<bool(const std::wstring& originalDrive, const std::wstring& newDrive)>& confirmLetterChange) {
     const std::wstring resolved = ResolveDriveLetterAfterVentoy(drive, identity);
     if (resolved.empty()) {
         fail(i18n::Tr(L"messages.drive_lost_after_ventoy"));
@@ -1131,7 +1226,7 @@ bool ReconcileDriveLetter(HWND hwnd, std::wstring& drive, const DriveIdentity& i
 
     if (!SameDriveLetter(resolved, drive)) {
         log(std::wstring(contextLabel) + L": drive letter changed from " + drive + L" to " + resolved);
-        if (!ConfirmDriveLetterChange(hwnd, drive, resolved, autoYes, quiet)) {
+        if (!confirmLetterChange(drive, resolved)) {
             cancel();
             return false;
         }
@@ -1146,7 +1241,7 @@ bool ReconcileDriveLetter(HWND hwnd, std::wstring& drive, const DriveIdentity& i
 }  // namespace
 
 void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
-                            VentoyInstallOptions ventoyInstall, HWND hwnd) {
+                            VentoyInstallOptions ventoyInstall) {
     const std::wstring root = root_;
     const std::wstring archive = ResolveArchivePath(cliOptions_.has_value() ? cliOptions_->archivePath : L"");
     const std::wstring sevenZip = sevenZa_;
@@ -1167,6 +1262,41 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
 
     const auto postProgress = [&](const int percent, const bool clearLog) {
         PostProgress(percent, clearLog);
+    };
+
+    const auto confirmVentoy = [&]() -> bool {
+        if (autoYes) {
+            return true;
+        }
+        if (quiet) {
+            return false;
+        }
+        if (headless_) {
+            const std::wstring message = i18n::Tr(L"ventoy_warning.message", drive);
+            const std::wstring title = i18n::Tr(L"ventoy_warning.title");
+            return MessageBoxW(nullptr, message.c_str(), title.c_str(),
+                               MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) == IDYES;
+        }
+        return PromptConfirm(i18n::Tr(L"ventoy_warning.message", drive), i18n::Tr(L"ventoy_warning.title"),
+                             MessageDialogKind::Warning);
+    };
+
+    const auto confirmDriveLetterChange = [&](const std::wstring& originalDrive,
+                                              const std::wstring& newDrive) -> bool {
+        if (autoYes) {
+            return true;
+        }
+        if (quiet) {
+            return false;
+        }
+        if (headless_) {
+            const std::wstring message = i18n::Tr(L"drive_letter_changed.message", originalDrive, newDrive);
+            const std::wstring title = i18n::Tr(L"drive_letter_changed.title");
+            return MessageBoxW(nullptr, message.c_str(), title.c_str(),
+                               MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) == IDYES;
+        }
+        return PromptConfirm(i18n::Tr(L"drive_letter_changed.message", originalDrive, newDrive),
+                             i18n::Tr(L"drive_letter_changed.title"), MessageDialogKind::Warning);
     };
 
     std::wstring ventoyExe;
@@ -1201,8 +1331,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
                 cancel();
                 return;
             }
-            fail(FormatDetailedError(i18n::Tr(L"errors.ventoy_download_failed"), ready.error),
-                 i18n::Tr(L"titles.download_failed"));
+            fail(FormatVentoyReadyFailure(ready), VentoyReadyFailureTitle(ready));
             return;
         }
         ventoyExe = ready.ventoyExe;
@@ -1230,7 +1359,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
             log_->Info(i18n::Tr(L"log.format_enabled"));
         }
 
-        if (!ConfirmVentoy(hwnd, drive, autoYes, quiet)) {
+        if (!confirmVentoy()) {
             cancel();
             return;
         }
@@ -1251,8 +1380,8 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
             return;
         }
 
-        if (!ReconcileDriveLetter(hwnd, drive, driveIdentity, logInfo, cancel, fail, L"After Ventoy install", autoYes,
-                                   quiet)) {
+        if (!ReconcileDriveLetter(drive, driveIdentity, logInfo, cancel, fail, L"After Ventoy install",
+                                  confirmDriveLetterChange)) {
             return;
         }
 
@@ -1277,8 +1406,8 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
     }
 
     if (runVentoy) {
-        if (!ReconcileDriveLetter(hwnd, drive, driveIdentity, logInfo, cancel, fail,
-                                  L"Final check before extract", autoYes, quiet)) {
+        if (!ReconcileDriveLetter(drive, driveIdentity, logInfo, cancel, fail, L"Final check before extract",
+                                  confirmDriveLetterChange)) {
             return;
         }
     }
@@ -1333,7 +1462,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
         return;
     }
     if (!outcome.success) {
-        if (outcome.failedFiles > 0 && !outcome.failures.empty()) {
+        if (outcome.failedFiles > 0 && !outcome.failures.empty() && !outcome.skipReExtract) {
             if (PromptReExtract(outcome)) {
                 std::wstring reextractError;
                 const bool reextractOk =

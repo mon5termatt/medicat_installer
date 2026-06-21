@@ -22,6 +22,8 @@ struct SessionReportRequest {
 
 std::wstring FormatDetailedError(const std::wstring& summary, const std::wstring& detail);
 std::string SanitizeTelemetryText(const std::wstring& text, size_t maxLen = 512);
+// Sanitize user-facing text for upload: translate to English first, then redact paths.
+std::string SanitizeTelemetryTextEnglish(const std::wstring& text, size_t maxLen = 512);
 
 std::string GenerateSessionId();
 std::string DeriveSessionOutcome(bool success, const std::wstring& message, const std::wstring& title,
@@ -42,6 +44,8 @@ struct FailureLogUploadRequest {
 };
 
 bool FailureLogAutoUploadEnabled();
-void SendFailureLogUpload(const FailureLogUploadRequest& request, SessionReportLogger logLine = nullptr);
+using FailureLogUploadCompleteCallback = std::function<void(bool success, const std::wstring& keyword)>;
+void SendFailureLogUpload(const FailureLogUploadRequest& request, SessionReportLogger logLine = nullptr,
+                          FailureLogUploadCompleteCallback onComplete = nullptr);
 
 }  // namespace medicat

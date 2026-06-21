@@ -446,7 +446,8 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
 
             std::wstring error;
             if (!HttpDownloadFile(zipUrl, zipPath, error)) {
-                result.error = L"Failed to download Ventoy: " + error;
+                result.failureKind = VentoyResult::FailureKind::Download;
+                result.error = error;
                 return result;
             }
 
@@ -462,19 +463,26 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
                 if (progress.percent >= 0) {
                     SetStatus(options, L"extracting_ventoy:" + std::to_wstring(progress.percent));
                 }
-            });
+            },
+            L"", false);
 
         if (deleteWorkingZip) {
             DeleteFileW(zipPath.c_str());
         }
 
         if (!extract.success) {
-            result.error = L"Failed to extract Ventoy: " + extract.error;
+            result.failureKind = VentoyResult::FailureKind::Extract;
+            result.exitCode = extract.exitCode;
+            result.error = extract.error;
+            if (!extract.detail.empty()) {
+                result.error += L"\n" + extract.detail;
+            }
             return result;
         }
 
         const std::wstring extractedDir = JoinPath(options.root, L"ventoy-" + targetVersion);
         if (!FileExists(JoinPath(extractedDir, L"Ventoy2Disk.exe"))) {
+            result.failureKind = VentoyResult::FailureKind::Prepare;
             result.error = L"Ventoy archive did not contain Ventoy2Disk.exe";
             return result;
         }
@@ -484,6 +492,7 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
         }
 
         if (!MoveFileW(extractedDir.c_str(), ventoyDir.c_str())) {
+            result.failureKind = VentoyResult::FailureKind::Prepare;
             result.error = L"Failed to rename extracted Ventoy folder";
             return result;
         }
@@ -494,6 +503,7 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
     }
 
     if (!FileExists(ventoyExe)) {
+        result.failureKind = VentoyResult::FailureKind::Prepare;
         result.error = L"Ventoy2Disk.exe not found after download";
         return result;
     }

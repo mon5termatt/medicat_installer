@@ -188,6 +188,13 @@ constexpr int kReExtractMessageId = 1101;
 constexpr int kReExtractListId = 1102;
 constexpr int kReExtractBtnId = 1103;
 constexpr int kReExtractCloseBtnId = 1104;
+constexpr int kMsgDialogMessageId = 1140;
+constexpr int kMsgDialogDiagLabelId = 1141;
+constexpr int kMsgDialogDiagEditId = 1142;
+constexpr int kMsgDialogCopyBtnId = 1143;
+constexpr int kMsgDialogOkBtnId = 1144;
+constexpr int kMsgDialogYesBtnId = 1145;
+constexpr int kMsgDialogNoBtnId = 1146;
 constexpr UINT_PTR kUiRefreshTimerId = 1;
 constexpr UINT_PTR kArchiveCheckTimerId = 2;
 constexpr UINT_PTR kDriveRefreshTimerId = 3;
@@ -203,6 +210,29 @@ constexpr int kAltOpenBtnX = kMargin + kAltComboWidth + kDownloadBtnGap;
 constexpr wchar_t kFileLogWindowClass[] = L"MedicatFileLogWindow";
 constexpr wchar_t kCreditsWindowClass[] = L"MedicatCreditsWindow";
 constexpr wchar_t kReExtractWindowClass[] = L"MedicatReExtractWindow";
+constexpr wchar_t kScrollableTextPaneClass[] = L"MedicatScrollableTextPane";
+constexpr wchar_t kMessageDialogWindowClass[] = L"MedicatMessageDialogWindow";
+constexpr int kMsgDialogClientWidth = 480;
+constexpr int kMsgDialogMinClientHeight = 220;
+constexpr int kMsgDialogMaxMessageHeight = 240;
+constexpr int kMsgDialogAccentHeight = 3;
+constexpr int kMsgDialogMargin = 24;
+constexpr int kMsgDialogTopPad = 20;
+constexpr int kMsgDialogBtnHeight = 34;
+constexpr int kMsgDialogBtnGap = 10;
+constexpr int kMsgDialogSectionGap = 16;
+constexpr int kMsgDialogDiagEditHeight = 32;
+constexpr int kReExtractClientWidth = 480;
+constexpr int kReExtractMinClientHeight = 300;
+constexpr int kReExtractMaxMessageHeight = 160;
+constexpr int kReExtractMinListHeight = 100;
+constexpr int kReExtractMaxListHeight = 280;
+constexpr int kReExtractRowHeight = 18;
+constexpr int kReExtractDialogMargin = 24;
+constexpr int kReExtractDialogTopPad = 20;
+constexpr int kReExtractDialogSectionGap = 16;
+constexpr int kReExtractDialogBtnHeight = 34;
+constexpr int kReExtractDialogBtnGap = 10;
 constexpr int kCreditsClientWidth = 400;
 constexpr int kCreditsClientHeight = 268;
 constexpr int kCreditsDialogMargin = 24;
@@ -265,6 +295,78 @@ int CreditsOuterHeight() {
     RECT frame{0, 0, kCreditsClientWidth, kCreditsClientHeight};
     AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0);
     return frame.bottom - frame.top;
+}
+
+int MessageDialogOuterWidth() {
+    RECT frame{0, 0, kMsgDialogClientWidth, kMsgDialogMinClientHeight};
+    AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0);
+    return frame.right - frame.left;
+}
+
+int MessageDialogOuterHeightForMessage(const int messageHeight, const MessageDialogFooter footer) {
+    const int cappedMessage = std::min(messageHeight, kMsgDialogMaxMessageHeight);
+    const int maxClientHeight = (GetSystemMetrics(SM_CYSCREEN) * 85) / 100;
+    int clientHeight = kMsgDialogAccentHeight + kMsgDialogTopPad + cappedMessage + kMsgDialogSectionGap;
+    if (footer == MessageDialogFooter::OkWithDiag) {
+        clientHeight += 18 + 6 + kMsgDialogDiagEditHeight + kMsgDialogSectionGap;
+    }
+    clientHeight += kMsgDialogBtnHeight + 16;
+    clientHeight = std::max(clientHeight, kMsgDialogMinClientHeight);
+    clientHeight = std::min(clientHeight, maxClientHeight);
+
+    RECT frame{0, 0, kMsgDialogClientWidth, clientHeight};
+    AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0);
+    return frame.bottom - frame.top;
+}
+
+int ReExtractOuterWidth() {
+    RECT frame{0, 0, kReExtractClientWidth, kReExtractMinClientHeight};
+    AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0);
+    return frame.right - frame.left;
+}
+
+int ReExtractOuterHeightForContent(const int messageHeight, const int listHeight) {
+    const int maxClientHeight = (GetSystemMetrics(SM_CYSCREEN) * 85) / 100;
+    const int cappedMessage = std::min(messageHeight, kReExtractMaxMessageHeight);
+    int clientHeight = kMsgDialogAccentHeight + kReExtractDialogTopPad + cappedMessage + kReExtractDialogSectionGap +
+                       listHeight + kReExtractDialogSectionGap + kReExtractDialogBtnHeight + 16;
+    clientHeight = std::max(clientHeight, kReExtractMinClientHeight);
+    clientHeight = std::min(clientHeight, maxClientHeight);
+
+    RECT frame{0, 0, kReExtractClientWidth, clientHeight};
+    AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0);
+    return frame.bottom - frame.top;
+}
+
+bool CopyTextToClipboard(HWND owner, const std::wstring& text) {
+    if (text.empty()) {
+        return false;
+    }
+    if (!OpenClipboard(owner)) {
+        return false;
+    }
+    EmptyClipboard();
+    const size_t bytes = (text.size() + 1) * sizeof(wchar_t);
+    HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, bytes);
+    if (!memory) {
+        CloseClipboard();
+        return false;
+    }
+    void* locked = GlobalLock(memory);
+    if (!locked) {
+        GlobalFree(memory);
+        CloseClipboard();
+        return false;
+    }
+    memcpy(locked, text.c_str(), bytes);
+    GlobalUnlock(memory);
+    if (!SetClipboardData(CF_UNICODETEXT, memory)) {
+        GlobalFree(memory);
+        CloseClipboard();
+        return false;
+    }
+    CloseClipboard();
+    return true;
 }
 
 std::vector<std::wstring> CollectComboDriveLetters(const HWND combo) {
@@ -363,6 +465,310 @@ void SubclassWrappedStatic(const HWND hwnd, const bool muted) {
         hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(WrappedStaticProc)));
     state->muted = muted;
     SetPropW(hwnd, L"MedicatWrappedStatic", state);
+}
+
+struct ScrollableTextPaneState {
+    std::wstring text;
+    int scrollY = 0;
+    int contentHeight = 0;
+    int viewportHeight = 0;
+    int contentWidth = 0;
+    int lineHeight = 20;
+};
+
+ScrollableTextPaneState* GetScrollableTextPaneState(const HWND hwnd) {
+    return reinterpret_cast<ScrollableTextPaneState*>(GetPropW(hwnd, L"MedicatScrollableTextPane"));
+}
+
+int MeasureScrollableTextPaneContentHeight(const HDC hdc, const HFONT font, const std::wstring& text,
+                                           const int width) {
+    if (text.empty() || width <= 0) {
+        return 32;
+    }
+
+    HFONT oldFont = nullptr;
+    if (font) {
+        oldFont = reinterpret_cast<HFONT>(SelectObject(hdc, font));
+    }
+
+    RECT rc{0, 0, width, 0};
+    DrawTextW(hdc, text.c_str(), -1, &rc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+
+    if (oldFont) {
+        SelectObject(hdc, oldFont);
+    }
+    return std::max(32, static_cast<int>(rc.bottom - rc.top) + 4);
+}
+
+void UpdateScrollableTextPaneMetrics(const HWND hwnd, ScrollableTextPaneState* state) {
+    if (!hwnd || !IsWindow(hwnd) || !state) {
+        return;
+    }
+
+    RECT client{};
+    GetClientRect(hwnd, &client);
+    state->viewportHeight = std::max(0, static_cast<int>(client.bottom - client.top));
+    state->contentWidth = std::max(0, static_cast<int>(client.right - client.left - 8));
+
+    const HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
+    const HDC hdc = GetDC(hwnd);
+    if (hdc) {
+        if (font) {
+            const HFONT oldFont = reinterpret_cast<HFONT>(SelectObject(hdc, font));
+            TEXTMETRICW metrics{};
+            if (GetTextMetricsW(hdc, &metrics)) {
+                state->lineHeight = std::max(16, static_cast<int>(metrics.tmHeight + metrics.tmExternalLeading));
+            }
+            state->contentHeight =
+                MeasureScrollableTextPaneContentHeight(hdc, font, state->text, state->contentWidth);
+            if (oldFont) {
+                SelectObject(hdc, oldFont);
+            }
+        } else {
+            state->contentHeight =
+                MeasureScrollableTextPaneContentHeight(hdc, nullptr, state->text, state->contentWidth);
+        }
+        ReleaseDC(hwnd, hdc);
+    }
+
+    const int maxScroll = std::max(0, state->contentHeight - state->viewportHeight);
+    state->scrollY = std::clamp(state->scrollY, 0, maxScroll);
+
+    SCROLLINFO si{};
+    si.cbSize = sizeof(si);
+    si.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
+    si.nMin = 0;
+    si.nMax = state->contentHeight;
+    si.nPage = static_cast<UINT>(std::max(1, state->viewportHeight));
+    si.nPos = state->scrollY;
+    SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+    ShowScrollBar(hwnd, SB_VERT, maxScroll > 0 ? TRUE : FALSE);
+}
+
+void ScrollableTextPaneScrollBy(const HWND hwnd, ScrollableTextPaneState* state, const int delta) {
+    if (!hwnd || !state) {
+        return;
+    }
+    const int maxScroll = std::max(0, state->contentHeight - state->viewportHeight);
+    const int next = std::clamp(state->scrollY + delta, 0, maxScroll);
+    if (next == state->scrollY) {
+        return;
+    }
+    state->scrollY = next;
+
+    SCROLLINFO si{};
+    si.cbSize = sizeof(si);
+    si.fMask = SIF_POS;
+    si.nPos = state->scrollY;
+    SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+    InvalidateRect(hwnd, nullptr, FALSE);
+}
+
+void SetScrollableTextPaneText(const HWND hwnd, const std::wstring& text) {
+    ScrollableTextPaneState* state = GetScrollableTextPaneState(hwnd);
+    if (!state) {
+        return;
+    }
+    state->text = text;
+    state->scrollY = 0;
+    UpdateScrollableTextPaneMetrics(hwnd, state);
+    InvalidateRect(hwnd, nullptr, TRUE);
+}
+
+void LayoutScrollableTextPane(const HWND hwnd, const int x, const int y, const int width, const int height) {
+    if (!hwnd || !IsWindow(hwnd)) {
+        return;
+    }
+    SetWindowPos(hwnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+    UpdateScrollableTextPaneMetrics(hwnd, GetScrollableTextPaneState(hwnd));
+}
+
+HWND CreateScrollableTextPane(const HWND parent, const HINSTANCE instance, const int controlId, const HFONT font,
+                              const std::wstring& text) {
+    HWND hwnd = CreateWindowExW(
+        WS_EX_CLIENTEDGE, kScrollableTextPaneClass, L"",
+        WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP, 0, 0, 100, 100, parent,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(controlId)), instance, nullptr);
+    if (!hwnd) {
+        return nullptr;
+    }
+
+    SendMessageW(hwnd, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+    SetScrollableTextPaneText(hwnd, text);
+    return hwnd;
+}
+
+LRESULT CALLBACK ScrollableTextPaneProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp) {
+    ScrollableTextPaneState* state = GetScrollableTextPaneState(hwnd);
+
+    switch (msg) {
+        case WM_CREATE: {
+            state = new ScrollableTextPaneState{};
+            SetPropW(hwnd, L"MedicatScrollableTextPane", state);
+            return 0;
+        }
+        case WM_DESTROY: {
+            ScrollableTextPaneState* paneState = GetScrollableTextPaneState(hwnd);
+            RemovePropW(hwnd, L"MedicatScrollableTextPane");
+            delete paneState;
+            return 0;
+        }
+        case WM_ERASEBKGND:
+            return 1;
+        case WM_SETFONT:
+        case WM_SIZE: {
+            const LRESULT result = DefWindowProcW(hwnd, msg, wp, lp);
+            state = GetScrollableTextPaneState(hwnd);
+            UpdateScrollableTextPaneMetrics(hwnd, state);
+            return result;
+        }
+        case WM_VSCROLL: {
+            state = GetScrollableTextPaneState(hwnd);
+            if (!state) {
+                return 0;
+            }
+            SCROLLINFO si{};
+            si.cbSize = sizeof(si);
+            si.fMask = SIF_ALL;
+            GetScrollInfo(hwnd, SB_VERT, &si);
+            const int line = std::max(16, state->lineHeight);
+            const int page = std::max(line, state->viewportHeight - line);
+            int next = si.nPos;
+            switch (LOWORD(wp)) {
+                case SB_LINEUP:
+                    next -= line;
+                    break;
+                case SB_LINEDOWN:
+                    next += line;
+                    break;
+                case SB_PAGEUP:
+                    next -= page;
+                    break;
+                case SB_PAGEDOWN:
+                    next += page;
+                    break;
+                case SB_TOP:
+                    next = 0;
+                    break;
+                case SB_BOTTOM:
+                    next = std::max(0, state->contentHeight - state->viewportHeight);
+                    break;
+                case SB_THUMBTRACK:
+                case SB_THUMBPOSITION:
+                    next = HIWORD(wp);
+                    break;
+                default:
+                    return 0;
+            }
+            const int maxScroll = std::max(0, state->contentHeight - state->viewportHeight);
+            state->scrollY = std::clamp(next, 0, maxScroll);
+            si.fMask = SIF_POS;
+            si.nPos = state->scrollY;
+            SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        case WM_MOUSEWHEEL: {
+            state = GetScrollableTextPaneState(hwnd);
+            if (!state) {
+                return 0;
+            }
+            const int delta = GET_WHEEL_DELTA_WPARAM(wp) / WHEEL_DELTA;
+            ScrollableTextPaneScrollBy(hwnd, state, -delta * std::max(16, state->lineHeight * 3));
+            return 0;
+        }
+        case WM_KEYDOWN: {
+            state = GetScrollableTextPaneState(hwnd);
+            if (!state) {
+                break;
+            }
+            if ((GetKeyState(VK_CONTROL) & 0x8000) != 0 && wp == 0x43) {
+                if (!state->text.empty()) {
+                    CopyTextToClipboard(hwnd, state->text);
+                }
+                return 0;
+            }
+            switch (wp) {
+                case VK_UP:
+                    ScrollableTextPaneScrollBy(hwnd, state, -state->lineHeight);
+                    return 0;
+                case VK_DOWN:
+                    ScrollableTextPaneScrollBy(hwnd, state, state->lineHeight);
+                    return 0;
+                case VK_PRIOR:
+                    ScrollableTextPaneScrollBy(hwnd, state, -std::max(state->lineHeight, state->viewportHeight - state->lineHeight));
+                    return 0;
+                case VK_NEXT:
+                    ScrollableTextPaneScrollBy(hwnd, state, std::max(state->lineHeight, state->viewportHeight - state->lineHeight));
+                    return 0;
+                case VK_HOME:
+                    ScrollableTextPaneScrollBy(hwnd, state, -state->contentHeight);
+                    return 0;
+                case VK_END:
+                    ScrollableTextPaneScrollBy(hwnd, state, state->contentHeight);
+                    return 0;
+                default:
+                    break;
+            }
+            break;
+        }
+        case WM_GETDLGCODE:
+            return DLGC_WANTARROWS | DLGC_WANTCHARS;
+        case WM_PAINT: {
+            state = GetScrollableTextPaneState(hwnd);
+            if (!state) {
+                return DefWindowProcW(hwnd, msg, wp, lp);
+            }
+
+            PAINTSTRUCT ps{};
+            const HDC hdc = BeginPaint(hwnd, &ps);
+            RECT client{};
+            GetClientRect(hwnd, &client);
+            FillRect(hdc, &client, theme::GetBrushes().control);
+
+            if (!state->text.empty() && state->contentWidth > 0) {
+                const HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
+                HFONT oldFont = nullptr;
+                if (font) {
+                    oldFont = reinterpret_cast<HFONT>(SelectObject(hdc, font));
+                }
+
+                SetBkMode(hdc, TRANSPARENT);
+                SetTextColor(hdc, theme::Colors().text);
+
+                const HRGN clip = CreateRectRgnIndirect(&client);
+                SelectClipRgn(hdc, clip);
+
+                constexpr int kPad = 4;
+                RECT drawRc{kPad, kPad - state->scrollY, client.right - kPad,
+                            kPad - state->scrollY + state->contentHeight};
+                DrawTextW(hdc, state->text.c_str(), -1, &drawRc, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+
+                SelectClipRgn(hdc, nullptr);
+                DeleteObject(clip);
+                if (oldFont) {
+                    SelectObject(hdc, oldFont);
+                }
+            }
+
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+        default:
+            break;
+    }
+    return DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+bool RegisterScrollableTextPaneClass(const HINSTANCE instance) {
+    WNDCLASSEXW wc{};
+    wc.cbSize = sizeof(wc);
+    wc.lpfnWndProc = ScrollableTextPaneProc;
+    wc.hInstance = instance;
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hbrBackground = theme::GetBrushes().control;
+    wc.lpszClassName = kScrollableTextPaneClass;
+    return RegisterClassExW(&wc) != 0;
 }
 
 struct GlowButtonState {
@@ -681,6 +1087,17 @@ bool Gui::Create(HINSTANCE instance) {
     reExtractWc.lpszClassName = kReExtractWindowClass;
     RegisterClassExW(&reExtractWc);
 
+    RegisterScrollableTextPaneClass(instance);
+
+    WNDCLASSEXW messageDialogWc{};
+    messageDialogWc.cbSize = sizeof(messageDialogWc);
+    messageDialogWc.lpfnWndProc = Gui::MessageDialogWndProc;
+    messageDialogWc.hInstance = instance;
+    messageDialogWc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    messageDialogWc.hbrBackground = theme::GetBrushes().window;
+    messageDialogWc.lpszClassName = kMessageDialogWindowClass;
+    RegisterClassExW(&messageDialogWc);
+
     const std::wstring windowTitle = i18n::Tr(L"ui.form_title", InstallerVersionWide());
     hwnd_ = CreateWindowExW(
         0, cls, windowTitle.c_str(),
@@ -744,10 +1161,9 @@ void Gui::ShowUpdatePrompt(const InstallerUpdateInfo& info) {
     const std::wstring message =
         i18n::Tr(L"update.available_message", localVersion, localTag, remoteVersion, info.releaseTag);
     const std::wstring title = i18n::Tr(L"update.available_title");
-    const int result = MessageBoxW(hwnd_, message.c_str(), title.c_str(), MB_YESNO | MB_ICONINFORMATION);
-    if (result == IDYES) {
+    if (ShowConfirmDialog(message, title, MessageDialogKind::Info)) {
         if (info.downloadUrl.empty()) {
-            MessageBoxW(hwnd_, i18n::Tr(L"update.download_unavailable").c_str(), title.c_str(), MB_OK | MB_ICONWARNING);
+            ShowMessageDialog(i18n::Tr(L"update.download_unavailable"), title, MessageDialogKind::Warning);
             return;
         }
         if (onApplyInstallerUpdate_) {
@@ -1389,6 +1805,45 @@ void Gui::FinishReExtractPrompt(const bool wantReExtract) {
     }
 }
 
+void Gui::LayoutReExtractDialog() {
+    if (!reExtractWindow_ || !IsWindow(reExtractWindow_)) {
+        return;
+    }
+
+    RECT client{};
+    GetClientRect(reExtractWindow_, &client);
+    const int clientWidth = client.right - client.left;
+    const int contentWidth = std::max(0, clientWidth - 2 * kReExtractDialogMargin);
+    const int reExtractBtnWidth = 220;
+    const int closeBtnWidth = 120;
+    const int actionGap = kReExtractDialogBtnGap;
+    const int actionRowWidth = reExtractBtnWidth + actionGap + closeBtnWidth;
+
+    int y = kMsgDialogAccentHeight + kReExtractDialogTopPad;
+    if (reExtractMessage_ && IsWindow(reExtractMessage_)) {
+        const int messageHeight = reExtractMessageHeight_ > 0 ? reExtractMessageHeight_ : kReExtractMaxMessageHeight;
+        LayoutScrollableTextPane(reExtractMessage_, kReExtractDialogMargin, y, contentWidth, messageHeight);
+        y += messageHeight + kReExtractDialogSectionGap;
+    }
+
+    if (reExtractList_ && IsWindow(reExtractList_)) {
+        const int clientHeight = client.bottom - client.top;
+        const int buttonsBlock = kReExtractDialogBtnHeight + 16;
+        const int listHeight = std::max(kReExtractMinListHeight, clientHeight - y - kReExtractDialogSectionGap - buttonsBlock);
+        SetWindowPos(reExtractList_, nullptr, kReExtractDialogMargin, y, contentWidth, listHeight, SWP_NOZORDER);
+        y += listHeight + kReExtractDialogSectionGap;
+    }
+
+    const int actionX = kReExtractDialogMargin + std::max(0, contentWidth - actionRowWidth);
+    if (reExtractBtn_ && IsWindow(reExtractBtn_)) {
+        SetWindowPos(reExtractBtn_, nullptr, actionX, y, reExtractBtnWidth, kReExtractDialogBtnHeight, SWP_NOZORDER);
+    }
+    if (reExtractCloseBtn_ && IsWindow(reExtractCloseBtn_)) {
+        SetWindowPos(reExtractCloseBtn_, nullptr, actionX + reExtractBtnWidth + actionGap, y, closeBtnWidth,
+                     kReExtractDialogBtnHeight, SWP_NOZORDER);
+    }
+}
+
 void Gui::OpenReExtractPrompt(ReExtractPromptPayload* payload) {
     if (!payload || !payload->state || !payload->state->doneEvent) {
         delete payload;
@@ -1400,19 +1855,45 @@ void Gui::OpenReExtractPrompt(ReExtractPromptPayload* payload) {
     }
 
     activeReExtractPrompt_ = payload->state;
-
-    RECT mainRc{};
-    GetWindowRect(hwnd_, &mainRc);
+    reExtractFailureLines_ = payload->failures;
+    reExtractFailedFilesTotal_ = payload->failedFiles > 0 ? payload->failedFiles : payload->failures.size();
 
     const std::wstring title =
         payload->title.empty() ? i18n::Tr(L"ui.re_extract_window_title") : payload->title;
-    const std::wstring summary = i18n::Tr(L"ui.re_extract_summary",
-                                          std::to_wstring(payload->failedFiles > 0 ? payload->failedFiles
-                                                                                   : payload->failures.size()));
+    const std::wstring summary = i18n::Tr(L"ui.re_extract_summary", std::to_wstring(reExtractFailedFilesTotal_));
+    std::wstring bodyText = payload->message;
+    if (!bodyText.empty() && !summary.empty()) {
+        bodyText += L"\r\n\r\n";
+    }
+    bodyText += summary;
+
+    const HFONT uiFont = theme::MakeUiFont();
+    const int contentWidth = kReExtractClientWidth - 2 * kReExtractDialogMargin;
+    int measuredMessageHeight = 64;
+    {
+        const HWND measureHost = CreateWindowExW(0, L"STATIC", L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, instance_,
+                                                 nullptr);
+        if (measureHost) {
+            SendMessageW(measureHost, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+            measuredMessageHeight = MeasureWrappedStaticHeight(measureHost, bodyText, contentWidth);
+            DestroyWindow(measureHost);
+        }
+    }
+
+    const size_t listRows = reExtractFailureLines_.size() +
+                            (reExtractFailedFilesTotal_ > reExtractFailureLines_.size() ? 1U : 0U);
+    const int listHeight = std::clamp(static_cast<int>(listRows) * kReExtractRowHeight + 12, kReExtractMinListHeight,
+                                      kReExtractMaxListHeight);
+    reExtractMessageHeight_ = std::min(measuredMessageHeight, kReExtractMaxMessageHeight);
+
+    const int windowWidth = ReExtractOuterWidth();
+    const int windowHeight = ReExtractOuterHeightForContent(measuredMessageHeight, listHeight);
+    const int x = (GetSystemMetrics(SM_CXSCREEN) - windowWidth) / 2;
+    const int yPos = (GetSystemMetrics(SM_CYSCREEN) - windowHeight) / 2;
 
     reExtractWindow_ = CreateWindowExW(
-        0, kReExtractWindowClass, title.c_str(), WS_OVERLAPPEDWINDOW,
-        mainRc.right + 12, mainRc.top + 40, 560, 420, hwnd_, nullptr, instance_, this);
+        0, kReExtractWindowClass, title.c_str(), WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+        x, yPos, windowWidth, windowHeight, hwnd_, nullptr, instance_, this);
     if (!reExtractWindow_) {
         FinishReExtractPrompt(false);
         delete payload;
@@ -1420,33 +1901,29 @@ void Gui::OpenReExtractPrompt(ReExtractPromptPayload* payload) {
     }
 
     theme::EnableDarkModeRecursive(reExtractWindow_);
-    const HFONT uiFont = theme::MakeUiFont();
-    const HFONT logFont = theme::MakeLogFont();
 
-    reExtractMessage_ = CreateWindowW(
-        L"STATIC", summary.c_str(), WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
-        16, 16, 520, 48, reExtractWindow_,
-        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kReExtractMessageId)), instance_, nullptr);
+    reExtractMessage_ = CreateScrollableTextPane(reExtractWindow_, instance_, kReExtractMessageId, uiFont, bodyText);
 
     reExtractList_ = CreateWindowW(
         L"LISTBOX", nullptr,
         WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | WS_HSCROLL | LBS_NOINTEGRALHEIGHT,
-        16, 72, 520, 260, reExtractWindow_,
+        0, 0, 100, listHeight, reExtractWindow_,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kReExtractListId)), instance_, nullptr);
 
     reExtractBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.re_extract_button").c_str(),
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        16, 348, 300, 32, reExtractWindow_,
+        WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP,
+        0, 0, 100, kReExtractDialogBtnHeight, reExtractWindow_,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kReExtractBtnId)), instance_, nullptr);
 
     reExtractCloseBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.re_extract_close_button").c_str(),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        332, 348, 204, 32, reExtractWindow_,
+        0, 0, 100, kReExtractDialogBtnHeight, reExtractWindow_,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kReExtractCloseBtnId)), instance_, nullptr);
 
-    for (HWND child : {reExtractMessage_, reExtractList_, reExtractBtn_, reExtractCloseBtn_}) {
+    const HFONT logFont = theme::MakeLogFont();
+    for (HWND child : {reExtractList_, reExtractBtn_, reExtractCloseBtn_}) {
         if (child && IsWindow(child)) {
             SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
         }
@@ -1454,12 +1931,13 @@ void Gui::OpenReExtractPrompt(ReExtractPromptPayload* payload) {
     SendMessageW(reExtractList_, WM_SETFONT, reinterpret_cast<WPARAM>(logFont), TRUE);
 
     SendMessageW(reExtractList_, LB_RESETCONTENT, 0, 0);
-    for (size_t i = 0; i < payload->failures.size(); ++i) {
-        SendMessageW(reExtractList_, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(payload->failures[i].c_str()));
+    for (const std::wstring& line : reExtractFailureLines_) {
+        SendMessageW(reExtractList_, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(line.c_str()));
     }
-    if (payload->failedFiles > payload->failures.size() && payload->failedFiles > 0) {
+    if (reExtractFailedFilesTotal_ > reExtractFailureLines_.size()) {
         const std::wstring more = L"... and " +
-                                  std::to_wstring(payload->failedFiles - payload->failures.size()) + L" more";
+                                  std::to_wstring(reExtractFailedFilesTotal_ - reExtractFailureLines_.size()) +
+                                  L" more";
         SendMessageW(reExtractList_, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(more.c_str()));
     }
     SendMessageW(reExtractList_, LB_SETHORIZONTALEXTENT, 8000, 0);
@@ -1469,6 +1947,7 @@ void Gui::OpenReExtractPrompt(ReExtractPromptPayload* payload) {
 
     delete payload;
 
+    LayoutReExtractDialog();
     ShowWindow(reExtractWindow_, SW_SHOW);
     SetForegroundWindow(reExtractWindow_);
     UpdateWindow(reExtractWindow_);
@@ -1505,6 +1984,12 @@ LRESULT CALLBACK Gui::ReExtractWndProc(const HWND hwnd, const UINT msg, const WP
             HDC hdc = reinterpret_cast<HDC>(wp);
             RECT rc{};
             GetClientRect(hwnd, &rc);
+            RECT accent = rc;
+            accent.bottom = accent.top + kMsgDialogAccentHeight;
+            HBRUSH accentBrush = CreateSolidBrush(self->MessageDialogAccentColor(MessageDialogKind::Warning));
+            FillRect(hdc, &accent, accentBrush);
+            DeleteObject(accentBrush);
+            rc.top = accent.bottom;
             FillRect(hdc, &rc, theme::GetBrushes().window);
             return 1;
         }
@@ -1516,6 +2001,16 @@ LRESULT CALLBACK Gui::ReExtractWndProc(const HWND hwnd, const UINT msg, const WP
             SetTextColor(hdc, theme::Colors().text);
             return reinterpret_cast<LRESULT>(theme::GetBrushes().control);
         }
+        case WM_CTLCOLOREDIT: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            SetBkMode(hdc, OPAQUE);
+            SetBkColor(hdc, theme::Colors().control);
+            SetTextColor(hdc, theme::Colors().text);
+            return reinterpret_cast<LRESULT>(theme::GetBrushes().control);
+        }
+        case WM_SIZE:
+            self->LayoutReExtractDialog();
+            return 0;
         case WM_CLOSE:
             self->FinishReExtractPrompt(false);
             return 0;
@@ -1525,8 +2020,408 @@ LRESULT CALLBACK Gui::ReExtractWndProc(const HWND hwnd, const UINT msg, const WP
             self->reExtractList_ = nullptr;
             self->reExtractBtn_ = nullptr;
             self->reExtractCloseBtn_ = nullptr;
+            self->reExtractFailureLines_.clear();
+            self->reExtractFailedFilesTotal_ = 0;
+            self->reExtractMessageHeight_ = 0;
             if (self->activeReExtractPrompt_ && !self->activeReExtractPrompt_->completed.load()) {
                 self->FinishReExtractPrompt(false);
+            }
+            return 0;
+        default:
+            break;
+    }
+    return DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+std::wstring Gui::FailureDiagDisplayText() const {
+    if (failureDiagResolved_ && failureDiagUploadSucceeded_ && !failureDiagKeyword_.empty()) {
+        return failureDiagKeyword_;
+    }
+    if (failureDiagResolved_) {
+        return i18n::Tr(L"messages.diag_unavailable");
+    }
+    return i18n::Tr(L"messages.diag_uploading");
+}
+
+void Gui::ResetFailureDiagCode() {
+    failureDiagUploadSucceeded_ = false;
+    failureDiagKeyword_.clear();
+    failureDiagResolved_ = false;
+}
+
+void Gui::SetFailureDiagCode(const bool uploadSucceeded, const std::wstring& keyword) {
+    failureDiagUploadSucceeded_ = uploadSucceeded;
+    failureDiagKeyword_ = keyword;
+    failureDiagResolved_ = true;
+    if (messageDialogDiagEdit_ && IsWindow(messageDialogDiagEdit_)) {
+        SetWindowTextW(messageDialogDiagEdit_, FailureDiagDisplayText().c_str());
+        SendMessageW(messageDialogDiagEdit_, EM_SETSEL, 0, -1);
+    }
+}
+
+bool Gui::CopyFailureDiagCodeToClipboard() {
+    if (!messageDialogDiagEdit_ || !IsWindow(messageDialogDiagEdit_)) {
+        return false;
+    }
+    if (!failureDiagUploadSucceeded_ || failureDiagKeyword_.empty()) {
+        return false;
+    }
+    return CopyTextToClipboard(messageDialog_, failureDiagKeyword_);
+}
+
+COLORREF Gui::MessageDialogAccentColor(const MessageDialogKind kind) const {
+    switch (kind) {
+        case MessageDialogKind::Info:
+            return theme::Colors().accent;
+        case MessageDialogKind::Warning:
+            return RGB(230, 176, 60);
+        case MessageDialogKind::Error:
+            return RGB(220, 82, 82);
+        default:
+            return theme::Colors().accent;
+    }
+}
+
+void Gui::LayoutMessageDialog() {
+    if (!messageDialog_ || !IsWindow(messageDialog_)) {
+        return;
+    }
+
+    const bool showDiag = messageDialogFooter_ == MessageDialogFooter::OkWithDiag;
+    const bool showYesNo = messageDialogFooter_ == MessageDialogFooter::YesNo;
+
+    RECT client{};
+    GetClientRect(messageDialog_, &client);
+    const int clientWidth = client.right - client.left;
+    const int contentWidth = std::max(0, clientWidth - 2 * kMsgDialogMargin);
+    const int copyBtnWidth = 120;
+    const int okBtnWidth = 100;
+    const int yesBtnWidth = 100;
+    const int noBtnWidth = 100;
+    const int actionGap = kMsgDialogBtnGap;
+
+    auto setVisible = [](HWND control, const int show) {
+        if (control && IsWindow(control)) {
+            ShowWindow(control, show);
+        }
+    };
+
+    setVisible(messageDialogDiagLabel_, showDiag ? SW_SHOW : SW_HIDE);
+    setVisible(messageDialogDiagEdit_, showDiag ? SW_SHOW : SW_HIDE);
+    setVisible(messageDialogCopyBtn_, showDiag ? SW_SHOW : SW_HIDE);
+    setVisible(messageDialogOkBtn_, showYesNo ? SW_HIDE : SW_SHOW);
+    setVisible(messageDialogYesBtn_, showYesNo ? SW_SHOW : SW_HIDE);
+    setVisible(messageDialogNoBtn_, showYesNo ? SW_SHOW : SW_HIDE);
+
+    int y = kMsgDialogAccentHeight + kMsgDialogTopPad;
+    if (messageDialogBody_ && IsWindow(messageDialogBody_)) {
+        const int messageHeight =
+            messageDialogBodyHeight_ > 0 ? messageDialogBodyHeight_ : kMsgDialogMaxMessageHeight;
+        LayoutScrollableTextPane(messageDialogBody_, kMsgDialogMargin, y, contentWidth, messageHeight);
+        y += messageHeight + kMsgDialogSectionGap;
+    }
+
+    if (showDiag && messageDialogDiagLabel_ && IsWindow(messageDialogDiagLabel_)) {
+        const int labelHeight = 18;
+        SetWindowPos(messageDialogDiagLabel_, nullptr, kMsgDialogMargin, y, contentWidth, labelHeight, SWP_NOZORDER);
+        y += labelHeight + 6;
+    }
+
+    if (showDiag && messageDialogDiagEdit_ && IsWindow(messageDialogDiagEdit_)) {
+        SetWindowPos(messageDialogDiagEdit_, nullptr, kMsgDialogMargin, y, contentWidth, kMsgDialogDiagEditHeight,
+                     SWP_NOZORDER);
+        y += kMsgDialogDiagEditHeight + kMsgDialogSectionGap;
+    }
+
+    if (showDiag) {
+        const int actionRowWidth = copyBtnWidth + actionGap + okBtnWidth;
+        const int actionX = kMsgDialogMargin + std::max(0, contentWidth - actionRowWidth);
+        if (messageDialogCopyBtn_ && IsWindow(messageDialogCopyBtn_)) {
+            SetWindowPos(messageDialogCopyBtn_, nullptr, actionX, y, copyBtnWidth, kMsgDialogBtnHeight, SWP_NOZORDER);
+        }
+        if (messageDialogOkBtn_ && IsWindow(messageDialogOkBtn_)) {
+            SetWindowPos(messageDialogOkBtn_, nullptr, actionX + copyBtnWidth + actionGap, y, okBtnWidth,
+                         kMsgDialogBtnHeight, SWP_NOZORDER);
+        }
+    } else if (showYesNo) {
+        const int actionRowWidth = noBtnWidth + actionGap + yesBtnWidth;
+        const int actionX = kMsgDialogMargin + std::max(0, contentWidth - actionRowWidth);
+        if (messageDialogNoBtn_ && IsWindow(messageDialogNoBtn_)) {
+            SetWindowPos(messageDialogNoBtn_, nullptr, actionX, y, noBtnWidth, kMsgDialogBtnHeight, SWP_NOZORDER);
+        }
+        if (messageDialogYesBtn_ && IsWindow(messageDialogYesBtn_)) {
+            SetWindowPos(messageDialogYesBtn_, nullptr, actionX + noBtnWidth + actionGap, y, yesBtnWidth,
+                         kMsgDialogBtnHeight, SWP_NOZORDER);
+        }
+    } else if (messageDialogOkBtn_ && IsWindow(messageDialogOkBtn_)) {
+        const int actionX = kMsgDialogMargin + std::max(0, contentWidth - okBtnWidth);
+        SetWindowPos(messageDialogOkBtn_, nullptr, actionX, y, okBtnWidth, kMsgDialogBtnHeight, SWP_NOZORDER);
+    }
+}
+
+void Gui::RefreshMessageDialogText() {
+    if (!messageDialog_ || !IsWindow(messageDialog_)) {
+        return;
+    }
+    if (messageDialogDiagLabel_ && IsWindow(messageDialogDiagLabel_)) {
+        SetWindowTextW(messageDialogDiagLabel_, i18n::Tr(L"ui.failure_dialog_diag_label").c_str());
+    }
+    if (messageDialogCopyBtn_ && IsWindow(messageDialogCopyBtn_)) {
+        SetWindowTextW(messageDialogCopyBtn_, i18n::Tr(L"ui.failure_dialog_copy_button").c_str());
+    }
+    if (messageDialogOkBtn_ && IsWindow(messageDialogOkBtn_)) {
+        SetWindowTextW(messageDialogOkBtn_, i18n::Tr(L"ui.failure_dialog_ok_button").c_str());
+    }
+    if (messageDialogYesBtn_ && IsWindow(messageDialogYesBtn_)) {
+        SetWindowTextW(messageDialogYesBtn_, i18n::Tr(L"ui.dialog_yes").c_str());
+    }
+    if (messageDialogNoBtn_ && IsWindow(messageDialogNoBtn_)) {
+        SetWindowTextW(messageDialogNoBtn_, i18n::Tr(L"ui.dialog_no").c_str());
+    }
+    if (messageDialogDiagEdit_ && IsWindow(messageDialogDiagEdit_)) {
+        SetWindowTextW(messageDialogDiagEdit_, FailureDiagDisplayText().c_str());
+    }
+    LayoutMessageDialog();
+}
+
+bool Gui::RunMessageDialogModalLoop() {
+    if (!messageDialog_ || !IsWindow(messageDialog_)) {
+        return false;
+    }
+
+    messageDialogModalActive_ = true;
+    messageDialogModalResult_ = false;
+
+    HWND parent = hwnd_;
+    if (parent && IsWindow(parent)) {
+        EnableWindow(parent, FALSE);
+    }
+
+    MSG msg{};
+    while (messageDialogModalActive_ && GetMessageW(&msg, nullptr, 0, 0)) {
+        if (msg.message == WM_QUIT) {
+            PostQuitMessage(static_cast<int>(msg.wParam));
+            break;
+        }
+        if (!IsDialogMessageW(messageDialog_, &msg)) {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+
+    if (parent && IsWindow(parent)) {
+        EnableWindow(parent, TRUE);
+        SetForegroundWindow(parent);
+    }
+
+    const bool result = messageDialogModalResult_;
+    messageDialogModalActive_ = false;
+    return result;
+}
+
+void Gui::OpenMessageDialogInternal(const std::wstring& message, const std::wstring& title,
+                                    const MessageDialogKind kind, const MessageDialogFooter footer,
+                                    const bool modal) {
+    if (messageDialog_ && IsWindow(messageDialog_)) {
+        DestroyWindow(messageDialog_);
+    }
+
+    messageDialogKind_ = kind;
+    messageDialogFooter_ = footer;
+    messageDialogModal_ = modal;
+
+    const HFONT uiFont = theme::MakeUiFont();
+    const HFONT logFont = theme::MakeLogFont();
+
+    const int contentWidth = kMsgDialogClientWidth - 2 * kMsgDialogMargin;
+    int measuredMessageHeight = 120;
+    {
+        const HWND measureHost = CreateWindowExW(0, L"STATIC", L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, instance_,
+                                                 nullptr);
+        if (measureHost) {
+            SendMessageW(measureHost, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+            measuredMessageHeight = MeasureWrappedStaticHeight(measureHost, message, contentWidth);
+            DestroyWindow(measureHost);
+        }
+    }
+
+    messageDialogBodyHeight_ = std::min(measuredMessageHeight, kMsgDialogMaxMessageHeight);
+
+    const int windowWidth = MessageDialogOuterWidth();
+    const int windowHeight = MessageDialogOuterHeightForMessage(measuredMessageHeight, footer);
+    const int x = (GetSystemMetrics(SM_CXSCREEN) - windowWidth) / 2;
+    const int yPos = (GetSystemMetrics(SM_CYSCREEN) - windowHeight) / 2;
+
+    messageDialog_ = CreateWindowExW(
+        0, kMessageDialogWindowClass, title.c_str(), WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+        x, yPos, windowWidth, windowHeight, hwnd_, nullptr, instance_, this);
+    if (!messageDialog_) {
+        MessageBoxW(hwnd_, message.c_str(), title.c_str(), MB_ICONERROR);
+        return;
+    }
+
+    theme::EnableDarkModeRecursive(messageDialog_);
+
+    messageDialogBody_ =
+        CreateScrollableTextPane(messageDialog_, instance_, kMsgDialogMessageId, uiFont, message);
+
+    messageDialogDiagLabel_ = CreateWindowW(
+        L"STATIC", i18n::Tr(L"ui.failure_dialog_diag_label").c_str(), WS_CHILD | SS_LEFT, 0, 0, 100, 18,
+        messageDialog_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kMsgDialogDiagLabelId)), instance_, nullptr);
+
+    messageDialogDiagEdit_ = CreateWindowExW(
+        WS_EX_CLIENTEDGE, L"EDIT", FailureDiagDisplayText().c_str(),
+        WS_CHILD | ES_AUTOHSCROLL | ES_READONLY | WS_TABSTOP, 0, 0, 100, kMsgDialogDiagEditHeight, messageDialog_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kMsgDialogDiagEditId)), instance_, nullptr);
+
+    messageDialogCopyBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.failure_dialog_copy_button").c_str(), WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON, 0, 0,
+        100, kMsgDialogBtnHeight, messageDialog_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kMsgDialogCopyBtnId)), instance_, nullptr);
+
+    messageDialogOkBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.failure_dialog_ok_button").c_str(),
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, 0, 100, kMsgDialogBtnHeight, messageDialog_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kMsgDialogOkBtnId)), instance_, nullptr);
+
+    messageDialogYesBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.dialog_yes").c_str(), WS_CHILD | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, 0, 100,
+        kMsgDialogBtnHeight, messageDialog_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kMsgDialogYesBtnId)), instance_, nullptr);
+
+    messageDialogNoBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.dialog_no").c_str(), WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 100,
+        kMsgDialogBtnHeight, messageDialog_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kMsgDialogNoBtnId)), instance_, nullptr);
+
+    SendMessageW(messageDialogDiagLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+    SendMessageW(messageDialogDiagEdit_, WM_SETFONT, reinterpret_cast<WPARAM>(logFont), TRUE);
+    for (HWND child :
+         {messageDialogCopyBtn_, messageDialogOkBtn_, messageDialogYesBtn_, messageDialogNoBtn_}) {
+        SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+    }
+
+    SubclassGlowButton(messageDialogCopyBtn_, false);
+    SubclassGlowButton(messageDialogOkBtn_, true);
+    SubclassGlowButton(messageDialogYesBtn_, true);
+    SubclassGlowButton(messageDialogNoBtn_, false);
+
+    RefreshMessageDialogText();
+    ShowWindow(messageDialog_, SW_SHOW);
+    SetForegroundWindow(messageDialog_);
+    if (footer == MessageDialogFooter::YesNo && messageDialogNoBtn_ && IsWindow(messageDialogNoBtn_)) {
+        SetFocus(messageDialogNoBtn_);
+    }
+    UpdateWindow(messageDialog_);
+}
+
+void Gui::ShowMessageDialog(const std::wstring& message, const std::wstring& title, const MessageDialogKind kind) {
+    OpenMessageDialogInternal(message, title, kind, MessageDialogFooter::Ok, false);
+}
+
+bool Gui::ShowConfirmDialog(const std::wstring& message, const std::wstring& title, const MessageDialogKind kind) {
+    OpenMessageDialogInternal(message, title, kind, MessageDialogFooter::YesNo, true);
+    return RunMessageDialogModalLoop();
+}
+
+void Gui::OpenFailureDialog(const std::wstring& message, const std::wstring& title) {
+    OpenMessageDialogInternal(message, title, MessageDialogKind::Error, MessageDialogFooter::OkWithDiag, false);
+}
+
+LRESULT CALLBACK Gui::MessageDialogWndProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp) {
+    Gui* self = nullptr;
+    if (msg == WM_NCCREATE) {
+        auto* cs = reinterpret_cast<CREATESTRUCTW*>(lp);
+        self = static_cast<Gui*>(cs->lpCreateParams);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+        return TRUE;
+    }
+
+    self = reinterpret_cast<Gui*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    if (!self) {
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    }
+
+    switch (msg) {
+        case WM_COMMAND: {
+            const int id = LOWORD(wp);
+            if (id == kMsgDialogCopyBtnId) {
+                if (self->CopyFailureDiagCodeToClipboard()) {
+                    SetWindowTextW(self->messageDialogCopyBtn_,
+                                   i18n::Tr(L"ui.failure_dialog_copied_button").c_str());
+                }
+                return 0;
+            }
+            if (id == kMsgDialogOkBtnId) {
+                if (self->messageDialogModal_) {
+                    self->messageDialogModalResult_ = true;
+                    self->messageDialogModalActive_ = false;
+                }
+                DestroyWindow(hwnd);
+                return 0;
+            }
+            if (id == kMsgDialogYesBtnId) {
+                self->messageDialogModalResult_ = true;
+                self->messageDialogModalActive_ = false;
+                DestroyWindow(hwnd);
+                return 0;
+            }
+            if (id == kMsgDialogNoBtnId) {
+                self->messageDialogModalResult_ = false;
+                self->messageDialogModalActive_ = false;
+                DestroyWindow(hwnd);
+                return 0;
+            }
+            break;
+        }
+        case WM_ERASEBKGND: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            RECT rc{};
+            GetClientRect(hwnd, &rc);
+            RECT accent = rc;
+            accent.bottom = accent.top + kMsgDialogAccentHeight;
+            HBRUSH accentBrush = CreateSolidBrush(self->MessageDialogAccentColor(self->messageDialogKind_));
+            FillRect(hdc, &accent, accentBrush);
+            DeleteObject(accentBrush);
+            rc.top = accent.bottom;
+            FillRect(hdc, &rc, theme::GetBrushes().window);
+            return 1;
+        }
+        case WM_CTLCOLORSTATIC: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, theme::Colors().text);
+            return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
+        }
+        case WM_CTLCOLOREDIT: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            SetBkMode(hdc, OPAQUE);
+            SetBkColor(hdc, theme::Colors().control);
+            SetTextColor(hdc, theme::Colors().text);
+            return reinterpret_cast<LRESULT>(theme::GetBrushes().control);
+        }
+        case WM_SIZE:
+            self->LayoutMessageDialog();
+            return 0;
+        case WM_CLOSE:
+            if (self->messageDialogModal_) {
+                self->messageDialogModalResult_ = false;
+                self->messageDialogModalActive_ = false;
+            }
+            DestroyWindow(hwnd);
+            return 0;
+        case WM_DESTROY:
+            self->messageDialog_ = nullptr;
+            self->messageDialogBody_ = nullptr;
+            self->messageDialogDiagLabel_ = nullptr;
+            self->messageDialogDiagEdit_ = nullptr;
+            self->messageDialogCopyBtn_ = nullptr;
+            self->messageDialogOkBtn_ = nullptr;
+            self->messageDialogYesBtn_ = nullptr;
+            self->messageDialogNoBtn_ = nullptr;
+            self->messageDialogBodyHeight_ = 0;
+            if (self->messageDialogModal_) {
+                self->messageDialogModalActive_ = false;
             }
             return 0;
         default:
@@ -1557,7 +2452,11 @@ void Gui::ShowDone(const bool success, const std::wstring& message, const std::w
     const std::wstring dialogTitle =
         title.empty() ? (success ? i18n::Tr(L"titles.installation_complete") : i18n::Tr(L"titles.installation_error"))
                       : title;
-    MessageBoxW(hwnd_, message.c_str(), dialogTitle.c_str(), success ? MB_ICONINFORMATION : MB_ICONERROR);
+    if (!success) {
+        OpenFailureDialog(message, dialogTitle);
+        return;
+    }
+    ShowMessageDialog(message, dialogTitle, MessageDialogKind::Info);
 }
 
 std::wstring Gui::SelectedDrive() const {
@@ -1979,6 +2878,8 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                     self->SetDownloadProgress(payload->percent, payload->statusText, payload->file);
                 } else if (payload->statusOnly) {
                     self->SetStatusBar(payload->statusText);
+                } else if (payload->openFileLog) {
+                    self->OpenFileLogWindow();
                 } else if (payload->extractUpdate) {
                     self->NotifyExtractProgress(payload->percent, payload->file, payload->resetLog);
                 } else {
@@ -2078,6 +2979,20 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             }
             return 0;
         }
+        case WM_MEDICAT_CONFIRM_PROMPT: {
+            auto* payload = reinterpret_cast<ConfirmPromptPayload*>(lp);
+            if (payload && payload->state) {
+                const bool result =
+                    self->ShowConfirmDialog(payload->message, payload->title, payload->kind);
+                payload->state->result = result;
+                payload->state->completed = true;
+                if (payload->state->doneEvent) {
+                    SetEvent(payload->state->doneEvent);
+                }
+            }
+            delete payload;
+            return 0;
+        }
         case WM_MEDICAT_DRIVE_LIST: {
             auto* payload = reinterpret_cast<DriveListPayload*>(lp);
             if (payload) {
@@ -2102,6 +3017,14 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             }
             return 0;
         }
+        case WM_MEDICAT_FAILURE_DIAG: {
+            auto* payload = reinterpret_cast<FailureDiagPayload*>(lp);
+            if (payload) {
+                self->SetFailureDiagCode(payload->uploadSucceeded, payload->keyword);
+                delete payload;
+            }
+            return 0;
+        }
         case WM_DESTROY:
             KillTimer(hwnd, kArchiveCheckTimerId);
             KillTimer(hwnd, kDriveRefreshTimerId);
@@ -2111,6 +3034,9 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             }
             if (self->reExtractWindow_ && IsWindow(self->reExtractWindow_)) {
                 DestroyWindow(self->reExtractWindow_);
+            }
+            if (self->messageDialog_ && IsWindow(self->messageDialog_)) {
+                DestroyWindow(self->messageDialog_);
             }
             if (self->creditsWindow_ && IsWindow(self->creditsWindow_)) {
                 DestroyWindow(self->creditsWindow_);
@@ -2495,6 +3421,7 @@ void Gui::RefreshTranslatedUi() {
     if (betaNoticeLabel_ && IsWindow(betaNoticeLabel_)) {
         SetWindowTextW(betaNoticeLabel_, i18n::Tr(L"ui.beta_telemetry_notice").c_str());
     }
+    RefreshMessageDialogText();
     RefreshCreditsWindowText();
     if (archiveMissingLabel_ && IsWindow(archiveMissingLabel_)) {
         SetWindowTextW(archiveMissingLabel_, i18n::Tr(L"ui.archive_missing", kMediCatArchiveFileName).c_str());

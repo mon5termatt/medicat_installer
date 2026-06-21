@@ -9,8 +9,11 @@
 namespace medicat {
 
 struct VentoyResult {
+    enum class FailureKind { None, Download, Extract, Prepare };
+
     bool success = false;
     int exitCode = -1;
+    FailureKind failureKind = FailureKind::None;
     std::wstring error;
     std::wstring ventoyExe;
     std::wstring version;

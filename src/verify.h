@@ -7,6 +7,8 @@
 
 namespace medicat {
 
+constexpr unsigned kMedicatPresenceProceedThresholdPercent = 25;
+
 struct VerifyProgress {
     size_t current = 0;
     size_t total = 0;
@@ -46,8 +48,26 @@ struct VerifyOptions {
     size_t threadCount = 0;
 };
 
+struct MedicatPresenceMarker {
+    const wchar_t* relativePath = nullptr;
+    bool isDirectory = false;
+    unsigned weight = 0;
+};
+
+struct MedicatPresenceResult {
+    unsigned scorePercent = 0;
+    unsigned markersFound = 0;
+    unsigned markersTotal = 0;
+    unsigned weightFound = 0;
+    unsigned weightTotal = 0;
+    bool likelyInstalled = false;
+    std::vector<std::wstring> foundMarkers;
+    std::vector<std::wstring> missingMarkers;
+};
+
 bool EnsureMedicatMd5Manifest(const std::wstring& installerRoot, const std::wstring& tempDir,
                               std::wstring& manifestPath, std::wstring& error);
+MedicatPresenceResult CheckMedicatPresenceOnDrive(const std::wstring& driveRoot);
 VerifyResult VerifyMedicatFiles(const VerifyOptions& options);
 
 }  // namespace medicat

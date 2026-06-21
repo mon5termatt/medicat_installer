@@ -396,15 +396,17 @@ struct ExtractMonitorState {
 };
 
 bool PollExtractHealth(const std::wstring& destinationRoot, const std::wstring& stderrText,
-                       ExtractMonitorState& state) {
-    const DestinationDriveStatus status = CheckDestinationDrive(destinationRoot, &state.ioDetail);
-    if (status == DestinationDriveStatus::Removed) {
-        state.driveRemoved = true;
-        return true;
-    }
-    if (status == DestinationDriveStatus::IoError) {
-        state.ioError = true;
-        return true;
+                       ExtractMonitorState& state, const bool monitorDestinationDrive) {
+    if (monitorDestinationDrive) {
+        const DestinationDriveStatus status = CheckDestinationDrive(destinationRoot, &state.ioDetail);
+        if (status == DestinationDriveStatus::Removed) {
+            state.driveRemoved = true;
+            return true;
+        }
+        if (status == DestinationDriveStatus::IoError) {
+            state.ioError = true;
+            return true;
+        }
     }
     if (ContainsFatalExtractOutput(stderrText)) {
         state.ioError = true;
@@ -436,7 +438,8 @@ ExtractResult Extract7zArchive(
     const uint64_t totalUncompressedBytes,
     const uint64_t initialFreeBytes,
     ProgressCallback onProgress,
-    const std::wstring& logFilePath) {
+    const std::wstring& logFilePath,
+    const bool monitorDestinationDrive) {
     ExtractResult result;
 
     std::wstring dest = destinationRoot;
@@ -539,7 +542,7 @@ ExtractResult Extract7zArchive(
             std::lock_guard lock(stderrMutex);
             stderrSnapshot = stderrText;
         }
-        if (PollExtractHealth(dest, stderrSnapshot, monitor)) {
+        if (PollExtractHealth(dest, stderrSnapshot, monitor, monitorDestinationDrive)) {
             TerminateProcess(pi.hProcess, 1);
             break;
         }
@@ -566,7 +569,7 @@ ExtractResult Extract7zArchive(
             std::chrono::duration_cast<std::chrono::milliseconds>(now - lastPoll).count() >= 500) {
             lastPoll = now;
             uint64_t written = 0;
-            if (initialFreeBytes > 0) {
+            if (monitorDestinationDrive && initialFreeBytes > 0) {
                 const uint64_t currentFree = GetDriveFreeBytes(dest);
                 if (currentFree < initialFreeBytes) {
                     written = initialFreeBytes - currentFree;
@@ -772,7 +775,7 @@ ExtractResult Extract7zArchiveSelective(
             std::lock_guard lock(stderrMutex);
             stderrSnapshot = stderrText;
         }
-        if (PollExtractHealth(dest, stderrSnapshot, monitor)) {
+        if (PollExtractHealth(dest, stderrSnapshot, monitor, true)) {
             TerminateProcess(pi.hProcess, 1);
             break;
         }

@@ -26,6 +26,7 @@ public:
 private:
     struct VerificationOutcome {
         bool success = false;
+        bool skipReExtract = false;
         std::wstring message;
         std::wstring title;
         size_t failedFiles = 0;
@@ -43,6 +44,8 @@ private:
     void PostExtractProgress(int percent, const std::wstring& file = L"", bool resetLog = false,
                              const wchar_t* cliTipKey = nullptr);
     void PostStatusBar(const std::wstring& text);  // Thread-safe; updates Gui::SetStatusBar on the UI thread.
+    void PostOpenFileLog();  // Thread-safe; opens verify/extract file log on the UI thread.
+    void PostFailureDiagCode(bool uploadSucceeded, const std::wstring& keyword);
     void PostDone(bool success, const std::wstring& message, const std::wstring& title = L"");
     void BeginAppSession();
     void MarkOperationStart();
@@ -58,8 +61,10 @@ private:
                                  const std::vector<std::wstring>& failureDetails,
                                  std::wstring* errorDetail = nullptr);
     bool PromptReExtract(const VerificationOutcome& outcome);
+    bool PromptConfirm(const std::wstring& message, const std::wstring& title,
+                       MessageDialogKind kind = MessageDialogKind::Warning);
     void RunInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
-                          VentoyInstallOptions ventoyInstall, HWND hwnd);
+                          VentoyInstallOptions ventoyInstall);
     void RunVerifyThread(std::wstring drive);
 
     int RunGui();

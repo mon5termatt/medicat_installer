@@ -35,7 +35,8 @@ ExtractResult Extract7zArchive(
     uint64_t totalUncompressedBytes,
     uint64_t initialFreeBytes,
     ProgressCallback onProgress,
-    const std::wstring& logFilePath = L"");
+    const std::wstring& logFilePath = L"",
+    bool monitorDestinationDrive = true);
 
 // Selectively extract only specific archive entries into destinationRoot.
 // `relativePaths` should match archive entry paths (e.g. "Ventoy/..." or "EFI\\...").

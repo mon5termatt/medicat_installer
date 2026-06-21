@@ -23,6 +23,25 @@ constexpr UINT WM_MEDICAT_REEXTRACT_PROMPT = WM_APP + 4;
 constexpr UINT WM_MEDICAT_DRIVE_LIST = WM_APP + 5;
 constexpr UINT WM_MEDICAT_VENTOY_STATUS = WM_APP + 6;
 constexpr UINT WM_MEDICAT_UPDATE_RESULT = WM_APP + 7;
+constexpr UINT WM_MEDICAT_FAILURE_DIAG = WM_APP + 8;
+constexpr UINT WM_MEDICAT_CONFIRM_PROMPT = WM_APP + 9;
+
+enum class MessageDialogKind { Info, Warning, Error };
+
+enum class MessageDialogFooter { Ok, OkWithDiag, YesNo };
+
+struct ConfirmPromptState {
+    HANDLE doneEvent = nullptr;
+    std::atomic<bool> result{false};
+    std::atomic<bool> completed{false};
+};
+
+struct ConfirmPromptPayload {
+    std::wstring message;
+    std::wstring title;
+    MessageDialogKind kind = MessageDialogKind::Warning;
+    std::shared_ptr<ConfirmPromptState> state;
+};
 
 struct ReExtractPromptState {
     HANDLE doneEvent = nullptr;
@@ -46,6 +65,7 @@ struct ProgressPayload {
     bool downloadUpdate = false;
     // When true, only statusText is applied to the main-window status bar (see Gui::SetStatusBar).
     bool statusOnly = false;
+    bool openFileLog = false;
     std::wstring file;
     std::wstring statusText;
 };
@@ -76,6 +96,11 @@ struct UpdateResultPayload {
     InstallerUpdateInfo info;
 };
 
+struct FailureDiagPayload {
+    bool uploadSucceeded = false;
+    std::wstring keyword;
+};
+
 enum class BusyProgressMode { FileLog, Verify, Download, None };
 
 class Gui {
@@ -104,6 +129,12 @@ public:
     void OpenCreditsWindow();
     void OpenReExtractPrompt(ReExtractPromptPayload* payload);
     void FinishReExtractPrompt(bool wantReExtract);
+    void OpenFailureDialog(const std::wstring& message, const std::wstring& title);
+    void SetFailureDiagCode(bool uploadSucceeded, const std::wstring& keyword);
+    void ResetFailureDiagCode();
+    void ShowMessageDialog(const std::wstring& message, const std::wstring& title, MessageDialogKind kind);
+    bool ShowConfirmDialog(const std::wstring& message, const std::wstring& title,
+                           MessageDialogKind kind = MessageDialogKind::Warning);
     void ShowDone(bool success, const std::wstring& message, const std::wstring& title = L"");
     void SetInitialLanguage(const std::wstring& languageCode);
     std::wstring SelectedDrive() const;
@@ -124,6 +155,7 @@ private:
     static LRESULT CALLBACK FileLogWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     static LRESULT CALLBACK CreditsWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     static LRESULT CALLBACK ReExtractWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+    static LRESULT CALLBACK MessageDialogWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     void OnCreate(HWND hwnd);
     void OnCommand(WPARAM wp);
     void RefreshDrives(bool fromDeviceChange = false);
@@ -152,6 +184,15 @@ private:
     void LayoutMainContent();
     void RefreshCreditsWindowText();
     void LayoutCreditsWindow();
+    void OpenMessageDialogInternal(const std::wstring& message, const std::wstring& title, MessageDialogKind kind,
+                                   MessageDialogFooter footer, bool modal);
+    void LayoutMessageDialog();
+    void RefreshMessageDialogText();
+    bool RunMessageDialogModalLoop();
+    bool CopyFailureDiagCodeToClipboard();
+    std::wstring FailureDiagDisplayText() const;
+    COLORREF MessageDialogAccentColor(MessageDialogKind kind) const;
+    void LayoutReExtractDialog();
     void UpdateArchivePanel();
     bool IsArchiveAvailable() const;
     void EnsureVentoyVersionsLoaded();
@@ -208,6 +249,26 @@ private:
     HWND reExtractBtn_ = nullptr;
     HWND reExtractCloseBtn_ = nullptr;
     std::shared_ptr<ReExtractPromptState> activeReExtractPrompt_;
+    HWND messageDialog_ = nullptr;
+    HWND messageDialogBody_ = nullptr;
+    HWND messageDialogDiagLabel_ = nullptr;
+    HWND messageDialogDiagEdit_ = nullptr;
+    HWND messageDialogCopyBtn_ = nullptr;
+    HWND messageDialogOkBtn_ = nullptr;
+    HWND messageDialogYesBtn_ = nullptr;
+    HWND messageDialogNoBtn_ = nullptr;
+    MessageDialogKind messageDialogKind_ = MessageDialogKind::Error;
+    MessageDialogFooter messageDialogFooter_ = MessageDialogFooter::Ok;
+    bool messageDialogModal_ = false;
+    bool messageDialogModalActive_ = false;
+    bool messageDialogModalResult_ = false;
+    bool failureDiagUploadSucceeded_ = false;
+    bool failureDiagResolved_ = false;
+    std::wstring failureDiagKeyword_;
+    std::vector<std::wstring> reExtractFailureLines_;
+    size_t reExtractFailedFilesTotal_ = 0;
+    int messageDialogBodyHeight_ = 0;
+    int reExtractMessageHeight_ = 0;
 
     std::mutex uiMutex_;
     int pendingPercent_ = 0;

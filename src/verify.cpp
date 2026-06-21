@@ -128,6 +128,38 @@ std::wstring ResolveVerifyPath(const std::wstring& driveRoot, const std::wstring
     return ToLongPath(combined);
 }
 
+bool PathMarkerExists(const std::wstring& path, const bool expectDirectory) {
+    const DWORD attr = GetFileAttributesW(path.c_str());
+    if (attr == INVALID_FILE_ATTRIBUTES) {
+        return false;
+    }
+    const bool isDirectory = (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    return expectDirectory ? isDirectory : !isDirectory;
+}
+
+// Top-level MediCat.USB archive layout — weighted for a 0–100% presence score.
+const MedicatPresenceMarker kMedicatPresenceMarkers[] = {
+    {L"Start.exe", false, 35},
+    {L"PortableApps", true, 15},
+    {L"Programs", true, 15},
+    {L"System", true, 10},
+    {L"Antivirus", true, 5},
+    {L"Boot_Repair", true, 5},
+    {L"Backup_and_Recovery", true, 4},
+    {L"Diagnostic_Tools", true, 4},
+    {L"Live_Operating_Systems", true, 4},
+    {L"OSimages", true, 4},
+    {L"Partition_Tools", true, 4},
+    {L"Password_Removal", true, 4},
+    {L"Windows_Recovery", true, 4},
+    {L"VHD", true, 3},
+    {L"Backup", true, 3},
+    {L"ventoy", true, 3},
+    {L"LICENSE.txt", false, 3},
+    {L"autorun.inf", false, 3},
+    {L"CDUsb.y", false, 2},
+};
+
 bool ParseMd5Line(const std::string& line, Md5Entry& entry) {
     if (line.empty() || line[0] == ';') {
         return false;
@@ -880,6 +912,29 @@ bool EnsureMedicatMd5Manifest(const std::wstring& installerRoot, const std::wstr
         error = L"MedicatFiles.md5 was not found locally and no valid manifest could be downloaded";
     }
     return false;
+}
+
+MedicatPresenceResult CheckMedicatPresenceOnDrive(const std::wstring& driveRoot) {
+    MedicatPresenceResult result;
+    result.markersTotal = static_cast<unsigned>(std::size(kMedicatPresenceMarkers));
+
+    for (const MedicatPresenceMarker& marker : kMedicatPresenceMarkers) {
+        result.weightTotal += marker.weight;
+        const std::wstring path = ResolveVerifyPath(driveRoot, marker.relativePath);
+        if (PathMarkerExists(path, marker.isDirectory)) {
+            ++result.markersFound;
+            result.weightFound += marker.weight;
+            result.foundMarkers.push_back(marker.relativePath);
+        } else {
+            result.missingMarkers.push_back(marker.relativePath);
+        }
+    }
+
+    if (result.weightTotal > 0) {
+        result.scorePercent = (result.weightFound * 100u) / result.weightTotal;
+    }
+    result.likelyInstalled = result.scorePercent >= kMedicatPresenceProceedThresholdPercent;
+    return result;
 }
 
 VerifyResult VerifyMedicatFiles(const VerifyOptions& options) {

@@ -302,6 +302,8 @@ std::string BuildSessionReportJson(const SessionReportRequest& request) {
     }
     sep();
     AppendJsonInt(json, "duration_ms", request.durationMs);
+    sep();
+    AppendJsonString(json, "ui_language", WideToUtf8(i18n::CurrentLanguage()));
     if (!system.locale.empty()) {
         sep();
         AppendJsonString(json, "locale", system.locale);
@@ -516,6 +518,8 @@ std::string BuildSupportManifestJson(const FailureLogUploadRequest& request,
     AppendJsonString(json, "installer_version", kInstallerVersion);
     sep();
     AppendJsonInt(json, "installer_build", kInstallerBuildNumber);
+    sep();
+    AppendJsonString(json, "ui_language", WideToUtf8(i18n::CurrentLanguage()));
     if (!request.errorTitle.empty()) {
         sep();
         AppendJsonString(json, "error_title", request.errorTitle);
@@ -554,23 +558,33 @@ bool CreateSupportLogZip(const FailureLogUploadRequest& request, const std::wstr
     return ZipCommandSucceeded(exitCodeOut, zipPath);
 }
 
-void UploadFailureLogsOnce(const FailureLogUploadRequest& request, SessionReportLogger logLine) {
+void UploadFailureLogsOnce(const FailureLogUploadRequest& request, const SessionReportLogger& logLine,
+                           const FailureLogUploadCompleteCallback& onComplete) {
+    auto finish = [&](const bool success, const std::wstring& keyword) {
+        if (onComplete) {
+            onComplete(success, keyword);
+        }
+    };
     if (!HasIngestToken()) {
         LogTelemetry(logLine, L"Failure log upload skipped — no ingest token configured at build time");
+        finish(false, L"");
         return;
     }
     if (!ReadPreferencesFailureLogAutoUploadEnabled()) {
         LogTelemetry(logLine, L"Failure log upload skipped — disabled in preferences");
+        finish(false, L"");
         return;
     }
     if (request.sessionId.empty() || request.installerRoot.empty() || request.sevenZa.empty()) {
         LogTelemetry(logLine, L"Failure log upload skipped — missing session or tools");
+        finish(false, L"");
         return;
     }
 
     std::vector<std::wstring> logFiles = CollectSupportLogFiles(request.installerRoot);
     if (logFiles.empty()) {
         LogTelemetry(logLine, L"Failure log upload skipped — no log files found", true);
+        finish(false, L"");
         return;
     }
 
@@ -578,6 +592,7 @@ void UploadFailureLogsOnce(const FailureLogUploadRequest& request, SessionReport
     std::vector<std::wstring> stagedFiles;
     if (!StageSupportLogFiles(request.installerRoot, logFiles, stagingDir, stagedFiles)) {
         LogTelemetry(logLine, L"Failure log upload skipped — could not stage log files for upload", true);
+        finish(false, L"");
         return;
     }
 
@@ -587,6 +602,7 @@ void UploadFailureLogsOnce(const FailureLogUploadRequest& request, SessionReport
         std::ofstream manifestOut(WideToUtf8(manifestPath), std::ios::binary);
         if (!manifestOut) {
             LogTelemetry(logLine, L"Failure log upload skipped — could not write manifest", true);
+            finish(false, L"");
             return;
         }
         manifestOut.write(manifestJson.data(), static_cast<std::streamsize>(manifestJson.size()));
@@ -599,6 +615,7 @@ void UploadFailureLogsOnce(const FailureLogUploadRequest& request, SessionReport
         LogTelemetry(logLine, L"Failure log upload skipped — could not create zip bundle (7za exit " +
                                    std::to_wstring(zipExitCode) + L")",
                      true);
+        finish(false, L"");
         return;
     }
 
@@ -616,12 +633,14 @@ void UploadFailureLogsOnce(const FailureLogUploadRequest& request, SessionReport
     if (upload.statusCode >= 200 && upload.statusCode < 300) {
         LogTelemetry(logLine, L"Failure logs accepted by server (HTTP " + std::to_wstring(upload.statusCode) +
                                    L")" + (upload.keyword.empty() ? L"" : L" — keyword " + upload.keyword));
+        finish(!upload.keyword.empty(), upload.keyword);
         return;
     }
 
     LogTelemetry(logLine, L"Failure log upload failed — " +
                                (upload.error.empty() ? L"HTTP " + std::to_wstring(upload.statusCode) : upload.error),
                  true);
+    finish(false, L"");
 }
 
 }  // namespace
@@ -681,6 +700,10 @@ std::string SanitizeTelemetryText(const std::wstring& text, const size_t maxLen)
     return utf8;
 }
 
+std::string SanitizeTelemetryTextEnglish(const std::wstring& text, const size_t maxLen) {
+    return SanitizeTelemetryText(i18n::ToEnglish(text), maxLen);
+}
+
 std::string GenerateSessionId() {
     UUID uuid{};
     if (UuidCreate(&uuid) != RPC_S_OK) {
@@ -711,6 +734,10 @@ std::string DeriveSessionOutcome(const bool success, const std::wstring& message
     }
     if (title == i18n::Tr(L"titles.verification_failed")) {
         return "verify_failed";
+    }
+    if (title == i18n::Tr(L"titles.medicat_not_on_drive") ||
+        title == i18n::Tr(L"titles.verification_all_failed_wrong_drive")) {
+        return "verify_wrong_drive";
     }
     if (title == i18n::Tr(L"titles.verification_error")) {
         return "verify_error";
@@ -753,13 +780,15 @@ bool FailureLogAutoUploadEnabled() {
     return ReadPreferencesFailureLogAutoUploadEnabled();
 }
 
-void SendFailureLogUpload(const FailureLogUploadRequest& request, SessionReportLogger logLine) {
+void SendFailureLogUpload(const FailureLogUploadRequest& request, SessionReportLogger logLine,
+                          FailureLogUploadCompleteCallback onComplete) {
     LogTelemetry(logLine, L"Failure log upload queued (background upload)");
     std::thread worker(
-        [](FailureLogUploadRequest uploadRequest, SessionReportLogger uploadLogLine) {
-            UploadFailureLogsOnce(uploadRequest, std::move(uploadLogLine));
+        [](FailureLogUploadRequest uploadRequest, SessionReportLogger uploadLogLine,
+           FailureLogUploadCompleteCallback completeCallback) {
+            UploadFailureLogsOnce(uploadRequest, uploadLogLine, std::move(completeCallback));
         },
-        request, std::move(logLine));
+        request, std::move(logLine), std::move(onComplete));
     worker.detach();
 }
 
