@@ -559,7 +559,7 @@ void App::SubmitSessionReport(const bool success, const std::wstring& message, c
                                                         : i18n::Tr(L"titles.installation_error");
         }
         request.errorTitle = SanitizeTelemetryTextEnglish(errorTitle, 128);
-        request.errorDetail = SanitizeTelemetryTextEnglish(message);
+        request.errorDetail = SanitizeTelemetryTextEnglish(message, 900);
     }
 
     SendSessionReport(request, headless_, [this](const std::wstring& line, const bool isError) {
@@ -598,7 +598,7 @@ void App::QueueFailureLogUpload(const std::string& sessionId, const std::wstring
                                                         : i18n::Tr(L"titles.installation_error");
         }
         request.errorTitle = SanitizeTelemetryTextEnglish(errorTitle, 128);
-        request.errorDetail = SanitizeTelemetryTextEnglish(message);
+        request.errorDetail = SanitizeTelemetryTextEnglish(message, 900);
     }
 
     SendFailureLogUpload(

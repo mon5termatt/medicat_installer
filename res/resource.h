@@ -1,4 +1,5 @@
 #define IDI_APP_ICON 1
+#define IDI_DISCORD_ICON 2
 #define IDR_7ZA 101
 #define IDR_LOGO_PNG 103
 #define IDR_VENTOY_VERSIONS 104

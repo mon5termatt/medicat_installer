@@ -34,6 +34,7 @@ const Brushes& GetBrushes();
 HBITMAP LoadLogoBitmap(HINSTANCE instance, int maxSize = 48);
 bool PaintLogo(HDC hdc, HINSTANCE instance, const RECT& bounds, int maxSize = 48);
 HICON LoadLogoIcon(HINSTANCE instance, int size = 48);
+HICON LoadEmbeddedIcon(HINSTANCE instance, int resourceId, int size);
 HFONT MakeUiFont();
 HFONT MakeTitleFont();
 HFONT MakeSubtitleFont();
@@ -48,6 +49,9 @@ enum class ButtonState { Normal, Hovered, Pressed, Disabled };
 
 void PaintFlatButton(HDC hdc, const RECT& rc, const wchar_t* text, HFONT font, ButtonStyle style,
                      ButtonState state);
+
+void PaintFlatIconButton(HDC hdc, const RECT& rc, HICON icon, ButtonStyle style, ButtonState state,
+                         bool fullBleed = false);
 
 void PaintFlatCheckbox(HDC hdc, const RECT& rc, const wchar_t* text, HFONT font, bool checked, bool enabled);
 

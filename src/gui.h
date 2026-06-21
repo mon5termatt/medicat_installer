@@ -227,6 +227,7 @@ private:
     HWND openLogBtn_ = nullptr;
     HWND manualInstallBtn_ = nullptr;
     HWND creditsBtn_ = nullptr;
+    HWND discordFooterBtn_ = nullptr;
     HWND feedbackBtn_ = nullptr;
     HWND progressBar_ = nullptr;
     HWND statusBar_ = nullptr;
@@ -254,6 +255,7 @@ private:
     HWND messageDialogDiagLabel_ = nullptr;
     HWND messageDialogDiagEdit_ = nullptr;
     HWND messageDialogCopyBtn_ = nullptr;
+    HWND messageDialogDiscordBtn_ = nullptr;
     HWND messageDialogOkBtn_ = nullptr;
     HWND messageDialogYesBtn_ = nullptr;
     HWND messageDialogNoBtn_ = nullptr;
@@ -289,6 +291,7 @@ private:
     std::wstring lastVentoyLogDrive_;
     bool lastVentoyLogFound_ = false;
     HBITMAP logoBitmap_ = nullptr;
+    HICON discordFooterIcon_ = nullptr;
     std::vector<std::wstring> ventoyVersions_;
     bool ventoyVersionsLoading_ = false;
     bool ventoyVersionsLoaded_ = false;

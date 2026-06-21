@@ -276,7 +276,7 @@ bool IsUsefulErrorLine(const std::wstring& line) {
         L"ERROR:", L"OPEN ERROR:", L"SYSTEM ERROR:", L"FATAL ERROR", L"CANNOT OPEN", L"CANNOT CREATE",
         L"CANNOT WRITE", L"CANNOT OPEN OUTPUT", L"WRONG PASSWORD", L"NOT ENOUGH SPACE", L"DISK FULL",
         L"FILE NOT FOUND", L"DATA ERROR", L"UNSUPPORTED", L"DEVICE IS NOT READY", L"I/O DEVICE",
-        L"WRITE PROTECTED", L"MEDIA IS WRITE", L"READ ERROR", L"WRITE ERROR", L"ERRORS:",
+        L"WRITE PROTECTED", L"MEDIA IS WRITE", L"READ ERROR", L"WRITE ERROR", L"ERRORS:", L"UNEXPECTED END",
     };
     for (const wchar_t* marker : kMarkers) {
         if (upper.find(marker) != std::wstring::npos) {
@@ -382,9 +382,19 @@ void SetExtractFailure(ExtractResult& result, const DWORD exitCode, const std::w
 }
 
 std::wstring FormatExtractFailureMessage(const ExtractResult& result) {
-    std::wstring message = i18n::Tr(L"messages.process_exit_code", L"7za", std::to_wstring(result.exitCode));
+    std::wstring message;
     if (!result.detail.empty()) {
-        message += L"\n\n" + result.detail;
+        message = result.detail;
+    }
+
+    const std::wstring exitLine =
+        i18n::Tr(L"messages.process_exit_code", L"7za", std::to_wstring(result.exitCode));
+    if (message.empty()) {
+        return exitLine;
+    }
+    if (message.find(exitLine) == std::wstring::npos) {
+        message += L"\n\n";
+        message += exitLine;
     }
     return message;
 }

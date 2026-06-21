@@ -51,9 +51,22 @@ add_custom_command(
 
 file(TO_NATIVE_PATH "${VENTOY_VERSIONS_GEN}" VENTOY_VERSIONS_PATH)
 string(REPLACE "\\" "/" VENTOY_VERSIONS_PATH "${VENTOY_VERSIONS_PATH}")
+
+set(DISCORD_ICON_SCRIPT "${REPO_ROOT}/tools/prepare_discord_icon.py")
+set(DISCORD_PNG "${CMAKE_CURRENT_SOURCE_DIR}/res/discord.png")
+set(DISCORD_ICO "${CMAKE_CURRENT_SOURCE_DIR}/res/discord.ico")
+
+add_custom_command(
+    OUTPUT "${DISCORD_ICO}"
+    COMMAND python "${DISCORD_ICON_SCRIPT}"
+    DEPENDS "${DISCORD_ICON_SCRIPT}" "${DISCORD_PNG}"
+    COMMENT "Building Discord icon from res/discord.png"
+    WORKING_DIRECTORY "${REPO_ROOT}"
+)
+
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/res/bundle.rc.in" "${CMAKE_BINARY_DIR}/bundle.rc" @ONLY)
 set_source_files_properties("${CMAKE_BINARY_DIR}/bundle.rc" PROPERTIES
-    OBJECT_DEPENDS "${VENTOY_VERSIONS_GEN};${BUNDLE_MD5_GZ};${BUNDLE_7ZA}"
+    OBJECT_DEPENDS "${VENTOY_VERSIONS_GEN};${BUNDLE_MD5_GZ};${BUNDLE_7ZA};${DISCORD_ICO}"
 )
 
 set(BUILD_NUMBER_FILE "${REPO_ROOT}/build_number.txt")
@@ -100,6 +113,7 @@ add_executable(MedicatInstaller WIN32
     "${CMAKE_BINARY_DIR}/ventoy_versions.txt"
     "${BUNDLE_MD5_GZ}"
     "${I18N_GEN}"
+    "${DISCORD_ICO}"
 )
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 4)

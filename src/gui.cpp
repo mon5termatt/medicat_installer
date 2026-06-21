@@ -60,6 +60,8 @@ constexpr int kManualInstallGap = 10;
 constexpr int kCreditsBtnHeight = 28;
 constexpr int kCreditsBtnGap = 8;
 constexpr int kFooterBtnGap = 8;
+constexpr int kDiscordFooterBtnWidth = kCreditsBtnHeight;
+constexpr int kDiscordFooterIconSize = kCreditsBtnHeight;
 constexpr int kActionRowGap = 12;
 constexpr int kStatusBarHeight = 20;
 constexpr int kBetaNoticeMinHeight = 20;
@@ -148,6 +150,24 @@ int ContentLeft(const int clientWidth) {
     return (clientWidth - kContentWidth) / 2;
 }
 
+struct FooterButtonLayout {
+    int sideBtnWidth = 0;
+    int discordBtnWidth = kDiscordFooterBtnWidth;
+    int creditsX = 0;
+    int discordX = 0;
+    int feedbackX = 0;
+};
+
+FooterButtonLayout ComputeFooterButtonLayout(const int contentLeft) {
+    FooterButtonLayout layout{};
+    layout.sideBtnWidth =
+        (kContentWidth - 2 * kFooterBtnGap - layout.discordBtnWidth) / 2;
+    layout.creditsX = contentLeft;
+    layout.discordX = contentLeft + layout.sideBtnWidth + kFooterBtnGap;
+    layout.feedbackX = layout.discordX + layout.discordBtnWidth + kFooterBtnGap;
+    return layout;
+}
+
 int OuterWindowWidthForClient(HWND hwnd, const int clientWidth) {
     RECT frame{0, 0, clientWidth, 100};
     const DWORD style = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_STYLE));
@@ -180,6 +200,7 @@ constexpr int kAltDownloadOpenBtnId = 1023;
 constexpr int kManualInstallBtnId = 1024;
 constexpr int kCreditsBtnId = 1025;
 constexpr int kFeedbackBtnId = 1026;
+constexpr int kDiscordFooterBtnId = 1027;
 constexpr int kCreditsIntroId = 1130;
 constexpr int kCreditsSevenZipBtnId = 1131;
 constexpr int kCreditsVentoyBtnId = 1132;
@@ -192,6 +213,7 @@ constexpr int kMsgDialogMessageId = 1140;
 constexpr int kMsgDialogDiagLabelId = 1141;
 constexpr int kMsgDialogDiagEditId = 1142;
 constexpr int kMsgDialogCopyBtnId = 1143;
+constexpr int kMsgDialogDiscordBtnId = 1147;
 constexpr int kMsgDialogOkBtnId = 1144;
 constexpr int kMsgDialogYesBtnId = 1145;
 constexpr int kMsgDialogNoBtnId = 1146;
@@ -776,7 +798,41 @@ struct GlowButtonState {
     bool hovered = false;
     bool pressed = false;
     bool primary = false;
+    HICON icon = nullptr;
+    bool iconFullBleed = false;
 };
+
+void PaintIconButtonBackground(const HDC hdc, const RECT& rc) {
+    FillRect(hdc, &rc, theme::GetBrushes().window);
+}
+
+void PaintGlowButtonClient(const HWND hwnd, const HDC hdc, const GlowButtonState* state) {
+    RECT rc{};
+    GetClientRect(hwnd, &rc);
+
+    theme::ButtonState btnState = theme::ButtonState::Normal;
+    if (!IsWindowEnabled(hwnd)) {
+        btnState = theme::ButtonState::Disabled;
+    } else if (state->pressed) {
+        btnState = theme::ButtonState::Pressed;
+    } else if (state->hovered) {
+        btnState = theme::ButtonState::Hovered;
+    }
+
+    const auto style = state->primary ? theme::ButtonStyle::Primary : theme::ButtonStyle::Secondary;
+    if (state->icon) {
+        if (state->iconFullBleed) {
+            PaintIconButtonBackground(hdc, rc);
+        }
+        theme::PaintFlatIconButton(hdc, rc, state->icon, style, btnState, state->iconFullBleed);
+        return;
+    }
+
+    wchar_t text[256]{};
+    GetWindowTextW(hwnd, text, static_cast<int>(std::size(text)));
+    const HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
+    theme::PaintFlatButton(hdc, rc, text, font, style, btnState);
+}
 
 LRESULT CALLBACK GlowButtonProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp) {
     auto* state = reinterpret_cast<GlowButtonState*>(GetPropW(hwnd, L"MedicatGlowBtn"));
@@ -793,19 +849,25 @@ LRESULT CALLBACK GlowButtonProc(const HWND hwnd, const UINT msg, const WPARAM wp
                 tme.dwFlags = TME_LEAVE;
                 tme.hwndTrack = hwnd;
                 TrackMouseEvent(&tme);
-                InvalidateRect(hwnd, nullptr, FALSE);
+                if (!state->iconFullBleed) {
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                }
             }
-            break;
+            return 0;
         case WM_MOUSELEAVE:
             state->hovered = false;
             state->pressed = false;
-            InvalidateRect(hwnd, nullptr, FALSE);
-            break;
+            if (!state->iconFullBleed) {
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
+            return 0;
         case WM_LBUTTONDOWN:
             if (IsWindowEnabled(hwnd)) {
                 state->pressed = true;
                 SetCapture(hwnd);
-                InvalidateRect(hwnd, nullptr, FALSE);
+                if (!state->iconFullBleed) {
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                }
             }
             return 0;
         case WM_LBUTTONUP: {
@@ -814,7 +876,9 @@ LRESULT CALLBACK GlowButtonProc(const HWND hwnd, const UINT msg, const WPARAM wp
             if (GetCapture() == hwnd) {
                 ReleaseCapture();
             }
-            InvalidateRect(hwnd, nullptr, FALSE);
+            if (!state->iconFullBleed) {
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
             if (wasPressed && IsWindowEnabled(hwnd)) {
                 POINT pt{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
                 RECT rc{};
@@ -830,14 +894,18 @@ LRESULT CALLBACK GlowButtonProc(const HWND hwnd, const UINT msg, const WPARAM wp
         case WM_KEYDOWN:
             if ((wp == VK_SPACE || wp == VK_RETURN) && IsWindowEnabled(hwnd)) {
                 state->pressed = true;
-                InvalidateRect(hwnd, nullptr, FALSE);
+                if (!state->iconFullBleed) {
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                }
                 return 0;
             }
-            break;
+            return 0;
         case WM_KEYUP:
             if ((wp == VK_SPACE || wp == VK_RETURN) && state->pressed) {
                 state->pressed = false;
-                InvalidateRect(hwnd, nullptr, FALSE);
+                if (!state->iconFullBleed) {
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                }
                 if (IsWindowEnabled(hwnd)) {
                     const int id = GetDlgCtrlID(hwnd);
                     SendMessageW(GetParent(hwnd), WM_COMMAND, MAKEWPARAM(id, BN_CLICKED),
@@ -845,60 +913,40 @@ LRESULT CALLBACK GlowButtonProc(const HWND hwnd, const UINT msg, const WPARAM wp
                 }
                 return 0;
             }
-            break;
+            return 0;
+        case WM_SETFOCUS:
+        case WM_KILLFOCUS:
+        case WM_CAPTURECHANGED:
+            return 0;
+        case WM_SETCURSOR:
+            if (LOWORD(lp) == HTCLIENT && IsWindowEnabled(hwnd)) {
+                SetCursor(LoadCursor(nullptr, IDC_HAND));
+                return TRUE;
+            }
+            return FALSE;
         case WM_ENABLE:
             state->hovered = false;
             state->pressed = false;
-            InvalidateRect(hwnd, nullptr, FALSE);
+            if (!state->iconFullBleed) {
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
             return 0;
         case WM_UPDATEUISTATE:
-            InvalidateRect(hwnd, nullptr, FALSE);
+            if (!state->iconFullBleed) {
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
             return 0;
         case BM_SETSTATE:
             return 0;
         case WM_PRINTCLIENT: {
             const HDC hdc = reinterpret_cast<HDC>(wp);
-            RECT rc{};
-            GetClientRect(hwnd, &rc);
-            wchar_t text[256]{};
-            GetWindowTextW(hwnd, text, static_cast<int>(std::size(text)));
-            const HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
-
-            theme::ButtonState btnState = theme::ButtonState::Normal;
-            if (!IsWindowEnabled(hwnd)) {
-                btnState = theme::ButtonState::Disabled;
-            } else if (state->pressed) {
-                btnState = theme::ButtonState::Pressed;
-            } else if (state->hovered) {
-                btnState = theme::ButtonState::Hovered;
-            }
-
-            theme::PaintFlatButton(
-                hdc, rc, text, font,
-                state->primary ? theme::ButtonStyle::Primary : theme::ButtonStyle::Secondary, btnState);
+            PaintGlowButtonClient(hwnd, hdc, state);
             return 0;
         }
         case WM_PAINT: {
             PAINTSTRUCT ps{};
             const HDC hdc = BeginPaint(hwnd, &ps);
-            RECT rc{};
-            GetClientRect(hwnd, &rc);
-            wchar_t text[256]{};
-            GetWindowTextW(hwnd, text, static_cast<int>(std::size(text)));
-            const HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
-
-            theme::ButtonState btnState = theme::ButtonState::Normal;
-            if (!IsWindowEnabled(hwnd)) {
-                btnState = theme::ButtonState::Disabled;
-            } else if (state->pressed) {
-                btnState = theme::ButtonState::Pressed;
-            } else if (state->hovered) {
-                btnState = theme::ButtonState::Hovered;
-            }
-
-            theme::PaintFlatButton(
-                hdc, rc, text, font,
-                state->primary ? theme::ButtonStyle::Primary : theme::ButtonStyle::Secondary, btnState);
+            PaintGlowButtonClient(hwnd, hdc, state);
             EndPaint(hwnd, &ps);
             return 0;
         }
@@ -920,6 +968,17 @@ void SubclassGlowButton(HWND hwnd, const bool primary) {
     SendMessageW(hwnd, BM_SETSTYLE, BS_PUSHBUTTON, TRUE);
     auto* state = new GlowButtonState{};
     state->primary = primary;
+    state->original = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
+        hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(GlowButtonProc)));
+    SetPropW(hwnd, L"MedicatGlowBtn", state);
+}
+
+void SubclassGlowIconButton(HWND hwnd, HICON icon, const bool fullBleed = false) {
+    SetWindowTheme(hwnd, L"", L"");
+    SendMessageW(hwnd, BM_SETSTYLE, BS_PUSHBUTTON, TRUE);
+    auto* state = new GlowButtonState{};
+    state->icon = icon;
+    state->iconFullBleed = fullBleed;
     state->original = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
         hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(GlowButtonProc)));
     SetPropW(hwnd, L"MedicatGlowBtn", state);
@@ -2094,7 +2153,8 @@ void Gui::LayoutMessageDialog() {
     GetClientRect(messageDialog_, &client);
     const int clientWidth = client.right - client.left;
     const int contentWidth = std::max(0, clientWidth - 2 * kMsgDialogMargin);
-    const int copyBtnWidth = 120;
+    const int copyBtnWidth = 100;
+    const int discordBtnWidth = 100;
     const int okBtnWidth = 100;
     const int yesBtnWidth = 100;
     const int noBtnWidth = 100;
@@ -2109,6 +2169,7 @@ void Gui::LayoutMessageDialog() {
     setVisible(messageDialogDiagLabel_, showDiag ? SW_SHOW : SW_HIDE);
     setVisible(messageDialogDiagEdit_, showDiag ? SW_SHOW : SW_HIDE);
     setVisible(messageDialogCopyBtn_, showDiag ? SW_SHOW : SW_HIDE);
+    setVisible(messageDialogDiscordBtn_, showDiag ? SW_SHOW : SW_HIDE);
     setVisible(messageDialogOkBtn_, showYesNo ? SW_HIDE : SW_SHOW);
     setVisible(messageDialogYesBtn_, showYesNo ? SW_SHOW : SW_HIDE);
     setVisible(messageDialogNoBtn_, showYesNo ? SW_SHOW : SW_HIDE);
@@ -2128,20 +2189,26 @@ void Gui::LayoutMessageDialog() {
     }
 
     if (showDiag && messageDialogDiagEdit_ && IsWindow(messageDialogDiagEdit_)) {
-        SetWindowPos(messageDialogDiagEdit_, nullptr, kMsgDialogMargin, y, contentWidth, kMsgDialogDiagEditHeight,
+        const int sideBtnWidth = copyBtnWidth + actionGap + discordBtnWidth;
+        const int editWidth = std::max(120, contentWidth - sideBtnWidth - actionGap);
+        SetWindowPos(messageDialogDiagEdit_, nullptr, kMsgDialogMargin, y, editWidth, kMsgDialogDiagEditHeight,
                      SWP_NOZORDER);
+        const int sideBtnX = kMsgDialogMargin + editWidth + actionGap;
+        if (messageDialogCopyBtn_ && IsWindow(messageDialogCopyBtn_)) {
+            SetWindowPos(messageDialogCopyBtn_, nullptr, sideBtnX, y, copyBtnWidth, kMsgDialogBtnHeight,
+                         SWP_NOZORDER);
+        }
+        if (messageDialogDiscordBtn_ && IsWindow(messageDialogDiscordBtn_)) {
+            SetWindowPos(messageDialogDiscordBtn_, nullptr, sideBtnX + copyBtnWidth + actionGap, y, discordBtnWidth,
+                         kMsgDialogBtnHeight, SWP_NOZORDER);
+        }
         y += kMsgDialogDiagEditHeight + kMsgDialogSectionGap;
     }
 
     if (showDiag) {
-        const int actionRowWidth = copyBtnWidth + actionGap + okBtnWidth;
-        const int actionX = kMsgDialogMargin + std::max(0, contentWidth - actionRowWidth);
-        if (messageDialogCopyBtn_ && IsWindow(messageDialogCopyBtn_)) {
-            SetWindowPos(messageDialogCopyBtn_, nullptr, actionX, y, copyBtnWidth, kMsgDialogBtnHeight, SWP_NOZORDER);
-        }
+        const int actionX = kMsgDialogMargin + std::max(0, contentWidth - okBtnWidth);
         if (messageDialogOkBtn_ && IsWindow(messageDialogOkBtn_)) {
-            SetWindowPos(messageDialogOkBtn_, nullptr, actionX + copyBtnWidth + actionGap, y, okBtnWidth,
-                         kMsgDialogBtnHeight, SWP_NOZORDER);
+            SetWindowPos(messageDialogOkBtn_, nullptr, actionX, y, okBtnWidth, kMsgDialogBtnHeight, SWP_NOZORDER);
         }
     } else if (showYesNo) {
         const int actionRowWidth = noBtnWidth + actionGap + yesBtnWidth;
@@ -2279,6 +2346,10 @@ void Gui::OpenMessageDialogInternal(const std::wstring& message, const std::wstr
         100, kMsgDialogBtnHeight, messageDialog_,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kMsgDialogCopyBtnId)), instance_, nullptr);
 
+    messageDialogDiscordBtn_ = CreateWindowW(
+        L"BUTTON", L"Discord", WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 100, kMsgDialogBtnHeight,
+        messageDialog_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kMsgDialogDiscordBtnId)), instance_, nullptr);
+
     messageDialogOkBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.failure_dialog_ok_button").c_str(),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, 0, 100, kMsgDialogBtnHeight, messageDialog_,
@@ -2297,11 +2368,13 @@ void Gui::OpenMessageDialogInternal(const std::wstring& message, const std::wstr
     SendMessageW(messageDialogDiagLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
     SendMessageW(messageDialogDiagEdit_, WM_SETFONT, reinterpret_cast<WPARAM>(logFont), TRUE);
     for (HWND child :
-         {messageDialogCopyBtn_, messageDialogOkBtn_, messageDialogYesBtn_, messageDialogNoBtn_}) {
+         {messageDialogCopyBtn_, messageDialogDiscordBtn_, messageDialogOkBtn_, messageDialogYesBtn_,
+          messageDialogNoBtn_}) {
         SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
     }
 
     SubclassGlowButton(messageDialogCopyBtn_, false);
+    SubclassGlowButton(messageDialogDiscordBtn_, false);
     SubclassGlowButton(messageDialogOkBtn_, true);
     SubclassGlowButton(messageDialogYesBtn_, true);
     SubclassGlowButton(messageDialogNoBtn_, false);
@@ -2350,6 +2423,10 @@ LRESULT CALLBACK Gui::MessageDialogWndProc(const HWND hwnd, const UINT msg, cons
                     SetWindowTextW(self->messageDialogCopyBtn_,
                                    i18n::Tr(L"ui.failure_dialog_copied_button").c_str());
                 }
+                return 0;
+            }
+            if (id == kMsgDialogDiscordBtnId) {
+                OpenBrowserUrl(kDiscordSupportUrl);
                 return 0;
             }
             if (id == kMsgDialogOkBtnId) {
@@ -2416,6 +2493,7 @@ LRESULT CALLBACK Gui::MessageDialogWndProc(const HWND hwnd, const UINT msg, cons
             self->messageDialogDiagLabel_ = nullptr;
             self->messageDialogDiagEdit_ = nullptr;
             self->messageDialogCopyBtn_ = nullptr;
+            self->messageDialogDiscordBtn_ = nullptr;
             self->messageDialogOkBtn_ = nullptr;
             self->messageDialogYesBtn_ = nullptr;
             self->messageDialogNoBtn_ = nullptr;
@@ -2802,20 +2880,28 @@ void Gui::LayoutMainContent() {
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (creditsBtn_ && IsWindow(creditsBtn_)) {
-        const int footerBtnWidth = (kContentWidth - kFooterBtnGap) / 2;
-        SetWindowPos(creditsBtn_, nullptr, contentLeft, layout.creditsBtnY, footerBtnWidth, kCreditsBtnHeight,
+        const auto footer = ComputeFooterButtonLayout(contentLeft);
+        SetWindowPos(creditsBtn_, nullptr, footer.creditsX, layout.creditsBtnY, footer.sideBtnWidth, kCreditsBtnHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
+    if (discordFooterBtn_ && IsWindow(discordFooterBtn_)) {
+        const auto footer = ComputeFooterButtonLayout(contentLeft);
+        SetWindowPos(discordFooterBtn_, nullptr, footer.discordX, layout.creditsBtnY, footer.discordBtnWidth,
+                     kCreditsBtnHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
     if (feedbackBtn_ && IsWindow(feedbackBtn_)) {
-        const int footerBtnWidth = (kContentWidth - kFooterBtnGap) / 2;
-        SetWindowPos(feedbackBtn_, nullptr, contentLeft + footerBtnWidth + kFooterBtnGap, layout.creditsBtnY,
-                     footerBtnWidth, kCreditsBtnHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+        const auto footer = ComputeFooterButtonLayout(contentLeft);
+        SetWindowPos(feedbackBtn_, nullptr, footer.feedbackX, layout.creditsBtnY, footer.sideBtnWidth, kCreditsBtnHeight,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
     int requiredClientHeight = layout.requiredClientHeight;
-    HWND bottomFooterBtn = creditsBtn_;
-    if (feedbackBtn_ && IsWindow(feedbackBtn_)) {
-        bottomFooterBtn = feedbackBtn_;
+    HWND bottomFooterBtn = feedbackBtn_;
+    if (!bottomFooterBtn || !IsWindow(bottomFooterBtn)) {
+        bottomFooterBtn = discordFooterBtn_;
+    }
+    if (!bottomFooterBtn || !IsWindow(bottomFooterBtn)) {
+        bottomFooterBtn = creditsBtn_;
     }
     if (bottomFooterBtn && IsWindow(bottomFooterBtn)) {
         RECT btnRect{};
@@ -3061,6 +3147,7 @@ void Gui::OnCreate(HWND hwnd) {
     const HFONT subtitleFont = theme::MakeSubtitleFont();
 
     logoBitmap_ = theme::LoadLogoBitmap(instance_, kLogoMaxSize);
+    discordFooterIcon_ = theme::LoadEmbeddedIcon(instance_, IDI_DISCORD_ICON, kDiscordFooterIconSize);
     if (!logoBitmap_) {
         logoStatic_ = CreateWindowW(
             L"STATIC", nullptr, WS_CHILD | WS_VISIBLE | SS_ICON | SS_LEFT,
@@ -3223,18 +3310,23 @@ void Gui::OnCreate(HWND hwnd) {
         kMargin, initialLayout.manualInstallY, kContentWidth, kManualInstallBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kManualInstallBtnId)), instance_, nullptr);
 
-    const int footerBtnWidth = (kContentWidth - kFooterBtnGap) / 2;
+    const auto footer = ComputeFooterButtonLayout(kMargin);
 
     creditsBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.credits_licenses_button").c_str(),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        kMargin, initialLayout.creditsBtnY, footerBtnWidth, kCreditsBtnHeight, hwnd,
+        footer.creditsX, initialLayout.creditsBtnY, footer.sideBtnWidth, kCreditsBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCreditsBtnId)), instance_, nullptr);
+
+    discordFooterBtn_ = CreateWindowW(
+        L"BUTTON", L"Discord", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        footer.discordX, initialLayout.creditsBtnY, footer.discordBtnWidth, kCreditsBtnHeight, hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kDiscordFooterBtnId)), instance_, nullptr);
 
     feedbackBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.feedback_button").c_str(),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        kMargin + footerBtnWidth + kFooterBtnGap, initialLayout.creditsBtnY, footerBtnWidth, kCreditsBtnHeight, hwnd,
+        footer.feedbackX, initialLayout.creditsBtnY, footer.sideBtnWidth, kCreditsBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFeedbackBtnId)), instance_, nullptr);
 
     versionLabel_ = CreateWindowW(
@@ -3246,7 +3338,8 @@ void Gui::OnCreate(HWND hwnd) {
          {languageCombo_, titleLabel_, versionLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_,
           altDownloadCombo_, altDownloadOpenBtn_, driveLabel_, driveCombo_, showAllDrivesCheck_, formatCheck_, ventoyActionCheck_, advancedCheck_,
           pinVentoyCheck_, ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_, verifyFilesBtn_,
-          openLogBtn_, manualInstallBtn_, creditsBtn_, feedbackBtn_, progressBar_, statusBar_, betaNoticeLabel_}) {
+          openLogBtn_, manualInstallBtn_, creditsBtn_, discordFooterBtn_, feedbackBtn_, progressBar_, statusBar_,
+          betaNoticeLabel_}) {
         if (child && IsWindow(child)) {
             SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
         }
@@ -3264,6 +3357,7 @@ void Gui::OnCreate(HWND hwnd) {
     SubclassGlowButton(openLogBtn_, false);
     SubclassGlowButton(manualInstallBtn_, false);
     SubclassGlowButton(creditsBtn_, false);
+    SubclassGlowIconButton(discordFooterBtn_, discordFooterIcon_, true);
     SubclassGlowButton(feedbackBtn_, false);
     SubclassGlowButton(downloadMirror1Btn_, true);
     SubclassGlowButton(downloadMirror2Btn_, true);
@@ -3325,6 +3419,10 @@ void Gui::OnCommand(WPARAM wp) {
     }
     if (id == kCreditsBtnId) {
         OpenCreditsWindow();
+        return;
+    }
+    if (id == kDiscordFooterBtnId) {
+        OpenBrowserUrl(kDiscordSupportUrl);
         return;
     }
     if (id == kFeedbackBtnId) {

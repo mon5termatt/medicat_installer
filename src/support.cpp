@@ -645,6 +645,39 @@ void UploadFailureLogsOnce(const FailureLogUploadRequest& request, const Session
 
 }  // namespace
 
+namespace {
+
+bool IsWindowsDriveLetterColon(const std::wstring& text, const size_t index) {
+    if (index + 1 >= text.size() || text[index + 1] != L':') {
+        return false;
+    }
+
+    const wchar_t letter = text[index];
+    const bool isLetter = (letter >= L'A' && letter <= L'Z') || (letter >= L'a' && letter <= L'z');
+    if (!isLetter) {
+        return false;
+    }
+
+    if (index > 0) {
+        const wchar_t previous = text[index - 1];
+        if (previous != L'\\' && previous != L'/' && previous != L' ' && previous != L'\t' && previous != L'\n' &&
+            previous != L'\r') {
+            return false;
+        }
+    }
+
+    if (index + 2 < text.size()) {
+        const wchar_t next = text[index + 2];
+        if (next != L'\\' && next != L'/') {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+}  // namespace
+
 std::wstring FormatDetailedError(const std::wstring& summary, const std::wstring& detail) {
     if (summary.empty()) {
         return detail;
@@ -672,7 +705,7 @@ std::string SanitizeTelemetryText(const std::wstring& text, const size_t maxLen)
             continue;
         }
 
-        if (((ch >= L'A' && ch <= L'Z') || (ch >= L'a' && ch <= L'z')) && i + 1 < text.size() && text[i + 1] == L':') {
+        if (IsWindowsDriveLetterColon(text, i)) {
             sanitized += L"<drive>:";
             i += 2;
             if (i < text.size() && text[i] == L'\\') {

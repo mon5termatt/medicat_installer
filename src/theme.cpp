@@ -312,13 +312,44 @@ bool PaintLogo(HDC hdc, const HINSTANCE instance, const RECT& bounds, const int 
 }
 
 HICON LoadLogoIcon(const HINSTANCE instance, const int size) {
+    return LoadEmbeddedIcon(instance, IDI_APP_ICON, size);
+}
+
+HICON LoadEmbeddedIcon(const HINSTANCE instance, const int resourceId, const int size) {
     const int iconSize = std::max(1, size);
-    HICON icon = static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
-                                               iconSize, iconSize, LR_DEFAULTCOLOR | LR_SHARED));
+    HICON icon = static_cast<HICON>(
+        LoadImageW(instance, MAKEINTRESOURCEW(resourceId), IMAGE_ICON, iconSize, iconSize, LR_SHARED));
     if (!icon) {
-        icon = LoadIconW(instance, MAKEINTRESOURCEW(IDI_APP_ICON));
+        icon = LoadIconW(instance, MAKEINTRESOURCEW(resourceId));
     }
     return icon;
+}
+
+void PaintFlatIconButton(HDC hdc, const RECT& rc, HICON icon, const ButtonStyle style, const ButtonState state,
+                         const bool fullBleed) {
+    if (!icon || rc.right <= rc.left || rc.bottom <= rc.top) {
+        if (!fullBleed) {
+            PaintFlatButton(hdc, rc, L"", nullptr, style, state);
+        }
+        return;
+    }
+
+    const int width = rc.right - rc.left;
+    const int height = rc.bottom - rc.top;
+
+    if (!fullBleed) {
+        PaintFlatButton(hdc, rc, L"", nullptr, style, state);
+        const int iconSize = std::max(1, std::min(width, height) - 8);
+        const int x = rc.left + (width - iconSize) / 2;
+        const int y = rc.top + (height - iconSize) / 2;
+        DrawIconEx(hdc, x, y, icon, iconSize, iconSize, 0, nullptr, DI_NORMAL);
+        return;
+    }
+
+    const int iconSize = std::max(1, std::min(width, height));
+    const int x = rc.left + (width - iconSize) / 2;
+    const int y = rc.top + (height - iconSize) / 2;
+    DrawIconEx(hdc, x, y, icon, iconSize, iconSize, 0, nullptr, DI_NORMAL);
 }
 
 HFONT MakeUiFont() {
