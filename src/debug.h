@@ -42,6 +42,7 @@ struct SessionSystemSnapshot {
     int logicalProcessors = 0;
     std::string ramGbBucket;
     std::string locale;
+    std::string machineIdHash;
 };
 
 SessionSystemSnapshot CollectSessionSystemSnapshot();

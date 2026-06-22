@@ -5,6 +5,7 @@
 #include "ventoy.h"
 
 #include <windows.h>
+#include <wincrypt.h>
 
 #include <fstream>
 #include <sstream>
@@ -606,6 +607,90 @@ void WriteInstallerOptionsSection(const DiagnosticContext& context,
     write(kDiagnosticSeparator);
 }
 
+std::string Sha256HexUtf8(const std::string& input) {
+    if (input.empty()) {
+        return {};
+    }
+
+    HCRYPTPROV provider = 0;
+    HCRYPTHASH hash = 0;
+    if (!CryptAcquireContextW(&provider, nullptr, nullptr, PROV_RSA_AES, CRYPT_VERIFYCONTEXT)) {
+        return {};
+    }
+    if (!CryptCreateHash(provider, CALG_SHA_256, 0, 0, &hash)) {
+        CryptReleaseContext(provider, 0);
+        return {};
+    }
+
+    const auto cleanup = [&]() {
+        if (hash) {
+            CryptDestroyHash(hash);
+        }
+        if (provider) {
+            CryptReleaseContext(provider, 0);
+        }
+    };
+
+    if (!CryptHashData(hash, reinterpret_cast<const BYTE*>(input.data()), static_cast<DWORD>(input.size()), 0)) {
+        cleanup();
+        return {};
+    }
+
+    BYTE digest[32]{};
+    DWORD digestLen = sizeof(digest);
+    if (!CryptGetHashParam(hash, HP_HASHVAL, digest, &digestLen, 0)) {
+        cleanup();
+        return {};
+    }
+    cleanup();
+
+    static constexpr char kHex[] = "0123456789abcdef";
+    std::string out(64, '\0');
+    for (DWORD i = 0; i < digestLen; ++i) {
+        out[i * 2] = kHex[(digest[i] >> 4) & 0x0F];
+        out[i * 2 + 1] = kHex[digest[i] & 0x0F];
+    }
+    return out;
+}
+
+std::string ReadMachineGuidUtf8() {
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Cryptography", 0, KEY_READ | KEY_WOW64_64KEY,
+                      &key) != ERROR_SUCCESS) {
+        return {};
+    }
+
+    wchar_t buffer[64]{};
+    DWORD size = sizeof(buffer);
+    const LSTATUS status =
+        RegQueryValueExW(key, L"MachineGuid", nullptr, nullptr, reinterpret_cast<LPBYTE>(buffer), &size);
+    RegCloseKey(key);
+    if (status != ERROR_SUCCESS || buffer[0] == L'\0') {
+        return {};
+    }
+
+    std::string guid;
+    const int len = WideCharToMultiByte(CP_UTF8, 0, buffer, -1, nullptr, 0, nullptr, nullptr);
+    if (len > 1) {
+        guid.assign(static_cast<size_t>(len - 1), '\0');
+        WideCharToMultiByte(CP_UTF8, 0, buffer, -1, guid.data(), len, nullptr, nullptr);
+    }
+    return guid;
+}
+
+std::string GetMachineIdHashUtf8() {
+    std::string guid = ReadMachineGuidUtf8();
+    if (guid.empty()) {
+        return {};
+    }
+    for (char& ch : guid) {
+        if (ch >= 'A' && ch <= 'Z') {
+            ch = static_cast<char>(ch - 'A' + 'a');
+        }
+    }
+    return Sha256HexUtf8(guid);
+}
+
 SessionSystemSnapshot BuildSessionSystemSnapshot() {
     SessionSystemSnapshot snapshot;
     const WindowsVersionInfo win = GetWindowsVersionInfo();
@@ -657,6 +742,8 @@ SessionSystemSnapshot BuildSessionSystemSnapshot() {
     if (GetUserDefaultLocaleName(localeName, LOCALE_NAME_MAX_LENGTH) > 0) {
         snapshot.locale = wideToUtf8(localeName);
     }
+
+    snapshot.machineIdHash = GetMachineIdHashUtf8();
 
     return snapshot;
 }

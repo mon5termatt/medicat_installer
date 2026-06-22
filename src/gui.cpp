@@ -246,6 +246,18 @@ constexpr int kMsgDialogBtnHeight = 34;
 constexpr int kMsgDialogBtnGap = 10;
 constexpr int kMsgDialogSectionGap = 16;
 constexpr int kMsgDialogDiagEditHeight = 32;
+
+constexpr wchar_t kHelpGateWindowClass[] = L"MedicatHelpGateWindow";
+constexpr int kHelpGateBodyId = 1150;
+constexpr int kHelpGateDiscordBtnId = 1151;
+constexpr int kHelpGateAckCheckboxId = 1152;
+constexpr int kHelpGateContinueBtnId = 1153;
+constexpr int kHelpGateClientWidth = 500;
+constexpr int kHelpGateMinClientHeight = 320;
+constexpr int kHelpGateMaxMessageHeight = 200;
+constexpr int kHelpGateDiscordBtnHeight = 56;
+constexpr int kHelpGateAckHeight = 48;
+constexpr COLORREF kHelpGateAccentColor = RGB(230, 176, 60);
 constexpr int kReExtractClientWidth = 480;
 constexpr int kReExtractMinClientHeight = 300;
 constexpr int kReExtractMaxMessageHeight = 160;
@@ -339,6 +351,26 @@ int MessageDialogOuterHeightForMessage(const int messageHeight, const MessageDia
     clientHeight = std::min(clientHeight, maxClientHeight);
 
     RECT frame{0, 0, kMsgDialogClientWidth, clientHeight};
+    AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0);
+    return frame.bottom - frame.top;
+}
+
+int HelpGateOuterWidth() {
+    RECT frame{0, 0, kHelpGateClientWidth, kHelpGateMinClientHeight};
+    AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0);
+    return frame.right - frame.left;
+}
+
+int HelpGateOuterHeightForMessage(const int messageHeight) {
+    const int cappedMessage = std::min(messageHeight, kHelpGateMaxMessageHeight);
+    const int maxClientHeight = (GetSystemMetrics(SM_CYSCREEN) * 85) / 100;
+    int clientHeight = kMsgDialogAccentHeight + kMsgDialogTopPad + cappedMessage + kMsgDialogSectionGap +
+                       kHelpGateDiscordBtnHeight + kMsgDialogSectionGap + kHelpGateAckHeight + kMsgDialogSectionGap +
+                       kMsgDialogBtnHeight + 16;
+    clientHeight = std::max(clientHeight, kHelpGateMinClientHeight);
+    clientHeight = std::min(clientHeight, maxClientHeight);
+
+    RECT frame{0, 0, kHelpGateClientWidth, clientHeight};
     AdjustWindowRectEx(&frame, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0);
     return frame.bottom - frame.top;
 }
@@ -1158,6 +1190,15 @@ bool Gui::Create(HINSTANCE instance) {
     messageDialogWc.hbrBackground = theme::GetBrushes().window;
     messageDialogWc.lpszClassName = kMessageDialogWindowClass;
     RegisterClassExW(&messageDialogWc);
+
+    WNDCLASSEXW helpGateWc{};
+    helpGateWc.cbSize = sizeof(helpGateWc);
+    helpGateWc.lpfnWndProc = Gui::HelpGateWndProc;
+    helpGateWc.hInstance = instance;
+    helpGateWc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    helpGateWc.hbrBackground = theme::GetBrushes().window;
+    helpGateWc.lpszClassName = kHelpGateWindowClass;
+    RegisterClassExW(&helpGateWc);
 
     const std::wstring windowTitle = i18n::Tr(L"ui.form_title", InstallerVersionWide());
     hwnd_ = CreateWindowExW(
@@ -2406,6 +2447,247 @@ bool Gui::ShowConfirmDialog(const std::wstring& message, const std::wstring& tit
 
 void Gui::OpenFailureDialog(const std::wstring& message, const std::wstring& title) {
     OpenMessageDialogInternal(message, title, MessageDialogKind::Error, MessageDialogFooter::OkWithDiag, false);
+}
+
+void Gui::LayoutHelpGateDialog() {
+    if (!helpGateDialog_ || !IsWindow(helpGateDialog_)) {
+        return;
+    }
+
+    RECT client{};
+    GetClientRect(helpGateDialog_, &client);
+    const int clientWidth = client.right - client.left;
+    const int contentWidth = std::max(0, clientWidth - 2 * kMsgDialogMargin);
+    const int continueBtnWidth = 160;
+
+    int y = kMsgDialogAccentHeight + kMsgDialogTopPad;
+    if (helpGateBody_ && IsWindow(helpGateBody_)) {
+        const int messageHeight = helpGateBodyHeight_ > 0 ? helpGateBodyHeight_ : kHelpGateMaxMessageHeight;
+        LayoutScrollableTextPane(helpGateBody_, kMsgDialogMargin, y, contentWidth, messageHeight);
+        y += messageHeight + kMsgDialogSectionGap;
+    }
+
+    if (helpGateDiscordBtn_ && IsWindow(helpGateDiscordBtn_)) {
+        SetWindowPos(helpGateDiscordBtn_, nullptr, kMsgDialogMargin, y, contentWidth, kHelpGateDiscordBtnHeight,
+                     SWP_NOZORDER);
+        y += kHelpGateDiscordBtnHeight + kMsgDialogSectionGap;
+    }
+
+    if (helpGateAckCheckbox_ && IsWindow(helpGateAckCheckbox_)) {
+        SetWindowPos(helpGateAckCheckbox_, nullptr, kMsgDialogMargin, y, contentWidth, kHelpGateAckHeight,
+                     SWP_NOZORDER);
+        y += kHelpGateAckHeight + kMsgDialogSectionGap;
+    }
+
+    if (helpGateContinueBtn_ && IsWindow(helpGateContinueBtn_)) {
+        const int actionX = kMsgDialogMargin + std::max(0, contentWidth - continueBtnWidth);
+        SetWindowPos(helpGateContinueBtn_, nullptr, actionX, y, continueBtnWidth, kMsgDialogBtnHeight, SWP_NOZORDER);
+    }
+}
+
+void Gui::RefreshHelpGateText() {
+    if (!helpGateDialog_ || !IsWindow(helpGateDialog_)) {
+        return;
+    }
+
+    const std::wstring message = i18n::Tr(L"messages.help_gate", std::to_wstring(helpGateFailureCount_));
+    if (helpGateBody_ && IsWindow(helpGateBody_)) {
+        SetScrollableTextPaneText(helpGateBody_, message);
+    }
+    if (helpGateDiscordBtn_ && IsWindow(helpGateDiscordBtn_)) {
+        SetWindowTextW(helpGateDiscordBtn_, i18n::Tr(L"ui.help_gate_discord_button").c_str());
+    }
+    if (helpGateAckCheckbox_ && IsWindow(helpGateAckCheckbox_)) {
+        SetWindowTextW(helpGateAckCheckbox_, i18n::Tr(L"ui.help_gate_ack_checkbox").c_str());
+    }
+    if (helpGateContinueBtn_ && IsWindow(helpGateContinueBtn_)) {
+        SetWindowTextW(helpGateContinueBtn_, i18n::Tr(L"ui.help_gate_continue_button").c_str());
+    }
+    LayoutHelpGateDialog();
+}
+
+bool Gui::RunHelpGateModalLoop() {
+    if (!helpGateDialog_ || !IsWindow(helpGateDialog_)) {
+        return false;
+    }
+
+    helpGateModalActive_ = true;
+    helpGateModalResult_ = false;
+
+    HWND parent = hwnd_;
+    if (parent && IsWindow(parent)) {
+        EnableWindow(parent, FALSE);
+    }
+
+    MSG msg{};
+    while (helpGateModalActive_ && GetMessageW(&msg, nullptr, 0, 0)) {
+        if (msg.message == WM_QUIT) {
+            PostQuitMessage(static_cast<int>(msg.wParam));
+            break;
+        }
+        if (!IsDialogMessageW(helpGateDialog_, &msg)) {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+
+    if (parent && IsWindow(parent)) {
+        EnableWindow(parent, TRUE);
+        SetForegroundWindow(parent);
+    }
+
+    const bool result = helpGateModalResult_;
+    helpGateModalActive_ = false;
+    return result;
+}
+
+bool Gui::ShowHelpGateDialog(const int failureCount) {
+    if (helpGateDialog_ && IsWindow(helpGateDialog_)) {
+        DestroyWindow(helpGateDialog_);
+    }
+
+    helpGateFailureCount_ = failureCount;
+    const HFONT uiFont = theme::MakeUiFont();
+    const std::wstring message = i18n::Tr(L"messages.help_gate", std::to_wstring(failureCount));
+    const std::wstring title = i18n::Tr(L"titles.help_gate");
+
+    const int contentWidth = kHelpGateClientWidth - 2 * kMsgDialogMargin;
+    int measuredMessageHeight = 120;
+    {
+        const HWND measureHost = CreateWindowExW(0, L"STATIC", L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, instance_,
+                                                 nullptr);
+        if (measureHost) {
+            SendMessageW(measureHost, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+            measuredMessageHeight = MeasureWrappedStaticHeight(measureHost, message, contentWidth);
+            DestroyWindow(measureHost);
+        }
+    }
+
+    helpGateBodyHeight_ = std::min(measuredMessageHeight, kHelpGateMaxMessageHeight);
+    const int windowWidth = HelpGateOuterWidth();
+    const int windowHeight = HelpGateOuterHeightForMessage(measuredMessageHeight);
+    const int x = (GetSystemMetrics(SM_CXSCREEN) - windowWidth) / 2;
+    const int yPos = (GetSystemMetrics(SM_CYSCREEN) - windowHeight) / 2;
+
+    helpGateDialog_ = CreateWindowExW(
+        0, kHelpGateWindowClass, title.c_str(), WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+        x, yPos, windowWidth, windowHeight, hwnd_, nullptr, instance_, this);
+    if (!helpGateDialog_) {
+        return false;
+    }
+
+    theme::EnableDarkModeRecursive(helpGateDialog_);
+    helpGateBody_ = CreateScrollableTextPane(helpGateDialog_, instance_, kHelpGateBodyId, uiFont, message);
+
+    helpGateDiscordBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.help_gate_discord_button").c_str(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+        0, 0, 100, kHelpGateDiscordBtnHeight, helpGateDialog_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kHelpGateDiscordBtnId)), instance_, nullptr);
+
+    helpGateAckCheckbox_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.help_gate_ack_checkbox").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | BS_MULTILINE | WS_TABSTOP, 0, 0, 100, kHelpGateAckHeight,
+        helpGateDialog_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kHelpGateAckCheckboxId)), instance_, nullptr);
+
+    helpGateContinueBtn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.help_gate_continue_button").c_str(),
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 160, kMsgDialogBtnHeight, helpGateDialog_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kHelpGateContinueBtnId)), instance_, nullptr);
+
+    for (HWND child : {helpGateDiscordBtn_, helpGateAckCheckbox_, helpGateContinueBtn_}) {
+        SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+    }
+
+    SubclassGlowIconButton(helpGateDiscordBtn_, discordFooterIcon_, true);
+    SubclassGlowButton(helpGateContinueBtn_, true);
+    SubclassFlatCheckbox(helpGateAckCheckbox_);
+    EnableWindow(helpGateContinueBtn_, FALSE);
+
+    LayoutHelpGateDialog();
+    ShowWindow(helpGateDialog_, SW_SHOW);
+    SetForegroundWindow(helpGateDialog_);
+    SetFocus(helpGateDiscordBtn_);
+    UpdateWindow(helpGateDialog_);
+
+    return RunHelpGateModalLoop();
+}
+
+LRESULT CALLBACK Gui::HelpGateWndProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp) {
+    Gui* self = reinterpret_cast<Gui*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    if (msg == WM_NCCREATE) {
+        const auto* cs = reinterpret_cast<CREATESTRUCTW*>(lp);
+        self = reinterpret_cast<Gui*>(cs->lpCreateParams);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+        return TRUE;
+    }
+    if (!self) {
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    }
+
+    switch (msg) {
+        case WM_COMMAND: {
+            const int id = LOWORD(wp);
+            if (id == kHelpGateDiscordBtnId) {
+                OpenBrowserUrl(kDiscordSupportUrl);
+                return 0;
+            }
+            if (id == kHelpGateAckCheckboxId) {
+                const bool checked =
+                    self->helpGateAckCheckbox_ && SendMessageW(self->helpGateAckCheckbox_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+                if (self->helpGateContinueBtn_ && IsWindow(self->helpGateContinueBtn_)) {
+                    EnableWindow(self->helpGateContinueBtn_, checked ? TRUE : FALSE);
+                }
+                return 0;
+            }
+            if (id == kHelpGateContinueBtnId) {
+                self->helpGateModalResult_ = true;
+                DestroyWindow(hwnd);
+                return 0;
+            }
+            break;
+        }
+        case WM_ERASEBKGND: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            RECT rc{};
+            GetClientRect(hwnd, &rc);
+            RECT accent = rc;
+            accent.bottom = accent.top + kMsgDialogAccentHeight;
+            HBRUSH accentBrush = CreateSolidBrush(kHelpGateAccentColor);
+            FillRect(hdc, &accent, accentBrush);
+            DeleteObject(accentBrush);
+            rc.top = accent.bottom;
+            FillRect(hdc, &rc, theme::GetBrushes().window);
+            return 1;
+        }
+        case WM_CTLCOLORSTATIC: {
+            HDC hdc = reinterpret_cast<HDC>(wp);
+            SetBkMode(hdc, OPAQUE);
+            SetBkColor(hdc, theme::Colors().control);
+            SetTextColor(hdc, theme::Colors().text);
+            return reinterpret_cast<LRESULT>(theme::GetBrushes().control);
+        }
+        case WM_SIZE:
+            self->LayoutHelpGateDialog();
+            return 0;
+        case WM_CLOSE:
+            self->helpGateModalResult_ = false;
+            DestroyWindow(hwnd);
+            return 0;
+        case WM_DESTROY:
+            self->helpGateDialog_ = nullptr;
+            self->helpGateBody_ = nullptr;
+            self->helpGateDiscordBtn_ = nullptr;
+            self->helpGateAckCheckbox_ = nullptr;
+            self->helpGateContinueBtn_ = nullptr;
+            self->helpGateBodyHeight_ = 0;
+            if (self->helpGateModalActive_) {
+                self->helpGateModalActive_ = false;
+            }
+            return 0;
+        default:
+            break;
+    }
+    return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
 LRESULT CALLBACK Gui::MessageDialogWndProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp) {

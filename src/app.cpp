@@ -14,6 +14,7 @@
 #include "download.h"
 #include "drives.h"
 #include "extract.h"
+#include "failure_tracker.h"
 #include "i18n.h"
 #include "offline.h"
 #include "support.h"
@@ -713,7 +714,10 @@ void App::ApplyInstallerUpdate(const InstallerUpdateInfo& info) {
 void App::PostDone(const bool success, const std::wstring& message, const std::wstring& title) {
     installing_ = false;
     if (!success && !message.empty()) {
+        RecordOperationFailure();
         LogOperationFailure(message, title);
+    } else if (success) {
+        RecordOperationSuccess();
     }
     const int exitCode = headless_ ? MapHeadlessExitCode(success, message, title) : (success ? 0 : 1);
     if (headless_) {
@@ -1069,8 +1073,23 @@ bool App::PromptConfirm(const std::wstring& message, const std::wstring& title, 
     return confirmed;
 }
 
+bool App::EnsureHelpGateAcknowledged() {
+    if (!NeedsHelpGate()) {
+        return true;
+    }
+
+    const int failures = OperationFailureCount();
+    log_->Info(L"Help gate shown after " + std::to_wstring(failures) + L" operation failure(s)");
+    return gui_.ShowHelpGateDialog(failures);
+}
+
 void App::OnVerify() {
     if (installing_.exchange(true)) {
+        return;
+    }
+
+    if (!EnsureHelpGateAcknowledged()) {
+        installing_ = false;
         return;
     }
 
@@ -1171,6 +1190,11 @@ void App::RunVerifyThread(std::wstring drive) {
 
 void App::OnInstall() {
     if (installing_.exchange(true)) {
+        return;
+    }
+
+    if (!EnsureHelpGateAcknowledged()) {
+        installing_ = false;
         return;
     }
 

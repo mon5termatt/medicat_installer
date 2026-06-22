@@ -135,6 +135,7 @@ public:
     void ShowMessageDialog(const std::wstring& message, const std::wstring& title, MessageDialogKind kind);
     bool ShowConfirmDialog(const std::wstring& message, const std::wstring& title,
                            MessageDialogKind kind = MessageDialogKind::Warning);
+    bool ShowHelpGateDialog(int failureCount);
     void ShowDone(bool success, const std::wstring& message, const std::wstring& title = L"");
     void UpdateArchivePanel();
     void SetInitialLanguage(const std::wstring& languageCode);
@@ -157,6 +158,7 @@ private:
     static LRESULT CALLBACK CreditsWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     static LRESULT CALLBACK ReExtractWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     static LRESULT CALLBACK MessageDialogWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+    static LRESULT CALLBACK HelpGateWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     void OnCreate(HWND hwnd);
     void OnCommand(WPARAM wp);
     void RefreshDrives(bool fromDeviceChange = false);
@@ -190,6 +192,9 @@ private:
     void LayoutMessageDialog();
     void RefreshMessageDialogText();
     bool RunMessageDialogModalLoop();
+    void LayoutHelpGateDialog();
+    void RefreshHelpGateText();
+    bool RunHelpGateModalLoop();
     bool CopyFailureDiagCodeToClipboard();
     std::wstring FailureDiagDisplayText() const;
     COLORREF MessageDialogAccentColor(MessageDialogKind kind) const;
@@ -260,6 +265,15 @@ private:
     HWND messageDialogOkBtn_ = nullptr;
     HWND messageDialogYesBtn_ = nullptr;
     HWND messageDialogNoBtn_ = nullptr;
+    HWND helpGateDialog_ = nullptr;
+    HWND helpGateBody_ = nullptr;
+    HWND helpGateDiscordBtn_ = nullptr;
+    HWND helpGateAckCheckbox_ = nullptr;
+    HWND helpGateContinueBtn_ = nullptr;
+    bool helpGateModalActive_ = false;
+    bool helpGateModalResult_ = false;
+    int helpGateFailureCount_ = 0;
+    int helpGateBodyHeight_ = 0;
     MessageDialogKind messageDialogKind_ = MessageDialogKind::Error;
     MessageDialogFooter messageDialogFooter_ = MessageDialogFooter::Ok;
     bool messageDialogModal_ = false;

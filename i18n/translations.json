@@ -41,6 +41,9 @@
       "failure_dialog_copy_button": "Copy",
       "failure_dialog_copied_button": "Copied!",
       "failure_dialog_ok_button": "OK",
+      "help_gate_discord_button": "Join the Discord",
+      "help_gate_ack_checkbox": "I understand I may need help from the community before trying again",
+      "help_gate_continue_button": "Continue anyway",
       "dialog_yes": "Yes",
       "dialog_no": "No",
       "language_label": "Language:",
@@ -119,6 +122,7 @@
       "verify_still_failed_after_reextract": "Verification still found {0} file(s) that do not match after re-extraction.\n\nCheck your antivirus, firewall, or other security software. They can block, quarantine, or delete files while extracting to a USB drive.\n\nLogs are saved beside this installer (medicat_installer.log, check.log, reextract.log). A future update will let you upload logs with a support keyword for Discord help.",
       "beta_failure_logs_notice": "Diagnostic log files may be uploaded automatically to help fix this issue (beta debugging). Check medicat_installer.log for [Telemetry] upload status.",
       "failure_diag_hint": "If you need help on Discord, copy the Diag code below once it appears.",
+      "help_gate": "Install or verify has failed {0} times on this PC.\n\nYou're not alone — many issues are quicker to fix with help from the MediCat community on Discord. Share your Diag code from the last error dialog if you ask for support.",
       "diag_uploading": "Uploading diagnostic logs…",
       "diag_unavailable": "Diag code unavailable (log upload did not complete)",
       "download_failed": "Failed to download the verification file. Please check your internet connection.",
@@ -189,7 +193,8 @@
       "archive_corrupt": "Archive Verification Failed",
       "selection_cancelled": "Selection Cancelled",
       "no_drive_for_check": "No Drive Selected",
-      "file_dialog_title": "Select MediCat Archive File (MediCat.USB.v{0}.7z)"
+      "file_dialog_title": "Select MediCat Archive File (MediCat.USB.v{0}.7z)",
+      "help_gate": "Repeated failures — get help"
     },
     "log": {
       "installer_started": "MediCat Installer v{0} Started",
@@ -294,6 +299,9 @@
       "failure_dialog_copy_button": "Copiar",
       "failure_dialog_copied_button": "¡Copiado!",
       "failure_dialog_ok_button": "OK",
+      "help_gate_discord_button": "Unirse a Discord",
+      "help_gate_ack_checkbox": "Entiendo que puede que necesite ayuda de la comunidad antes de intentarlo de nuevo",
+      "help_gate_continue_button": "Continuar de todos modos",
       "dialog_yes": "Sí",
       "dialog_no": "No",
       "language_label": "Idioma:",
@@ -372,6 +380,7 @@
       "verify_still_failed_after_reextract": "La verificación aún encontró {0} archivo(s) que no coinciden después de la re-extracción.\n\nRevise su antivirus, firewall u otro software de seguridad. Pueden bloquear, poner en cuarentena o eliminar archivos al extraer a una unidad USB.\n\nLos registros se guardan junto a este instalador (medicat_installer.log, check.log, reextract.log). Una actualización futura permitirá subir registros con una palabra clave de soporte para ayuda en Discord.",
       "beta_failure_logs_notice": "Los archivos de registro de diagnóstico pueden subirse automáticamente para ayudar a corregir este problema (depuración beta). Consulte medicat_installer.log para el estado de carga [Telemetry].",
       "failure_diag_hint": "Si necesita ayuda en Discord, copie el código Diag cuando aparezca.",
+      "help_gate": "Instalar o verificar ha fallado {0} veces en este PC.\n\nNo está solo: muchos problemas se resuelven más rápido con ayuda de la comunidad MediCat en Discord. Comparta su código Diag del último error si pide soporte.",
       "diag_uploading": "Subiendo registros de diagnóstico…",
       "diag_unavailable": "Código Diag no disponible (la carga de registros no se completó)",
       "download_failed": "Falló al descargar el archivo de verificación. Por favor verifique su conexión a internet.",
@@ -440,7 +449,8 @@
       "archive_corrupt": "Error de Verificación del Archivo",
       "selection_cancelled": "Selección Cancelada",
       "no_drive_for_check": "No se Seleccionó Unidad",
-      "file_dialog_title": "Seleccionar Archivo MediCat (MediCat.USB.v{0}.7z)"
+      "file_dialog_title": "Seleccionar Archivo MediCat (MediCat.USB.v{0}.7z)",
+      "help_gate": "Fallos repetidos — obtener ayuda"
     },
     "log": {
       "installer_started": "Instalador MediCat v{0} Iniciado",
@@ -546,6 +556,9 @@
       "failure_dialog_copy_button": "Copier",
       "failure_dialog_copied_button": "Copié !",
       "failure_dialog_ok_button": "OK",
+      "help_gate_discord_button": "Rejoindre Discord",
+      "help_gate_ack_checkbox": "Je comprends que j'ai peut-être besoin d'aide de la communauté avant de réessayer",
+      "help_gate_continue_button": "Continuer quand même",
       "dialog_yes": "Oui",
       "dialog_no": "Non",
       "language_label": "Langue :",
@@ -624,6 +637,7 @@
       "verify_still_failed_after_reextract": "La vérification a encore trouvé {0} fichier(s) qui ne correspondent pas après la ré-extraction.\n\nVérifiez votre antivirus, pare-feu ou autre logiciel de sécurité. Ils peuvent bloquer, mettre en quarantaine ou supprimer des fichiers lors de l'extraction sur une clé USB.\n\nLes journaux sont enregistrés à côté de cet installateur (medicat_installer.log, check.log, reextract.log). Une future mise à jour permettra d'envoyer les journaux avec un mot-clé de support pour l'aide Discord.",
       "beta_failure_logs_notice": "Les fichiers journaux de diagnostic peuvent être envoyés automatiquement pour aider à corriger ce problème (débogage bêta). Vérifiez medicat_installer.log pour le statut d'envoi [Telemetry].",
       "failure_diag_hint": "Si vous avez besoin d'aide sur Discord, copiez le code Diag lorsqu'il apparaît.",
+      "help_gate": "L'installation ou la vérification a échoué {0} fois sur ce PC.\n\nVous n'êtes pas seul — de nombreux problèmes se règlent plus vite avec l'aide de la communauté MediCat sur Discord. Partagez votre code Diag de la dernière erreur si vous demandez de l'aide.",
       "diag_uploading": "Envoi des journaux de diagnostic…",
       "diag_unavailable": "Code Diag indisponible (l'envoi des journaux ne s'est pas terminé)",
       "download_failed": "Échec du téléchargement du fichier de vérification. Veuillez vérifier votre connexion Internet.",
@@ -692,7 +706,8 @@
       "archive_corrupt": "Échec de Vérification de l'Archive",
       "selection_cancelled": "Sélection Annulée",
       "no_drive_for_check": "Aucun Lecteur Sélectionné",
-      "file_dialog_title": "Sélectionner le Fichier d'Archive MediCat (MediCat.USB.v{0}.7z)"
+      "file_dialog_title": "Sélectionner le Fichier d'Archive MediCat (MediCat.USB.v{0}.7z)",
+      "help_gate": "Échecs répétés — obtenir de l'aide"
     },
     "log": {
       "installer_started": "Installateur MediCat v{0} Démarré",
@@ -798,6 +813,9 @@
       "failure_dialog_copy_button": "Kopiuj",
       "failure_dialog_copied_button": "Skopiowano!",
       "failure_dialog_ok_button": "OK",
+      "help_gate_discord_button": "Dołącz do Discorda",
+      "help_gate_ack_checkbox": "Rozumiem, że mogę potrzebować pomocy społeczności przed ponowną próbą",
+      "help_gate_continue_button": "Kontynuuj mimo to",
       "dialog_yes": "Tak",
       "dialog_no": "Nie",
       "language_label": "Język:",
@@ -876,6 +894,7 @@
       "verify_still_failed_after_reextract": "Weryfikacja nadal wykryła {0} plików, które nie pasują po ponownym rozpakowaniu.\n\nSprawdź program antywirusowy, zaporę sieciową lub inne oprogramowanie zabezpieczające. Mogą blokować, kwarantannować lub usuwać pliki podczas rozpakowywania na dysk USB.\n\nDzienniki są zapisywane obok tego instalatora (medicat_installer.log, check.log, reextract.log). W przyszłej aktualizacji będzie można przesłać dzienniki z hasłem wsparcia, aby uzyskać pomoc na Discordzie.",
       "beta_failure_logs_notice": "Pliki dziennika diagnostycznego mogą być przesłane automatycznie, aby pomóc naprawić ten problem (debugowanie beta). Sprawdź medicat_installer.log pod kątem statusu wysyłki [Telemetry].",
       "failure_diag_hint": "Jeśli potrzebujesz pomocy na Discordzie, skopiuj kod Diag po jego pojawieniu się.",
+      "help_gate": "Instalacja lub weryfikacja nie powiodła się {0} razy na tym komputerze.\n\nNie jesteś sam — wiele problemów łatwiej rozwiązać z pomocą społeczności MediCat na Discordzie. Podaj kod Diag z ostatniego błędu, jeśli prosisz o wsparcie.",
       "diag_uploading": "Wysyłanie dzienników diagnostycznych…",
       "diag_unavailable": "Kod Diag niedostępny (wysyłanie dzienników nie zakończone)",
       "download_failed": "Nie udało się pobrać pliku weryfikacyjnego. Sprawdź połączenie internetowe.",
@@ -944,7 +963,8 @@
       "archive_corrupt": "Błąd weryfikacji archiwum",
       "selection_cancelled": "Wybór anulowany",
       "no_drive_for_check": "Nie wybrano dysku",
-      "file_dialog_title": "Wybierz plik archiwum MediCat (MediCat.USB.v{0}.7z)"
+      "file_dialog_title": "Wybierz plik archiwum MediCat (MediCat.USB.v{0}.7z)",
+      "help_gate": "Powtarzające się błędy — uzyskaj pomoc"
     },
     "log": {
       "installer_started": "Uruchomiono instalator MediCat v{0}",
@@ -1041,6 +1061,9 @@
       "failure_dialog_copy_button": "Kopyala",
       "failure_dialog_copied_button": "Kopyalandı!",
       "failure_dialog_ok_button": "Tamam",
+      "help_gate_discord_button": "Discord'a katıl",
+      "help_gate_ack_checkbox": "Tekrar denemeden önce topluluktan yardıma ihtiyacım olabileceğini anlıyorum",
+      "help_gate_continue_button": "Yine de devam et",
       "dialog_yes": "Evet",
       "dialog_no": "Hayır",
       "language_label": "Dil:",
@@ -1128,6 +1151,7 @@
       "verify_still_failed_after_reextract": "Yeniden çıkarma işleminden sonra bile doğrulama {0} dosyanın eşleşmediğini tespit etti.\n\nAntivirüs, güvenlik duvarı veya diğer güvenlik yazılımlarınızı kontrol edin. Bir USB sürücüye çıkarma yaparken dosyaları engelleyebilir, karantinaya alabilir veya silebilirler.\n\nGünlükler bu kurulumcunun yanına kaydedilir (medicat_installer.log, check.log, reextract.log). Gelecekteki bir güncelleme, Discord yardımı için bir destek anahtar kelimesiyle günlükleri yüklemenize izin verecektir.",
       "beta_failure_logs_notice": "Tanı günlük dosyaları bu sorunu düzeltmeye yardımcı olmak için otomatik olarak yüklenebilir (beta hata ayıklama). Yükleme durumu için medicat_installer.log dosyasındaki [Telemetry] satırlarına bakın.",
       "failure_diag_hint": "Discord'da yardıma ihtiyacınız varsa, Diag kodu göründüğünde kopyalayın.",
+      "help_gate": "Bu bilgisayarda kurulum veya doğrulama {0} kez başarısız oldu.\n\nYalnız değilsiniz — birçok sorun MediCat Discord topluluğundan yardım alınca daha hızlı çözülür. Destek isterseniz son hata penceresindeki Diag kodunu paylaşın.",
       "diag_uploading": "Tanı günlükleri yükleniyor…",
       "diag_unavailable": "Diag kodu kullanılamıyor (günlük yükleme tamamlanmadı)",
       "download_failed": "Doğrulama dosyası indirilemedi. Lütfen internet bağlantınızı kontrol edin.",
@@ -1198,7 +1222,8 @@
       "archive_corrupt": "Arşiv Doğrulaması Başarısız",
       "selection_cancelled": "Seçim İptal Edildi",
       "no_drive_for_check": "Sürücü Seçilmedi",
-      "file_dialog_title": "MediCat Arşiv Dosyasını Seçin (MediCat.USB.v{0}.7z)"
+      "file_dialog_title": "MediCat Arşiv Dosyasını Seçin (MediCat.USB.v{0}.7z)",
+      "help_gate": "Tekrarlayan hatalar — yardım alın"
     },
     "log": {
       "installer_started": "MediCat Kurulumcu v{0} Başlatıldı",

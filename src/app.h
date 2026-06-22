@@ -63,6 +63,7 @@ private:
     bool PromptReExtract(const VerificationOutcome& outcome);
     bool PromptConfirm(const std::wstring& message, const std::wstring& title,
                        MessageDialogKind kind = MessageDialogKind::Warning);
+    bool EnsureHelpGateAcknowledged();
     void RunInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
                           VentoyInstallOptions ventoyInstall);
     void RunVerifyThread(std::wstring drive);

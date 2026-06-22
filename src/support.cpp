@@ -371,6 +371,10 @@ std::string BuildSessionReportJson(const SessionReportRequest& request) {
         systemSep();
         AppendJsonString(json, "ram_gb_bucket", system.ramGbBucket);
     }
+    if (!system.machineIdHash.empty()) {
+        systemSep();
+        AppendJsonString(json, "machine_id_hash", system.machineIdHash);
+    }
     json << "}";
 
     if (!request.errorTitle.empty() || !request.errorDetail.empty()) {
