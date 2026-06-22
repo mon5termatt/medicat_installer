@@ -6,6 +6,7 @@
 
 #include "app.h"
 
+#include "archive.h"
 #include "bundle.h"
 #include "cancel.h"
 #include "cli.h"
@@ -21,22 +22,6 @@
 #include "verify.h"
 
 namespace medicat {
-
-constexpr wchar_t kMediCatArchiveName[] = L"MediCat.USB.v21.12.7z";
-
-std::wstring ResolveMediCatArchivePath(const std::wstring& root) {
-    const std::wstring besideExe = JoinPath(root, kMediCatArchiveName);
-    if (FileExists(besideExe)) {
-        return besideExe;
-    }
-
-    const std::wstring offline = ResolveOfflineArchivePath(kMediCatArchiveName);
-    if (!offline.empty()) {
-        return offline;
-    }
-
-    return besideExe;
-}
 
 namespace {
 
@@ -133,6 +118,13 @@ std::wstring App::ResolveArchivePath(const std::wstring& overridePath) const {
         return overridePath;
     }
     return ResolveMediCatArchivePath(root_);
+}
+
+void App::LogMediCatArchiveDebug(const std::wstring& path) const {
+    const std::wstring line = BuildMediCatArchiveSizeDebugLine(path);
+    if (!line.empty()) {
+        log_->Debug(line);
+    }
 }
 
 bool App::ShouldAutoConfirm() const {
@@ -250,7 +242,8 @@ int App::RunParsed(const CliParseResult& parsed, int argc, wchar_t** argv) {
 
     LogCommandLine(argc, argv);
     LogSystemDiagnostics(BuildDiagnosticContext(),
-                         [this](const std::wstring& line) { log_->Info(line); });
+                         [this](const std::wstring& line) { log_->Info(line); },
+                         [this](const std::wstring& line) { log_->Debug(line); });
     log_->Info(L"MediCat Installer (C++) started");
 
     if (parsed.options.action == CliAction::Help) {
@@ -363,9 +356,14 @@ int App::RunHeadlessInstall(const CliOptions& cli) {
     }
 
     const std::wstring archive = ResolveArchivePath(cli.archivePath);
-    if (!FileExists(archive)) {
-        const std::wstring msg = L"MediCat archive not found: " + archive;
-        log_->Error(msg);
+    LogMediCatArchiveDebug(archive);
+    std::wstring archiveMessage;
+    std::wstring archiveTitle;
+    if (!IsMediCatArchiveReadyForInstall(
+            archive, archiveMessage, archiveTitle,
+            [this](const std::wstring& status) { PostStatusBar(status); },
+            [this](const std::wstring& msg) { log_->Info(msg); })) {
+        log_->Error(archiveMessage);
         return 1;
     }
 
@@ -615,19 +613,27 @@ void App::QueueFailureLogUpload(const std::string& sessionId, const std::wstring
 }
 
 void App::StartUpdateCheck() {
-    bool expected = false;
-    if (!updateCheckStarted_.compare_exchange_strong(expected, true)) {
+    if (installing_.load()) {
         return;
     }
-    if (installing_.load()) {
+
+    bool expected = false;
+    if (!updateCheckInProgress_.compare_exchange_strong(expected, true)) {
         return;
     }
 
     HWND hwnd = gui_.Hwnd();
     std::thread([this, hwnd]() {
+        const auto finish = [this] { updateCheckInProgress_ = false; };
+        if (installing_.load()) {
+            finish();
+            return;
+        }
+
         std::wstring connectionError;
         if (!TestInternetConnection(connectionError)) {
             log_->Debug(L"[Update] Skipped — offline");
+            finish();
             return;
         }
 
@@ -635,10 +641,12 @@ void App::StartUpdateCheck() {
         const UpdateCheckResult result = CheckForInstallerUpdate();
         if (!result.success) {
             log_->Debug(L"[Update] Check failed — " + result.error);
+            finish();
             return;
         }
         if (!result.info.updateAvailable) {
             log_->Debug(L"[Update] Installer is up to date");
+            finish();
             return;
         }
 
@@ -646,6 +654,7 @@ void App::StartUpdateCheck() {
                    L")");
         auto* payload = new UpdateResultPayload{result.info};
         PostToGui(hwnd, WM_MEDICAT_UPDATE_RESULT, reinterpret_cast<LPARAM>(payload));
+        finish();
     }).detach();
 }
 
@@ -948,6 +957,20 @@ bool App::TryReExtractFailedFiles(const std::wstring& drive, const std::wstring&
         return false;
     }
 
+    LogMediCatArchiveDebug(archive);
+    std::wstring archiveMessage;
+    std::wstring archiveTitle;
+    if (!IsMediCatArchiveReadyForInstall(
+            archive, archiveMessage, archiveTitle,
+            [this](const std::wstring& status) { PostStatusBar(status); },
+            [this](const std::wstring& msg) { log_->Info(msg); })) {
+        log_->Error(archiveMessage);
+        if (errorDetail) {
+            *errorDetail = archiveMessage;
+        }
+        return false;
+    }
+
     log_->Info(i18n::Tr(L"log.re_extraction_started", std::to_wstring(relPaths.size())));
     PostStatusBar(i18n::Tr(L"status.re_extracting"));
     PostExtractProgress(0, L"", true, L"status.re_extracting");
@@ -1167,7 +1190,15 @@ void App::OnInstall() {
     }
 
     const std::wstring archive = ResolveMediCatArchivePath(root_);
-    if (!FileExists(archive)) {
+    LogMediCatArchiveDebug(archive);
+    std::wstring archiveMessage;
+    std::wstring archiveTitle;
+    if (!IsMediCatArchiveReadyForInstall(
+            archive, archiveMessage, archiveTitle,
+            [this](const std::wstring& status) { gui_.SetStatusBar(status); },
+            [this](const std::wstring& msg) { log_->Info(msg); })) {
+        gui_.ShowMessageDialog(archiveMessage, archiveTitle, MessageDialogKind::Warning);
+        gui_.UpdateArchivePanel();
         installing_ = false;
         return;
     }
@@ -1252,6 +1283,17 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
         log_->Error(msg);
         PostDone(false, msg, title);
     };
+
+    LogMediCatArchiveDebug(archive);
+    std::wstring archiveMessage;
+    std::wstring archiveTitle;
+    if (!IsMediCatArchiveReadyForInstall(
+            archive, archiveMessage, archiveTitle,
+            [this](const std::wstring& status) { PostStatusBar(status); },
+            [this](const std::wstring& msg) { log_->Info(msg); })) {
+        fail(archiveMessage, archiveTitle);
+        return;
+    }
 
     auto cancel = [&] {
         log_->Info(i18n::Tr(L"log.user_cancelled"));

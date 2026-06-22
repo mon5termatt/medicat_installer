@@ -7,6 +7,10 @@ namespace medicat {
 
 // From mon5termatt/medicat-website (altDownloads.json + downloads.astro).
 constexpr wchar_t kMediCatArchiveFileName[] = L"MediCat.USB.v21.12.7z";
+// Full MediCat.USB.v21.12.7z is 22,994,783,619 bytes; allow 5% below for size check.
+constexpr uint64_t kMediCatArchiveFullBytes = 22994783619ULL;
+constexpr uint64_t kMediCatArchiveMinBytes = kMediCatArchiveFullBytes * 95 / 100;
+constexpr char kMediCatArchiveMd5[] = "db50f96a5c7b5ec6dc9ed77ea29fffb0";
 
 constexpr wchar_t kDownloadMirror1Name[] = L"files.medicatusb.com";
 constexpr wchar_t kDownloadMirror1Url[] =

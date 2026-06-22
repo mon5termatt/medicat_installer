@@ -77,6 +77,7 @@ private:
                                        std::wstring& errorMessage) const;
     int MapHeadlessExitCode(bool success, const std::wstring& message, const std::wstring& title) const;
     void LogCommandLine(int argc, wchar_t** argv);
+    void LogMediCatArchiveDebug(const std::wstring& path) const;
     std::wstring ResolveArchivePath(const std::wstring& overridePath) const;
     bool ShouldAutoConfirm() const;
     bool IsQuiet() const;
@@ -96,7 +97,7 @@ private:
     HeadlessResult headlessResult_;
     std::string sessionId_;
     std::chrono::steady_clock::time_point sessionStart_{};
-    std::atomic<bool> updateCheckStarted_{false};
+    std::atomic<bool> updateCheckInProgress_{false};
 };
 
 }  // namespace medicat

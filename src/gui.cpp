@@ -1,5 +1,6 @@
 #include "gui.h"
 
+#include "archive.h"
 #include "drives.h"
 #include "download.h"
 #include "downloads.h"
@@ -221,7 +222,8 @@ constexpr UINT_PTR kUiRefreshTimerId = 1;
 constexpr UINT_PTR kArchiveCheckTimerId = 2;
 constexpr UINT_PTR kDriveRefreshTimerId = 3;
 constexpr UINT_PTR kUpdateCheckTimerId = 4;
-constexpr UINT kUpdateCheckDelayMs = 2000;
+constexpr UINT kUpdateCheckDelayMs = 500;
+constexpr UINT kUpdateCheckIntervalMs = 5 * 60 * 1000;  // 5 minutes
 constexpr UINT kUiRefreshIntervalMs = 250;
 constexpr UINT kArchiveCheckIntervalMs = 3000;
 constexpr UINT kDriveDebounceMs = 500;
@@ -1191,18 +1193,23 @@ void Gui::SetApplyInstallerUpdateHandler(std::function<void(const InstallerUpdat
 }
 
 void Gui::ScheduleUpdateCheck() {
-    if (!hwnd_ || !IsWindow(hwnd_) || updateCheckScheduled_) {
+    if (!hwnd_ || !IsWindow(hwnd_)) {
         return;
     }
-    updateCheckScheduled_ = true;
     SetTimer(hwnd_, kUpdateCheckTimerId, kUpdateCheckDelayMs, nullptr);
 }
 
 void Gui::ShowUpdatePrompt(const InstallerUpdateInfo& info) {
-    if (!hwnd_ || !IsWindow(hwnd_) || updatePromptShownThisSession_) {
+    if (!hwnd_ || !IsWindow(hwnd_)) {
         return;
     }
-    updatePromptShownThisSession_ = true;
+    const std::wstring releaseTag = info.releaseTag.empty() ? info.version : info.releaseTag;
+    if (!releaseTag.empty() && releaseTag == lastUpdatePromptReleaseTag_) {
+        return;
+    }
+    if (!releaseTag.empty()) {
+        lastUpdatePromptReleaseTag_ = releaseTag;
+    }
 
 #ifndef INSTALLER_RELEASE_TAG
 #define INSTALLER_RELEASE_TAG "unknown"
@@ -2712,11 +2719,19 @@ void Gui::UpdateAdvancedControls() {
 }
 
 bool Gui::IsArchiveAvailable() const {
-    const std::wstring beside = JoinPath(GetExeDirectory(), kMediCatArchiveFileName);
-    if (FileExists(beside)) {
-        return true;
+    const MediCatArchiveInfo info = InspectMediCatArchive(ResolveMediCatArchivePath(GetExeDirectory()));
+    return info.state == MediCatArchiveState::SizeOk || info.state == MediCatArchiveState::Verified;
+}
+
+void Gui::RefreshArchivePanelLabel() {
+    if (!archiveMissingLabel_ || !IsWindow(archiveMissingLabel_)) {
+        return;
     }
-    return !ResolveOfflineArchivePath(kMediCatArchiveFileName).empty();
+
+    const MediCatArchiveInfo info = InspectMediCatArchive(ResolveMediCatArchivePath(GetExeDirectory()));
+    const wchar_t* labelKey =
+        info.state == MediCatArchiveState::Incomplete ? L"ui.archive_incomplete" : L"ui.archive_missing";
+    SetWindowTextW(archiveMissingLabel_, i18n::Tr(labelKey, kMediCatArchiveFileName).c_str());
 }
 
 void Gui::PopulateAlternativeDownloadCombo() {
@@ -2748,12 +2763,17 @@ void Gui::OpenSelectedAlternativeDownload() {
 }
 
 void Gui::UpdateArchivePanel() {
-    const bool missing = !IsArchiveAvailable();
+    const MediCatArchiveInfo info = InspectMediCatArchive(ResolveMediCatArchivePath(GetExeDirectory()));
+    const bool missing = info.state == MediCatArchiveState::Missing || info.state == MediCatArchiveState::Incomplete;
     if (missing == archiveMissing_) {
+        if (missing) {
+            RefreshArchivePanelLabel();
+        }
         return;
     }
 
     archiveMissing_ = missing;
+    RefreshArchivePanelLabel();
     const int show = missing ? SW_SHOW : SW_HIDE;
     for (HWND control :
          {archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_, altDownloadCombo_, altDownloadOpenBtn_}) {
@@ -2984,10 +3004,10 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 KillTimer(hwnd, kDriveRefreshTimerId);
                 self->OnDebouncedDriveChange();
             } else if (wp == kUpdateCheckTimerId) {
-                KillTimer(hwnd, kUpdateCheckTimerId);
                 if (self->onUpdateCheck_) {
                     self->onUpdateCheck_();
                 }
+                SetTimer(hwnd, kUpdateCheckTimerId, kUpdateCheckIntervalMs, nullptr);
             }
             return 0;
         case WM_SIZE:
@@ -3522,7 +3542,7 @@ void Gui::RefreshTranslatedUi() {
     RefreshMessageDialogText();
     RefreshCreditsWindowText();
     if (archiveMissingLabel_ && IsWindow(archiveMissingLabel_)) {
-        SetWindowTextW(archiveMissingLabel_, i18n::Tr(L"ui.archive_missing", kMediCatArchiveFileName).c_str());
+        RefreshArchivePanelLabel();
     }
     if (downloadMirror1Btn_ && IsWindow(downloadMirror1Btn_)) {
         SetWindowTextW(downloadMirror1Btn_, kDownloadMirror1Name);

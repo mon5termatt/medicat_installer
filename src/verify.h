@@ -69,5 +69,6 @@ bool EnsureMedicatMd5Manifest(const std::wstring& installerRoot, const std::wstr
                               std::wstring& manifestPath, std::wstring& error);
 MedicatPresenceResult CheckMedicatPresenceOnDrive(const std::wstring& driveRoot);
 VerifyResult VerifyMedicatFiles(const VerifyOptions& options);
+bool ComputeFileMd5(const std::wstring& path, std::string& outHex, std::wstring& error, uint64_t* outBytesRead = nullptr);
 
 }  // namespace medicat

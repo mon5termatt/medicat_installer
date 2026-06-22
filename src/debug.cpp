@@ -564,7 +564,8 @@ void WriteSystemSection(const DiagnosticContext& context, const std::function<vo
 }
 
 void WriteBundledToolsSection(const DiagnosticContext& context,
-                              const std::function<void(const std::wstring&)>& write) {
+                              const std::function<void(const std::wstring&)>& write,
+                              const std::function<void(const std::wstring&)>& writeDebug) {
     auto field = [&](const wchar_t* label, const std::wstring& value) {
         write(std::wstring(label) + value);
     };
@@ -575,6 +576,12 @@ void WriteBundledToolsSection(const DiagnosticContext& context,
     field(L"7za version: ", GetToolVersionLine(context.sevenZaPath));
     field(L"MedicatFiles.md5: ", DescribeFile(context.md5ManifestPath));
     field(L"MediCat archive: ", DescribeFile(context.archivePath));
+    if (writeDebug) {
+        const std::wstring archiveDebug = BuildMediCatArchiveSizeDebugLine(context.archivePath);
+        if (!archiveDebug.empty()) {
+            writeDebug(archiveDebug);
+        }
+    }
     write(kDiagnosticSeparator);
 }
 
@@ -656,11 +663,21 @@ SessionSystemSnapshot BuildSessionSystemSnapshot() {
 
 }  // namespace
 
+std::wstring BuildMediCatArchiveSizeDebugLine(const std::wstring& path) {
+    if (path.empty() || !FileExists(path)) {
+        return {};
+    }
+    const uint64_t size = GetFileSizeBytes(path);
+    return L"MediCat archive: " + path + L" — " + FormatBytes(size) + L" (" + std::to_wstring(size) +
+           L" bytes)";
+}
+
 void LogSystemDiagnostics(const DiagnosticContext& context,
-                          const std::function<void(const std::wstring&)>& logLine) {
+                          const std::function<void(const std::wstring&)>& logLine,
+                          const std::function<void(const std::wstring&)>& logDebug) {
     WriteApplicationSection(context, logLine);
     WriteSystemSection(context, logLine);
-    WriteBundledToolsSection(context, logLine);
+    WriteBundledToolsSection(context, logLine, logDebug);
 }
 
 void LogInstallerDiagnostics(const DiagnosticContext& context,

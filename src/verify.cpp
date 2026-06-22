@@ -269,111 +269,6 @@ bool LoadMd5Manifest(const std::wstring& path, std::vector<Md5Entry>& entries, s
     return true;
 }
 
-bool ComputeFileMd5(const std::wstring& path, std::string& outHex, std::wstring& error, uint64_t* outBytesRead) {
-    outHex.clear();
-    if (outBytesRead) {
-        *outBytesRead = 0;
-    }
-
-    HCRYPTPROV provider = 0;
-    HCRYPTHASH hash = 0;
-    HANDLE file = INVALID_HANDLE_VALUE;
-
-    auto cleanup = [&] {
-        if (file != INVALID_HANDLE_VALUE) {
-            CloseHandle(file);
-            file = INVALID_HANDLE_VALUE;
-        }
-        if (hash) {
-            CryptDestroyHash(hash);
-            hash = 0;
-        }
-        if (provider) {
-            CryptReleaseContext(provider, 0);
-            provider = 0;
-        }
-    };
-
-    if (!CryptAcquireContextW(&provider, nullptr, nullptr, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
-        error = L"CryptAcquireContext failed";
-        return false;
-    }
-    if (!CryptCreateHash(provider, CALG_MD5, 0, 0, &hash)) {
-        error = L"CryptCreateHash failed";
-        cleanup();
-        return false;
-    }
-
-    file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-                       FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
-    if (file == INVALID_HANDLE_VALUE) {
-        error = L"Could not open file for hashing";
-        cleanup();
-        return false;
-    }
-
-    LARGE_INTEGER fileSize{};
-    if (!GetFileSizeEx(file, &fileSize) || fileSize.QuadPart < 0) {
-        error = L"Could not determine file size";
-        cleanup();
-        return false;
-    }
-
-    std::vector<BYTE> buffer(static_cast<size_t>(1) << 20);
-    uint64_t totalRead = 0;
-    DWORD read = 0;
-    while (true) {
-        if (!ReadFile(file, buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr)) {
-            const DWORD readError = GetLastError();
-            if (readError != ERROR_HANDLE_EOF && readError != ERROR_SUCCESS) {
-                error = L"ReadFile failed while hashing";
-                cleanup();
-                return false;
-            }
-            break;
-        }
-        if (read == 0) {
-            break;
-        }
-
-        if (!CryptHashData(hash, buffer.data(), read, 0)) {
-            error = L"CryptHashData failed";
-            cleanup();
-            return false;
-        }
-        totalRead += read;
-    }
-
-    if (totalRead != static_cast<uint64_t>(fileSize.QuadPart)) {
-        error = L"Incomplete file read while hashing (" + std::to_wstring(totalRead) + L" of " +
-                std::to_wstring(fileSize.QuadPart) + L" bytes)";
-        cleanup();
-        return false;
-    }
-
-    BYTE digest[16]{};
-    DWORD digestLen = sizeof(digest);
-    if (!CryptGetHashParam(hash, HP_HASHVAL, digest, &digestLen, 0)) {
-        error = L"CryptGetHashParam failed";
-        cleanup();
-        return false;
-    }
-
-    static constexpr char kHex[] = "0123456789abcdef";
-    outHex.resize(32);
-    for (DWORD i = 0; i < digestLen; ++i) {
-        outHex[i * 2] = kHex[(digest[i] >> 4) & 0x0f];
-        outHex[i * 2 + 1] = kHex[digest[i] & 0x0f];
-    }
-
-    if (outBytesRead) {
-        *outBytesRead = totalRead;
-    }
-
-    cleanup();
-    return true;
-}
-
 bool WriteFailedFilesList(const std::wstring& path, const std::vector<std::wstring>& failures) {
     std::ofstream out(path, std::ios::binary);
     if (!out) {
@@ -848,6 +743,111 @@ bool TryParentDirectory(std::wstring& directory) {
 }
 
 }  // namespace
+
+bool ComputeFileMd5(const std::wstring& path, std::string& outHex, std::wstring& error, uint64_t* outBytesRead) {
+    outHex.clear();
+    if (outBytesRead) {
+        *outBytesRead = 0;
+    }
+
+    HCRYPTPROV provider = 0;
+    HCRYPTHASH hash = 0;
+    HANDLE file = INVALID_HANDLE_VALUE;
+
+    auto cleanup = [&] {
+        if (file != INVALID_HANDLE_VALUE) {
+            CloseHandle(file);
+            file = INVALID_HANDLE_VALUE;
+        }
+        if (hash) {
+            CryptDestroyHash(hash);
+            hash = 0;
+        }
+        if (provider) {
+            CryptReleaseContext(provider, 0);
+            provider = 0;
+        }
+    };
+
+    if (!CryptAcquireContextW(&provider, nullptr, nullptr, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
+        error = L"CryptAcquireContext failed";
+        return false;
+    }
+    if (!CryptCreateHash(provider, CALG_MD5, 0, 0, &hash)) {
+        error = L"CryptCreateHash failed";
+        cleanup();
+        return false;
+    }
+
+    file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                       FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        error = L"Could not open file for hashing";
+        cleanup();
+        return false;
+    }
+
+    LARGE_INTEGER fileSize{};
+    if (!GetFileSizeEx(file, &fileSize) || fileSize.QuadPart < 0) {
+        error = L"Could not determine file size";
+        cleanup();
+        return false;
+    }
+
+    std::vector<BYTE> buffer(static_cast<size_t>(1) << 20);
+    uint64_t totalRead = 0;
+    DWORD read = 0;
+    while (true) {
+        if (!ReadFile(file, buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr)) {
+            const DWORD readError = GetLastError();
+            if (readError != ERROR_HANDLE_EOF && readError != ERROR_SUCCESS) {
+                error = L"ReadFile failed while hashing";
+                cleanup();
+                return false;
+            }
+            break;
+        }
+        if (read == 0) {
+            break;
+        }
+
+        if (!CryptHashData(hash, buffer.data(), read, 0)) {
+            error = L"CryptHashData failed";
+            cleanup();
+            return false;
+        }
+        totalRead += read;
+    }
+
+    if (totalRead != static_cast<uint64_t>(fileSize.QuadPart)) {
+        error = L"Incomplete file read while hashing (" + std::to_wstring(totalRead) + L" of " +
+                std::to_wstring(fileSize.QuadPart) + L" bytes)";
+        cleanup();
+        return false;
+    }
+
+    BYTE digest[16]{};
+    DWORD digestLen = sizeof(digest);
+    if (!CryptGetHashParam(hash, HP_HASHVAL, digest, &digestLen, 0)) {
+        error = L"CryptGetHashParam failed";
+        cleanup();
+        return false;
+    }
+
+    static constexpr char kHex[] = "0123456789abcdef";
+    outHex.resize(32);
+    for (DWORD i = 0; i < digestLen; ++i) {
+        outHex[i * 2] = kHex[(digest[i] >> 4) & 0x0f];
+        outHex[i * 2 + 1] = kHex[digest[i] & 0x0f];
+    }
+
+    if (outBytesRead) {
+        *outBytesRead = totalRead;
+    }
+
+    cleanup();
+    return true;
+}
 
 bool EnsureMedicatMd5Manifest(const std::wstring& installerRoot, const std::wstring& tempDir,
                               std::wstring& manifestPath, std::wstring& error) {

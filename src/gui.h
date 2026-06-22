@@ -136,6 +136,7 @@ public:
     bool ShowConfirmDialog(const std::wstring& message, const std::wstring& title,
                            MessageDialogKind kind = MessageDialogKind::Warning);
     void ShowDone(bool success, const std::wstring& message, const std::wstring& title = L"");
+    void UpdateArchivePanel();
     void SetInitialLanguage(const std::wstring& languageCode);
     std::wstring SelectedDrive() const;
     bool FormatChecked() const;
@@ -193,7 +194,7 @@ private:
     std::wstring FailureDiagDisplayText() const;
     COLORREF MessageDialogAccentColor(MessageDialogKind kind) const;
     void LayoutReExtractDialog();
-    void UpdateArchivePanel();
+    void RefreshArchivePanelLabel();
     bool IsArchiveAvailable() const;
     void EnsureVentoyVersionsLoaded();
     void PopulateVentoyVersionCombo();
@@ -285,8 +286,7 @@ private:
     std::function<void(const std::wstring&)> onLog_;
     std::function<void()> onUpdateCheck_;
     std::function<void(const InstallerUpdateInfo&)> onApplyInstallerUpdate_;
-    bool updateCheckScheduled_ = false;
-    bool updatePromptShownThisSession_ = false;
+    std::wstring lastUpdatePromptReleaseTag_;
     bool hasLastVentoyLog_ = false;
     std::wstring lastVentoyLogDrive_;
     bool lastVentoyLogFound_ = false;
