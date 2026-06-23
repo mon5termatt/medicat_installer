@@ -1384,10 +1384,14 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
             return;
         }
 
+        const std::wstring ventoyLogPath = JoinPath(root, L"ventoy.log");
+        log_->Info(L"Writing Ventoy diagnostics to " + ventoyLogPath);
+
         VentoyEnsureOptions ensureOptions;
         ensureOptions.root = root;
         ensureOptions.sevenZipExe = sevenZip;
         ensureOptions.pinVersion = std::move(pinVersion);
+        ensureOptions.logPath = ventoyLogPath;
         ensureOptions.onStatus = [&](const std::wstring& key) { PostVentoyStatus(postProgress, key); };
         ensureOptions.onLog = [&](const std::wstring& msg) { log_->Info(msg); };
 
@@ -1404,7 +1408,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
         log_->Info(L"Ventoy v" + ready.version + L" ready");
 
         PostProgress(0);
-        const VentoyDetectionResult ventoyDetection = DetectVentoyOnDrive(drive);
+        const VentoyDetectionResult ventoyDetection = DetectVentoyOnDrive(drive, ventoyLogPath);
         for (const std::wstring& line : ventoyDetection.logLines) {
             log_->Info(line);
         }
@@ -1434,12 +1438,22 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
         log_->Info(upgrade ? L"Running Ventoy upgrade" : L"Running Ventoy fresh install");
         log_->Info(L"Ventoy options: " + std::wstring(ventoyInstall.useGpt ? L"GPT" : L"MBR") + L", Secure Boot " +
                    (ventoyInstall.enableSecureBoot ? L"enabled" : L"disabled"));
+        ventoyInstall.logPath = ventoyLogPath;
         const VentoyResult ventoy = RunVentoyInstall(ventoyExe, drive, upgrade, ventoyInstall);
         if (!ventoy.success) {
+            if (!ventoy.cliLogExcerpt.empty()) {
+                log_->Error(L"Ventoy cli_log.txt excerpt:\n" + ventoy.cliLogExcerpt);
+            } else if (!ventoy.error.empty()) {
+                log_->Error(ventoy.error);
+            }
             const std::wstring exitLine =
                 i18n::Tr(L"messages.process_exit_code", L"Ventoy2Disk", std::to_wstring(ventoy.exitCode));
-            const std::wstring summary = upgrade ? i18n::Tr(L"messages.ventoy_upgrade_failed", exitLine)
-                                                 : i18n::Tr(L"messages.ventoy_install_failed", exitLine);
+            std::wstring detail = exitLine;
+            if (!ventoy.cliLogExcerpt.empty()) {
+                detail += L"\n\n" + ventoy.cliLogExcerpt;
+            }
+            const std::wstring summary = upgrade ? i18n::Tr(L"messages.ventoy_upgrade_failed", detail)
+                                                 : i18n::Tr(L"messages.ventoy_install_failed", detail);
             const std::wstring title =
                 upgrade ? i18n::Tr(L"titles.ventoy_upgrade_failed") : i18n::Tr(L"titles.ventoy_install_failed");
             fail(summary, title);

@@ -9,8 +9,11 @@
 
 #include <windows.h>
 
+#include <atomic>
 #include <fstream>
+#include <mutex>
 #include <sstream>
+#include <thread>
 #include <vector>
 
 #include <cstring>
@@ -148,11 +151,121 @@ bool IsVentoyPhysicalDrive(const DWORD phyDrive) {
 
 }  // namespace
 
+class VentoyFileLog {
+public:
+    bool OpenNew(const std::wstring& path) {
+        Close();
+        file_ = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS,
+                            FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file_ == INVALID_HANDLE_VALUE) {
+            return false;
+        }
+        static constexpr char kHeader[] = "===== MediCat Ventoy log =====\r\n\r\n";
+        WriteRaw(kHeader, sizeof(kHeader) - 1);
+        return true;
+    }
+
+    bool OpenAppend(const std::wstring& path) {
+        Close();
+        file_ = CreateFileW(path.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ, nullptr, OPEN_ALWAYS,
+                            FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file_ == INVALID_HANDLE_VALUE) {
+            return false;
+        }
+        return true;
+    }
+
+    bool IsOpen() const { return file_ != INVALID_HANDLE_VALUE; }
+
+    void WriteSection(const std::wstring& title) {
+        if (!IsOpen()) {
+            return;
+        }
+        std::string section = "\r\n----- ";
+        section += WideToUtf8(title);
+        section += " -----\r\n";
+        WriteRaw(section.data(), section.size());
+    }
+
+    void WriteLine(const std::wstring& line) {
+        if (!IsOpen()) {
+            return;
+        }
+        std::string text = WideToUtf8(line);
+        text += "\r\n";
+        WriteRaw(text.data(), text.size());
+    }
+
+    void WriteStdout(const char* data, const size_t len) { WriteProcessOutput(data, len, false); }
+
+    void WriteStderr(const char* data, const size_t len) { WriteProcessOutput(data, len, true); }
+
+    bool AppendFile(const std::wstring& path) {
+        if (!IsOpen() || !FileExists(path)) {
+            return false;
+        }
+        std::ifstream in(path, std::ios::binary);
+        if (!in) {
+            return false;
+        }
+        char buf[8192];
+        while (in.read(buf, sizeof(buf)) || in.gcount() > 0) {
+            const std::streamsize count = in.gcount();
+            if (count > 0) {
+                WriteRaw(buf, static_cast<size_t>(count));
+            }
+        }
+        return true;
+    }
+
+    void Close() {
+        if (file_ != INVALID_HANDLE_VALUE) {
+            CloseHandle(file_);
+            file_ = INVALID_HANDLE_VALUE;
+        }
+        stderrMarkerWritten_ = false;
+    }
+
+private:
+    void WriteProcessOutput(const char* data, const size_t len, const bool isStderr) {
+        if (!data || len == 0 || !IsOpen()) {
+            return;
+        }
+        std::lock_guard lock(mutex_);
+        if (isStderr && !stderrMarkerWritten_) {
+            static constexpr char kMarker[] = "\r\n----- stderr -----\r\n";
+            WriteRawLocked(kMarker, sizeof(kMarker) - 1);
+            stderrMarkerWritten_ = true;
+        }
+        WriteRawLocked(data, len);
+    }
+
+    void WriteRaw(const char* data, const size_t len) {
+        std::lock_guard lock(mutex_);
+        WriteRawLocked(data, len);
+    }
+
+    void WriteRawLocked(const char* data, const size_t len) {
+        if (file_ == INVALID_HANDLE_VALUE || !data || len == 0) {
+            return;
+        }
+        DWORD written = 0;
+        WriteFile(file_, data, static_cast<DWORD>(len), &written, nullptr);
+    }
+
+    HANDLE file_ = INVALID_HANDLE_VALUE;
+    std::mutex mutex_;
+    bool stderrMarkerWritten_ = false;
+};
+
 namespace {
 
-void LogLine(const VentoyEnsureOptions& options, const std::wstring& message) {
+void LogLine(const VentoyEnsureOptions& options, VentoyFileLog* fileLog, const std::wstring& message) {
     if (options.onLog) {
         options.onLog(message);
+    }
+    if (fileLog && fileLog->IsOpen()) {
+        fileLog->WriteLine(message);
     }
 }
 
@@ -182,6 +295,116 @@ int RunHiddenProcess(const std::wstring& commandLine, const std::wstring& workin
     GetExitCodeProcess(pi.hProcess, &code);
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
+    return static_cast<int>(code);
+}
+
+int RunProcessWithLog(const std::wstring& commandLine, const std::wstring& workingDir, VentoyFileLog& log) {
+    SECURITY_ATTRIBUTES sa{};
+    sa.nLength = sizeof(sa);
+    sa.bInheritHandle = TRUE;
+
+    HANDLE stdoutRead = nullptr;
+    HANDLE stdoutWrite = nullptr;
+    if (!CreatePipe(&stdoutRead, &stdoutWrite, &sa, 0)) {
+        return -1;
+    }
+    SetHandleInformation(stdoutRead, HANDLE_FLAG_INHERIT, 0);
+
+    HANDLE stderrRead = nullptr;
+    HANDLE stderrWrite = nullptr;
+    if (!CreatePipe(&stderrRead, &stderrWrite, &sa, 0)) {
+        CloseHandle(stdoutRead);
+        CloseHandle(stdoutWrite);
+        return -1;
+    }
+    SetHandleInformation(stderrRead, HANDLE_FLAG_INHERIT, 0);
+
+    STARTUPINFOW si{};
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+    si.hStdOutput = stdoutWrite;
+    si.hStdError = stderrWrite;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.wShowWindow = SW_HIDE;
+
+    PROCESS_INFORMATION pi{};
+    std::vector<wchar_t> cmd(commandLine.begin(), commandLine.end());
+    cmd.push_back(L'\0');
+    const wchar_t* work = workingDir.empty() ? nullptr : workingDir.c_str();
+
+    if (!CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, work, &si,
+                        &pi)) {
+        CloseHandle(stdoutRead);
+        CloseHandle(stdoutWrite);
+        CloseHandle(stderrRead);
+        CloseHandle(stderrWrite);
+        return -1;
+    }
+
+    CloseHandle(stdoutWrite);
+    CloseHandle(stderrWrite);
+
+    std::atomic<bool> running{true};
+    std::thread stderrThread([&] {
+        char buf[4096];
+        DWORD n = 0;
+        while (running.load()) {
+            if (!ReadFile(stderrRead, buf, sizeof(buf), &n, nullptr) || n == 0) {
+                break;
+            }
+            if (log.IsOpen()) {
+                log.WriteStderr(buf, n);
+            }
+        }
+    });
+
+    while (true) {
+        DWORD avail = 0;
+        if (!PeekNamedPipe(stdoutRead, nullptr, 0, nullptr, &avail, nullptr)) {
+            break;
+        }
+        if (avail == 0) {
+            DWORD wait = WaitForSingleObject(pi.hProcess, 50);
+            if (wait == WAIT_OBJECT_0) {
+                break;
+            }
+            continue;
+        }
+
+        std::string chunk(avail, '\0');
+        DWORD read = 0;
+        if (!ReadFile(stdoutRead, chunk.data(), avail, &read, nullptr) || read == 0) {
+            break;
+        }
+        chunk.resize(read);
+        if (log.IsOpen()) {
+            log.WriteStdout(chunk.data(), chunk.size());
+        }
+    }
+
+    while (true) {
+        char buf[4096];
+        DWORD n = 0;
+        if (!ReadFile(stdoutRead, buf, sizeof(buf), &n, nullptr) || n == 0) {
+            break;
+        }
+        if (log.IsOpen()) {
+            log.WriteStdout(buf, n);
+        }
+    }
+
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    running.store(false);
+    if (stderrThread.joinable()) {
+        stderrThread.join();
+    }
+
+    DWORD code = 1;
+    GetExitCodeProcess(pi.hProcess, &code);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    CloseHandle(stdoutRead);
+    CloseHandle(stderrRead);
     return static_cast<int>(code);
 }
 
@@ -231,6 +454,121 @@ std::wstring ReadTextFile(const std::wstring& path) {
         MultiByteToWideChar(CP_UTF8, 0, content.c_str(), -1, wide.data(), len);
     }
     return wide;
+}
+
+std::wstring ReadTextFileFull(const std::wstring& path) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        return L"";
+    }
+    const std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    if (content.empty()) {
+        return L"";
+    }
+    const int len = MultiByteToWideChar(CP_UTF8, 0, content.c_str(), static_cast<int>(content.size()), nullptr, 0);
+    if (len <= 0) {
+        return L"";
+    }
+    std::wstring wide(static_cast<size_t>(len), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, content.c_str(), static_cast<int>(content.size()), wide.data(), len);
+    return wide;
+}
+
+void ClearVentoyCliArtifacts(const std::wstring& ventoyDir) {
+    static const wchar_t* kFiles[] = {L"cli_log.txt", L"cli_done.txt", L"cli_percent.txt", nullptr};
+    for (const wchar_t* const* name = kFiles; *name != nullptr; ++name) {
+        DeleteFileW(JoinPath(ventoyDir, *name).c_str());
+    }
+}
+
+bool VentoyCliLineLooksImportant(const std::wstring& line) {
+    if (line.empty()) {
+        return false;
+    }
+    std::wstring upper = line;
+    for (wchar_t& ch : upper) {
+        if (ch >= L'a' && ch <= L'z') {
+            ch = static_cast<wchar_t>(ch - L'a' + L'A');
+        }
+    }
+    static const wchar_t* kNeedles[] = {L"FAILED", L"ERROR", L"LASTERR", L"CANNOT", L"UNABLE", L"REFUSE",
+                                        L"INVALID", L"NOT FOUND", L"NO SUCH", nullptr};
+    for (const wchar_t* const* needle = kNeedles; *needle != nullptr; ++needle) {
+        if (upper.find(*needle) != std::wstring::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::wstring ExtractVentoyCliLogExcerpt(const std::wstring& cliLogPath) {
+    const std::wstring content = ReadTextFileFull(cliLogPath);
+    if (content.empty()) {
+        return L"";
+    }
+
+    std::vector<std::wstring> highlights;
+    size_t start = 0;
+    while (start <= content.size()) {
+        const size_t end = content.find(L'\n', start);
+        const size_t lineEnd = end == std::wstring::npos ? content.size() : end;
+        std::wstring line = content.substr(start, lineEnd - start);
+        while (!line.empty() && (line.back() == L'\r' || line.back() == L' ' || line.back() == L'\t')) {
+            line.pop_back();
+        }
+        if (VentoyCliLineLooksImportant(line)) {
+            highlights.push_back(line);
+        }
+        if (end == std::wstring::npos) {
+            break;
+        }
+        start = end + 1;
+    }
+
+    if (highlights.empty()) {
+        std::vector<std::wstring> tail;
+        start = 0;
+        while (start <= content.size()) {
+            const size_t end = content.find(L'\n', start);
+            const size_t lineEnd = end == std::wstring::npos ? content.size() : end;
+            std::wstring line = content.substr(start, lineEnd - start);
+            while (!line.empty() && (line.back() == L'\r' || line.back() == L' ' || line.back() == L'\t')) {
+                line.pop_back();
+            }
+            if (!line.empty()) {
+                tail.push_back(line);
+            }
+            if (end == std::wstring::npos) {
+                break;
+            }
+            start = end + 1;
+        }
+        const size_t keep = tail.size() < 12 ? tail.size() : 12;
+        highlights.assign(tail.end() - static_cast<std::ptrdiff_t>(keep), tail.end());
+    } else if (highlights.size() > 12) {
+        highlights.erase(highlights.begin(), highlights.end() - 12);
+    }
+
+    std::wstring excerpt;
+    for (const std::wstring& line : highlights) {
+        if (!excerpt.empty()) {
+            excerpt += L"\n";
+        }
+        excerpt += line;
+    }
+    return excerpt;
+}
+
+void AppendVentoyCliArtifacts(const std::wstring& ventoyDir, VentoyFileLog& fileLog) {
+    static const wchar_t* kFiles[] = {L"cli_log.txt", L"cli_done.txt", L"cli_percent.txt", nullptr};
+    for (const wchar_t* const* name = kFiles; *name != nullptr; ++name) {
+        const std::wstring path = JoinPath(ventoyDir, *name);
+        if (!FileExists(path) || GetFileSizeBytes(path) == 0) {
+            continue;
+        }
+        fileLog.WriteSection(std::wstring(*name) + L" (from Ventoy2Disk/)");
+        fileLog.AppendFile(path);
+    }
 }
 
 std::wstring NormalizeVersion(std::wstring version) {
@@ -401,6 +739,12 @@ bool LoadBundledVentoyVersionList(const HINSTANCE instance, std::vector<std::wst
 VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
     VentoyResult result;
 
+    VentoyFileLog fileLog;
+    VentoyFileLog* fileLogPtr = nullptr;
+    if (!options.logPath.empty() && fileLog.OpenNew(options.logPath)) {
+        fileLogPtr = &fileLog;
+    }
+
     std::wstring targetVersion = NormalizeVersion(options.pinVersion);
     if (targetVersion.empty()) {
         SetStatus(options, L"checking_ventoy");
@@ -408,9 +752,9 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
         if (!latest.success) {
             return latest;
         }
-        LogLine(options, L"Latest Ventoy version: v" + targetVersion);
+        LogLine(options, fileLogPtr, L"Latest Ventoy version: v" + targetVersion);
     } else {
-        LogLine(options, L"Using pinned Ventoy version: v" + targetVersion);
+        LogLine(options, fileLogPtr, L"Using pinned Ventoy version: v" + targetVersion);
     }
 
     const std::wstring ventoyDir = JoinPath(options.root, L"Ventoy2Disk");
@@ -423,9 +767,9 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
 
     if (needsDownload) {
         if (!localVersion.empty() && localVersion != targetVersion) {
-            LogLine(options, L"Updating Ventoy from v" + localVersion + L" to v" + targetVersion);
+            LogLine(options, fileLogPtr, L"Updating Ventoy from v" + localVersion + L" to v" + targetVersion);
         } else if (!OfflineVentoyZipExists(targetVersion)) {
-            LogLine(options, L"Downloading Ventoy v" + targetVersion);
+            LogLine(options, fileLogPtr, L"Downloading Ventoy v" + targetVersion);
         }
 
         const std::wstring cachedZip = GetOfflineVentoyZipPath(targetVersion);
@@ -434,7 +778,7 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
         bool deleteWorkingZip = false;
 
         if (OfflineVentoyZipExists(targetVersion)) {
-            LogLine(options, L"Using offline Ventoy cache for v" + targetVersion);
+            LogLine(options, fileLogPtr, L"Using offline Ventoy cache for v" + targetVersion);
             zipPath = cachedZip;
         } else {
             SetStatus(options, L"downloading_ventoy:" + targetVersion);
@@ -455,7 +799,13 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
         }
 
         SetStatus(options, L"extracting_ventoy");
-        LogLine(options, L"Extracting Ventoy archive");
+        LogLine(options, fileLogPtr, L"Extracting Ventoy archive");
+        if (fileLogPtr) {
+            fileLogPtr->WriteSection(L"Ventoy archive extract (7za)");
+        }
+
+        const std::wstring extractTmpLog = JoinPath(GetMedicatTempDir(), L"ventoy_7za_extract.log");
+        DeleteFileW(extractTmpLog.c_str());
 
         const ExtractResult extract = Extract7zArchive(
             options.sevenZipExe, zipPath, options.root, 0, 0,
@@ -464,7 +814,12 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
                     SetStatus(options, L"extracting_ventoy:" + std::to_wstring(progress.percent));
                 }
             },
-            L"", false);
+            extractTmpLog, false);
+
+        if (fileLogPtr) {
+            fileLogPtr->AppendFile(extractTmpLog);
+            DeleteFileW(extractTmpLog.c_str());
+        }
 
         if (deleteWorkingZip) {
             DeleteFileW(zipPath.c_str());
@@ -497,9 +852,9 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
             return result;
         }
 
-        LogLine(options, L"Ventoy v" + targetVersion + L" ready");
+        LogLine(options, fileLogPtr, L"Ventoy v" + targetVersion + L" ready");
     } else {
-        LogLine(options, L"Local Ventoy v" + localVersion + L" is up to date");
+        LogLine(options, fileLogPtr, L"Local Ventoy v" + localVersion + L" is up to date");
     }
 
     if (!FileExists(ventoyExe)) {
@@ -514,9 +869,20 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
     return result;
 }
 
-VentoyDetectionResult DetectVentoyOnDrive(const std::wstring& driveLetter) {
+VentoyDetectionResult DetectVentoyOnDrive(const std::wstring& driveLetter, const std::wstring& logPath) {
     VentoyDetectionResult result;
-    auto log = [&](const std::wstring& line) { result.logLines.push_back(line); };
+    VentoyFileLog fileLog;
+    const bool logging = !logPath.empty() && fileLog.OpenAppend(logPath);
+    if (logging) {
+        fileLog.WriteSection(L"Ventoy detection");
+    }
+
+    auto log = [&](const std::wstring& line) {
+        result.logLines.push_back(line);
+        if (logging) {
+            fileLog.WriteLine(line);
+        }
+    };
 
     if (driveLetter.size() < 2) {
         log(L"Ventoy detection: invalid drive letter");
@@ -580,7 +946,8 @@ VentoyResult RunVentoyInstall(const std::wstring& ventoyExe, const std::wstring&
     const std::wstring ventoyWork = GetExeDirectory();
     const std::wstring ventoyDir = JoinPath(ventoyWork, L"Ventoy2Disk");
     std::wstring args =
-        upgrade ? (L"VTOYCLI /U /Drive:" + drive) : (L"VTOYCLI /I /Drive:" + drive + L" /NOUSBCheck");
+        upgrade ? (L"VTOYCLI /U /Drive:" + drive + L" /Y")
+                : (L"VTOYCLI /I /Drive:" + drive + L" /NOUSBCheck /Y");
     if (options.useGpt) {
         args += L" /GPT";
     }
@@ -589,13 +956,42 @@ VentoyResult RunVentoyInstall(const std::wstring& ventoyExe, const std::wstring&
     }
 
     std::wstring cmd = L"\"" + ventoyExe + L"\" " + args;
-    result.exitCode = RunHiddenProcess(cmd, ventoyDir);
+
+    VentoyFileLog fileLog;
+    const bool logging = !options.logPath.empty() && fileLog.OpenAppend(options.logPath);
+    if (logging) {
+        fileLog.WriteSection(upgrade ? L"Ventoy upgrade (Ventoy2Disk.exe)" : L"Ventoy install (Ventoy2Disk.exe)");
+        fileLog.WriteLine(L"Command: " + cmd);
+        fileLog.WriteLine(L"Working directory: " + ventoyDir);
+        fileLog.WriteLine(
+            L"Note: Ventoy2Disk VTOYCLI writes diagnostics to cli_log.txt in the working directory (not stdout).");
+    }
+
+    ClearVentoyCliArtifacts(ventoyDir);
+
+    if (logging) {
+        result.exitCode = RunProcessWithLog(cmd, ventoyDir, fileLog);
+        fileLog.WriteLine(L"Process exit code: " + std::to_wstring(result.exitCode));
+        AppendVentoyCliArtifacts(ventoyDir, fileLog);
+    } else {
+        result.exitCode = RunHiddenProcess(cmd, ventoyDir);
+    }
+
+    const std::wstring cliLogPath = JoinPath(ventoyDir, L"cli_log.txt");
+    result.cliLogExcerpt = ExtractVentoyCliLogExcerpt(cliLogPath);
     result.success = (result.exitCode == 0);
     result.ventoyExe = ventoyExe;
     if (!result.success) {
         std::wostringstream err;
         err << L"Ventoy failed with exit code " << result.exitCode;
         result.error = err.str();
+        if (!result.cliLogExcerpt.empty()) {
+            result.error += L"\n\n" + result.cliLogExcerpt;
+        } else if (!FileExists(cliLogPath)) {
+            result.error += L"\n\n(Ventoy cli_log.txt was not created — check Ventoy2Disk folder beside installer)";
+        } else {
+            result.error += L"\n\n(Ventoy cli_log.txt was empty — see ventoy.log)";
+        }
     }
     return result;
 }

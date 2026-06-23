@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0\.."
 
-set "MANIFEST=installer\update.json"
+set "MANIFEST=update.json"
 
 if not exist "%MANIFEST%" (
     echo Update manifest not found: %MANIFEST%
@@ -35,7 +35,7 @@ if errorlevel 1 (
 
 for /f "usebackq delims=" %%B in (`git rev-parse --abbrev-ref HEAD`) do set "BRANCH=%%B"
 if /i not "%BRANCH%"=="cpp" (
-    echo Pushing installer\update.json to origin/cpp ^(current branch: %BRANCH%^)...
+    echo Pushing update.json to origin/cpp ^(current branch: %BRANCH%^)...
     git push origin HEAD:cpp
 ) else (
     git push origin cpp

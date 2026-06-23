@@ -55,12 +55,15 @@ if not "%PIN_BUILD%"=="0" (
 )
 set MEDICAT_BUILD_NUMBER_BUMPED=1
 
+set "SRC_DIR=%~dp0"
+if "%SRC_DIR:~-1%"=="\" set "SRC_DIR=%SRC_DIR:~0,-1%"
+
 echo Configuring x64 CMake...
-cmake -B build -G "Visual Studio 17 2022" -A x64
+call :configure_cmake build x64
 if errorlevel 1 goto fail
 
 echo Configuring Win32 CMake...
-cmake -B build-x86 -G "Visual Studio 17 2022" -A Win32
+call :configure_cmake build-x86 Win32
 if errorlevel 1 goto fail
 
 echo Building x64 Release...
@@ -81,7 +84,7 @@ if "%UPLOAD_RELEASE%"=="1" (
     if errorlevel 1 goto fail
 ) else if "%PIN_BUILD%"=="0" (
     echo Publishing update manifest...
-    python "tools\publish_update_manifest.py" --build-number "build_number.txt" --build-version "generated\build_version.cpp" --output "installer\update.json"
+    python "tools\publish_update_manifest.py" --build-number "build_number.txt" --build-version "generated\build_version.cpp" --output "update.json"
     if errorlevel 1 goto fail
 )
 
@@ -115,6 +118,19 @@ for %%P in (MedicatInstaller.exe MedicatInstaller-x86.exe) do (
     )
 )
 exit /b 0
+
+:configure_cmake
+set "BUILD_DIR=%~1"
+set "VS_ARCH=%~2"
+if exist "%BUILD_DIR%\CMakeCache.txt" (
+    findstr /I /C:"%SRC_DIR:\=/%" "%BUILD_DIR%\CMakeCache.txt" >nul 2>&1
+    if errorlevel 1 (
+        echo Removing stale CMake cache in %BUILD_DIR% ^(project moved or path changed^)...
+        rmdir /s /q "%BUILD_DIR%" 2>nul
+    )
+)
+cmake -S "%SRC_DIR%" -B "%BUILD_DIR%" -G "Visual Studio 17 2022" -A %VS_ARCH%
+exit /b %ERRORLEVEL%
 
 :fail
 echo Build failed.

@@ -15,6 +15,7 @@ struct VentoyResult {
     int exitCode = -1;
     FailureKind failureKind = FailureKind::None;
     std::wstring error;
+    std::wstring cliLogExcerpt;  // last meaningful lines from Ventoy cli_log.txt
     std::wstring ventoyExe;
     std::wstring version;
 };
@@ -23,6 +24,7 @@ struct VentoyEnsureOptions {
     std::wstring root;
     std::wstring sevenZipExe;
     std::wstring pinVersion;  // empty = always fetch/use latest
+    std::wstring logPath;     // optional ventoy.log beside installer
     std::function<void(const std::wstring&)> onStatus;
     std::function<void(const std::wstring&)> onLog;
 };
@@ -30,6 +32,7 @@ struct VentoyEnsureOptions {
 struct VentoyInstallOptions {
     bool useGpt = false;           // default MBR; append /GPT when true
     bool enableSecureBoot = true;  // Ventoy default; append /NOSB when false
+    std::wstring logPath;          // optional ventoy.log beside installer (append)
 };
 
 // Fetch newest tag from GitHub (e.g. "1.0.99").
@@ -49,7 +52,8 @@ struct VentoyDetectionResult {
     std::vector<std::wstring> logLines;  // English diagnostics for medicat_installer.log
 };
 
-VentoyDetectionResult DetectVentoyOnDrive(const std::wstring& driveLetter);
+VentoyDetectionResult DetectVentoyOnDrive(const std::wstring& driveLetter,
+                                          const std::wstring& logPath = L"");
 bool TestVentoyInstalled(const std::wstring& driveLetter);
 
 VentoyResult RunVentoyInstall(const std::wstring& ventoyExe, const std::wstring& driveLetter, bool upgrade,

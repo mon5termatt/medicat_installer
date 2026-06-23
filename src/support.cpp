@@ -458,8 +458,9 @@ void PostSessionReportOnce(const SessionReportRequest& request, const SessionRep
 }
 
 std::vector<std::wstring> CollectSupportLogFiles(const std::wstring& installerRoot) {
-    static const wchar_t* kAllowed[] = {L"medicat_installer.log", L"extract.log",      L"reextract.log",
-                                          L"check.log",            L"failed_files.txt", nullptr};
+    static const wchar_t* kAllowed[] = {L"medicat_installer.log", L"ventoy.log",       L"extract.log",
+                                          L"reextract.log",         L"check.log",        L"failed_files.txt",
+                                          nullptr};
     std::vector<std::wstring> files;
     for (const wchar_t* const* name = kAllowed; *name != nullptr; ++name) {
         const std::wstring path = JoinPath(installerRoot, *name);

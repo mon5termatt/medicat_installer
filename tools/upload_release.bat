@@ -43,7 +43,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-python "tools\publish_update_manifest.py" --tag "%TAG%" --build-number "build_number.txt" --build-version "generated\build_version.cpp" --output "installer\update.json"
+python "tools\publish_update_manifest.py" --tag "%TAG%" --build-number "build_number.txt" --build-version "generated\build_version.cpp" --output "update.json"
 if errorlevel 1 (
     echo Update manifest generation failed.
     exit /b 1
@@ -53,7 +53,7 @@ echo.
 echo Uploaded:
 echo   %X64_EXE%
 echo   %X86_EXE%
-echo   installer\update.json
+echo   update.json
 echo Release: https://github.com/mon5termatt/medicat_installer/releases/tag/%TAG%
-echo rebuild.bat will push installer\update.json to origin/cpp next.
+echo rebuild.bat will push update.json to origin/cpp next.
 exit /b 0

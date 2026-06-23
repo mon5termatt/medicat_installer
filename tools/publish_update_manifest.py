@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write installer/update.json for self-update checks."""
+"""Write update.json for self-update checks."""
 
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("installer/update.json"),
+        default=Path("update.json"),
         help="Output manifest path",
     )
     args = parser.parse_args()
