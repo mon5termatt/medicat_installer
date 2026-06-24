@@ -816,6 +816,15 @@ LRESULT CALLBACK ScrollableTextPaneProc(const HWND hwnd, const UINT msg, const W
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
+HICON LoadAppWindowIcon(const HINSTANCE instance) {
+    return LoadIconW(instance, MAKEINTRESOURCEW(IDI_APP_ICON));
+}
+
+void SetWindowClassIcons(WNDCLASSEXW& wc, const HICON icon) {
+    wc.hIcon = icon;
+    wc.hIconSm = icon;
+}
+
 bool RegisterScrollableTextPaneClass(const HINSTANCE instance) {
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(wc);
@@ -1141,6 +1150,8 @@ bool Gui::Create(HINSTANCE instance) {
     icc.dwICC = ICC_PROGRESS_CLASS | ICC_STANDARD_CLASSES;
     InitCommonControlsEx(&icc);
 
+    const HICON appIcon = LoadAppWindowIcon(instance);
+
     const wchar_t* cls = L"MedicatInstallerWindow";
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(wc);
@@ -1148,8 +1159,7 @@ bool Gui::Create(HINSTANCE instance) {
     wc.hInstance = instance;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.hbrBackground = theme::GetBrushes().window;
-    wc.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(IDI_APP_ICON));
-    wc.hIconSm = wc.hIcon;
+    SetWindowClassIcons(wc, appIcon);
     wc.lpszClassName = cls;
     RegisterClassExW(&wc);
 
@@ -1159,6 +1169,7 @@ bool Gui::Create(HINSTANCE instance) {
     logWc.hInstance = instance;
     logWc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     logWc.hbrBackground = theme::GetBrushes().window;
+    SetWindowClassIcons(logWc, appIcon);
     logWc.lpszClassName = kFileLogWindowClass;
     RegisterClassExW(&logWc);
 
@@ -1168,6 +1179,7 @@ bool Gui::Create(HINSTANCE instance) {
     creditsWc.hInstance = instance;
     creditsWc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     creditsWc.hbrBackground = theme::GetBrushes().window;
+    SetWindowClassIcons(creditsWc, appIcon);
     creditsWc.lpszClassName = kCreditsWindowClass;
     RegisterClassExW(&creditsWc);
 
@@ -1177,6 +1189,7 @@ bool Gui::Create(HINSTANCE instance) {
     reExtractWc.hInstance = instance;
     reExtractWc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     reExtractWc.hbrBackground = theme::GetBrushes().window;
+    SetWindowClassIcons(reExtractWc, appIcon);
     reExtractWc.lpszClassName = kReExtractWindowClass;
     RegisterClassExW(&reExtractWc);
 
@@ -1188,6 +1201,7 @@ bool Gui::Create(HINSTANCE instance) {
     messageDialogWc.hInstance = instance;
     messageDialogWc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     messageDialogWc.hbrBackground = theme::GetBrushes().window;
+    SetWindowClassIcons(messageDialogWc, appIcon);
     messageDialogWc.lpszClassName = kMessageDialogWindowClass;
     RegisterClassExW(&messageDialogWc);
 
@@ -1197,6 +1211,7 @@ bool Gui::Create(HINSTANCE instance) {
     helpGateWc.hInstance = instance;
     helpGateWc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     helpGateWc.hbrBackground = theme::GetBrushes().window;
+    SetWindowClassIcons(helpGateWc, appIcon);
     helpGateWc.lpszClassName = kHelpGateWindowClass;
     RegisterClassExW(&helpGateWc);
 
@@ -1472,7 +1487,10 @@ void Gui::StartMirrorDownload(const std::wstring& url, const std::wstring& mirro
         std::wstring netError;
         if (!TestInternetConnection(netError)) {
             downloadingArchive_ = false;
-            auto* payload = new DonePayload{false, i18n::Tr(L"messages.no_internet"), i18n::Tr(L"titles.download_failed")};
+            auto* payload = new DonePayload{};
+            payload->success = false;
+            payload->message = i18n::Tr(L"messages.no_internet");
+            payload->title = i18n::Tr(L"titles.download_failed");
             PostMessageW(hwnd, WM_MEDICAT_DONE, 0, reinterpret_cast<LPARAM>(payload));
             return;
         }
@@ -1524,8 +1542,10 @@ void Gui::StartMirrorDownload(const std::wstring& url, const std::wstring& mirro
 
         if (!ok) {
             downloadingArchive_ = false;
-            auto* payload =
-                new DonePayload{false, i18n::Tr(L"messages.archive_download_failed", error), i18n::Tr(L"titles.download_failed")};
+            auto* payload = new DonePayload{};
+            payload->success = false;
+            payload->message = i18n::Tr(L"messages.archive_download_failed", error);
+            payload->title = i18n::Tr(L"titles.download_failed");
             PostMessageW(hwnd, WM_MEDICAT_DONE, 0, reinterpret_cast<LPARAM>(payload));
             return;
         }
@@ -1534,14 +1554,17 @@ void Gui::StartMirrorDownload(const std::wstring& url, const std::wstring& mirro
         if (!MoveFileW(tempPath.c_str(), destination.c_str())) {
             DeleteFileW(tempPath.c_str());
             downloadingArchive_ = false;
-            auto* payload = new DonePayload{false, i18n::Tr(L"messages.archive_download_failed", L"Could not save archive file"),
-                                            i18n::Tr(L"titles.download_failed")};
+            auto* payload = new DonePayload{};
+            payload->success = false;
+            payload->message = i18n::Tr(L"messages.archive_download_failed", L"Could not save archive file");
+            payload->title = i18n::Tr(L"titles.download_failed");
             PostMessageW(hwnd, WM_MEDICAT_DONE, 0, reinterpret_cast<LPARAM>(payload));
             return;
         }
 
         downloadingArchive_ = false;
-        auto* payload = new DonePayload{true, L"", L""};
+        auto* payload = new DonePayload{};
+        payload->success = true;
         PostMessageW(hwnd, WM_MEDICAT_DONE, 0, reinterpret_cast<LPARAM>(payload));
     }).detach();
 }
@@ -2797,7 +2820,8 @@ LRESULT CALLBACK Gui::MessageDialogWndProc(const HWND hwnd, const UINT msg, cons
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
-void Gui::ShowDone(const bool success, const std::wstring& message, const std::wstring& title) {
+void Gui::ShowDone(const bool success, const std::wstring& message, const std::wstring& title,
+                   const bool refreshArchivePanel) {
     downloadingArchive_ = false;
     SetBusy(false);
     if (success && message.empty()) {
@@ -2820,6 +2844,9 @@ void Gui::ShowDone(const bool success, const std::wstring& message, const std::w
         title.empty() ? (success ? i18n::Tr(L"titles.installation_complete") : i18n::Tr(L"titles.installation_error"))
                       : title;
     if (!success) {
+        if (refreshArchivePanel) {
+            UpdateArchivePanel();
+        }
         OpenFailureDialog(message, dialogTitle);
         return;
     }
@@ -3268,6 +3295,8 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                     self->SetStatusBar(payload->statusText);
                 } else if (payload->openFileLog) {
                     self->OpenFileLogWindow();
+                } else if (payload->setBusyMode) {
+                    self->SetBusy(true, payload->busyProgressMode);
                 } else if (payload->extractUpdate) {
                     self->NotifyExtractProgress(payload->percent, payload->file, payload->resetLog);
                 } else {
@@ -3345,7 +3374,7 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_MEDICAT_DONE: {
             auto* payload = reinterpret_cast<DonePayload*>(lp);
             if (payload) {
-                self->ShowDone(payload->success, payload->message, payload->title);
+                self->ShowDone(payload->success, payload->message, payload->title, payload->refreshArchivePanel);
                 delete payload;
             }
             return 0;

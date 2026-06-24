@@ -744,7 +744,8 @@ bool TryParentDirectory(std::wstring& directory) {
 
 }  // namespace
 
-bool ComputeFileMd5(const std::wstring& path, std::string& outHex, std::wstring& error, uint64_t* outBytesRead) {
+bool ComputeFileMd5(const std::wstring& path, std::string& outHex, std::wstring& error, uint64_t* outBytesRead,
+                    const FileHashProgressFn& onProgress) {
     outHex.clear();
     if (outBytesRead) {
         *outBytesRead = 0;
@@ -794,6 +795,11 @@ bool ComputeFileMd5(const std::wstring& path, std::string& outHex, std::wstring&
         return false;
     }
 
+    const uint64_t totalBytes = static_cast<uint64_t>(fileSize.QuadPart);
+    if (onProgress) {
+        onProgress(0, totalBytes);
+    }
+
     std::vector<BYTE> buffer(static_cast<size_t>(1) << 20);
     uint64_t totalRead = 0;
     DWORD read = 0;
@@ -817,9 +823,12 @@ bool ComputeFileMd5(const std::wstring& path, std::string& outHex, std::wstring&
             return false;
         }
         totalRead += read;
+        if (onProgress) {
+            onProgress(totalRead, totalBytes);
+        }
     }
 
-    if (totalRead != static_cast<uint64_t>(fileSize.QuadPart)) {
+    if (totalRead != totalBytes) {
         error = L"Incomplete file read while hashing (" + std::to_wstring(totalRead) + L" of " +
                 std::to_wstring(fileSize.QuadPart) + L" bytes)";
         cleanup();

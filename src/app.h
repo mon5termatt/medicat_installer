@@ -44,6 +44,9 @@ private:
     void PostExtractProgress(int percent, const std::wstring& file = L"", bool resetLog = false,
                              const wchar_t* cliTipKey = nullptr);
     void PostStatusBar(const std::wstring& text);  // Thread-safe; updates Gui::SetStatusBar on the UI thread.
+    void PostArchiveHashProgress(uint64_t bytesRead, uint64_t totalBytes);
+    void PostArchiveCheckFailed(const std::wstring& message, const std::wstring& title);
+    void PostSetBusyMode(BusyProgressMode mode);
     void PostOpenFileLog();  // Thread-safe; opens verify/extract file log on the UI thread.
     void PostFailureDiagCode(bool uploadSucceeded, const std::wstring& keyword);
     void PostDone(bool success, const std::wstring& message, const std::wstring& title = L"");
@@ -63,7 +66,10 @@ private:
     bool PromptReExtract(const VerificationOutcome& outcome);
     bool PromptConfirm(const std::wstring& message, const std::wstring& title,
                        MessageDialogKind kind = MessageDialogKind::Warning);
+    bool PromptWipeConfirm(const std::wstring& drive, bool format, bool runVentoy);
     bool EnsureHelpGateAcknowledged();
+    void RunPreInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
+                             VentoyInstallOptions ventoyInstall, std::wstring archive);
     void RunInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
                           VentoyInstallOptions ventoyInstall);
     void RunVerifyThread(std::wstring drive);

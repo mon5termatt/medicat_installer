@@ -70,7 +70,7 @@ MediCatArchiveInfo InspectMediCatArchive(const std::wstring& path) {
     return info;
 }
 
-bool VerifyMediCatArchiveMd5(MediCatArchiveInfo& info, std::wstring& error) {
+bool VerifyMediCatArchiveMd5(MediCatArchiveInfo& info, std::wstring& error, const FileHashProgressFn& onProgress) {
     error.clear();
     if (info.path.empty() || !FileExists(info.path)) {
         info.state = MediCatArchiveState::Missing;
@@ -88,7 +88,7 @@ bool VerifyMediCatArchiveMd5(MediCatArchiveInfo& info, std::wstring& error) {
     }
 
     std::string md5Hex;
-    if (!ComputeFileMd5(info.path, md5Hex, error)) {
+    if (!ComputeFileMd5(info.path, md5Hex, error, nullptr, onProgress)) {
         return false;
     }
     info.md5Hex = md5Hex;
@@ -106,7 +106,8 @@ bool VerifyMediCatArchiveMd5(MediCatArchiveInfo& info, std::wstring& error) {
 bool IsMediCatArchiveReadyForInstall(
     const std::wstring& path, std::wstring& userMessage, std::wstring& userTitle,
     const std::function<void(const std::wstring&)>& onStatus,
-    const std::function<void(const std::wstring&)>& onLog) {
+    const std::function<void(const std::wstring&)>& onLog,
+    const FileHashProgressFn& onProgress) {
     userMessage.clear();
     userTitle.clear();
 
@@ -132,7 +133,7 @@ bool IsMediCatArchiveReadyForInstall(
         onStatus(i18n::Tr(L"status.verifying_archive"));
     }
     std::wstring hashError;
-    if (!VerifyMediCatArchiveMd5(info, hashError)) {
+    if (!VerifyMediCatArchiveMd5(info, hashError, onProgress)) {
         if (info.state == MediCatArchiveState::HashMismatch) {
             if (onLog) {
                 onLog(i18n::Tr(L"log.archive_hash_mismatch", FormatMd5HexForDisplay(info.md5Hex),

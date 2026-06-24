@@ -60,25 +60,6 @@ std::wstring BuildWipeDetails(const bool format, const bool runVentoy) {
     return details;
 }
 
-bool ConfirmWipeDrive(Gui* gui, HWND hwnd, const std::wstring& drive, const bool format, const bool runVentoy,
-                      const bool autoYes, const bool quiet) {
-    if (autoYes) {
-        return true;
-    }
-    if (quiet) {
-        return false;
-    }
-    const std::wstring details = BuildWipeDetails(format, runVentoy);
-    const std::wstring message = i18n::Tr(L"wipe_confirm.message", drive, details);
-    const std::wstring title = i18n::Tr(L"wipe_confirm.title");
-    if (gui) {
-        return gui->ShowConfirmDialog(message, title, MessageDialogKind::Warning);
-    }
-    const int result = MessageBoxW(
-        hwnd, message.c_str(), title.c_str(), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2);
-    return result == IDYES;
-}
-
 }  // namespace
 
 struct MedicatTempDirGuard {
@@ -358,15 +339,6 @@ int App::RunHeadlessInstall(const CliOptions& cli) {
 
     const std::wstring archive = ResolveArchivePath(cli.archivePath);
     LogMediCatArchiveDebug(archive);
-    std::wstring archiveMessage;
-    std::wstring archiveTitle;
-    if (!IsMediCatArchiveReadyForInstall(
-            archive, archiveMessage, archiveTitle,
-            [this](const std::wstring& status) { PostStatusBar(status); },
-            [this](const std::wstring& msg) { log_->Info(msg); })) {
-        log_->Error(archiveMessage);
-        return 1;
-    }
 
     if (cli.offlineOnly && runVentoy && !CanInstallVentoyOffline(root_, pinVersion)) {
         const std::wstring msg = L"Offline Ventoy cache not available for the requested install";
@@ -374,16 +346,10 @@ int App::RunHeadlessInstall(const CliOptions& cli) {
         return 1;
     }
 
-    if (!ConfirmWipeDrive(nullptr, nullptr, cli.drive, format, runVentoy, ShouldAutoConfirm(), IsQuiet())) {
-        log_->Info(L"User cancelled at wipe confirmation");
-        return 4;
-    }
-
     installing_ = true;
     currentOperation_ = L"install";
-    MarkOperationStart();
     log_->Info(L"Headless install started on " + cli.drive);
-    RunInstallThread(cli.drive, format, runVentoy, std::move(pinVersion), ventoyInstall);
+    RunPreInstallThread(cli.drive, format, runVentoy, std::move(pinVersion), ventoyInstall, std::move(archive));
     return headlessResult_.completed ? headlessResult_.exitCode : 1;
 }
 
@@ -468,6 +434,68 @@ void App::PostStatusBar(const std::wstring& text) {
     auto* payload = new ProgressPayload{};
     payload->statusOnly = true;
     payload->statusText = text;
+    PostToGui(gui_.Hwnd(), WM_MEDICAT_PROGRESS, reinterpret_cast<LPARAM>(payload));
+}
+
+void App::PostArchiveHashProgress(const uint64_t bytesRead, const uint64_t totalBytes) {
+    static thread_local uint64_t lastUiTick = 0;
+    const uint64_t now = GetTickCount64();
+    if (lastUiTick != 0 && now - lastUiTick < 200) {
+        return;
+    }
+    lastUiTick = now;
+
+    int percent = 0;
+    if (totalBytes > 0) {
+        percent = static_cast<int>((bytesRead * 100) / totalBytes);
+    }
+
+    if (headless_) {
+        std::wstring line = FormatProgressBytes(bytesRead);
+        if (totalBytes > 0) {
+            line += L" / " + FormatProgressBytes(totalBytes);
+        }
+        WriteCliProgress(line);
+        return;
+    }
+
+    std::wstring sizeText = FormatProgressBytes(bytesRead);
+    if (totalBytes > 0) {
+        sizeText += L" / " + FormatProgressBytes(totalBytes);
+    }
+
+    auto* payload = new ProgressPayload{};
+    payload->downloadUpdate = true;
+    payload->percent = percent;
+    payload->statusText = sizeText;
+    payload->file = i18n::Tr(L"status.verifying_archive");
+    PostToGui(gui_.Hwnd(), WM_MEDICAT_PROGRESS, reinterpret_cast<LPARAM>(payload));
+}
+
+void App::PostArchiveCheckFailed(const std::wstring& message, const std::wstring& title) {
+    installing_ = false;
+    if (headless_) {
+        headlessResult_.completed = true;
+        headlessResult_.exitCode = 1;
+        log_->Error(message);
+        return;
+    }
+
+    auto* payload = new DonePayload{};
+    payload->success = false;
+    payload->message = message;
+    payload->title = title;
+    payload->refreshArchivePanel = true;
+    PostToGui(gui_.Hwnd(), WM_MEDICAT_DONE, reinterpret_cast<LPARAM>(payload));
+}
+
+void App::PostSetBusyMode(const BusyProgressMode mode) {
+    if (headless_) {
+        return;
+    }
+    auto* payload = new ProgressPayload{};
+    payload->setBusyMode = true;
+    payload->busyProgressMode = mode;
     PostToGui(gui_.Hwnd(), WM_MEDICAT_PROGRESS, reinterpret_cast<LPARAM>(payload));
 }
 
@@ -700,8 +728,10 @@ void App::ApplyInstallerUpdate(const InstallerUpdateInfo& info) {
 
         if (!ok) {
             installing_ = false;
-            auto* payload = new DonePayload{false, i18n::Tr(L"update.download_failed", error),
-                                             i18n::Tr(L"update.download_failed_title")};
+            auto* payload = new DonePayload{};
+            payload->success = false;
+            payload->message = i18n::Tr(L"update.download_failed", error);
+            payload->title = i18n::Tr(L"update.download_failed_title");
             PostToGui(hwnd, WM_MEDICAT_DONE, reinterpret_cast<LPARAM>(payload));
             return;
         }
@@ -741,7 +771,10 @@ void App::PostDone(const bool success, const std::wstring& message, const std::w
     if (!success && !message.empty()) {
         userMessage += L"\n\n" + i18n::Tr(L"messages.beta_failure_logs_notice");
     }
-    auto* payload = new DonePayload{success, userMessage, title};
+    auto* payload = new DonePayload{};
+    payload->success = success;
+    payload->message = userMessage;
+    payload->title = title;
     PostToGui(gui_.Hwnd(), WM_MEDICAT_DONE, reinterpret_cast<LPARAM>(payload));
 }
 
@@ -1073,6 +1106,25 @@ bool App::PromptConfirm(const std::wstring& message, const std::wstring& title, 
     return confirmed;
 }
 
+bool App::PromptWipeConfirm(const std::wstring& drive, const bool format, const bool runVentoy) {
+    if (ShouldAutoConfirm()) {
+        return true;
+    }
+    if (IsQuiet()) {
+        return false;
+    }
+
+    const std::wstring details = BuildWipeDetails(format, runVentoy);
+    const std::wstring message = i18n::Tr(L"wipe_confirm.message", drive, details);
+    const std::wstring title = i18n::Tr(L"wipe_confirm.title");
+
+    if (headless_) {
+        return MessageBoxW(nullptr, message.c_str(), title.c_str(), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) ==
+               IDYES;
+    }
+    return PromptConfirm(message, title, MessageDialogKind::Warning);
+}
+
 bool App::EnsureHelpGateAcknowledged() {
     if (!NeedsHelpGate()) {
         return true;
@@ -1215,40 +1267,23 @@ void App::OnInstall() {
 
     const std::wstring archive = ResolveMediCatArchivePath(root_);
     LogMediCatArchiveDebug(archive);
-    std::wstring archiveMessage;
-    std::wstring archiveTitle;
-    if (!IsMediCatArchiveReadyForInstall(
-            archive, archiveMessage, archiveTitle,
-            [this](const std::wstring& status) { gui_.SetStatusBar(status); },
-            [this](const std::wstring& msg) { log_->Info(msg); })) {
-        gui_.ShowMessageDialog(archiveMessage, archiveTitle, MessageDialogKind::Warning);
-        gui_.UpdateArchivePanel();
-        installing_ = false;
-        return;
-    }
 
-    gui_.SetBusy(true);
+    gui_.SetBusy(true, BusyProgressMode::Download);
     gui_.ClearFileLog();
     gui_.SetProgress(0);
+    gui_.SetStatusBar(i18n::Tr(L"status.verifying_archive"));
     currentOperation_ = L"install";
     log_->Info(L"Install started on " + drive);
 
     const bool format = gui_.FormatChecked();
     const bool runVentoy = gui_.RunVentoyChecked();
-
-    if (!ConfirmWipeDrive(&gui_, gui_.Hwnd(), drive, format, runVentoy, false, false)) {
-        log_->Info(L"User cancelled at wipe confirmation");
-        installing_ = false;
-        gui_.SetBusy(false);
-        return;
-    }
-
-    MarkOperationStart();
     const std::wstring pinVersion = gui_.PinnedVentoyVersion();
     VentoyInstallOptions ventoyInstall;
     ventoyInstall.enableSecureBoot = gui_.VentoySecureBootChecked();
     ventoyInstall.useGpt = gui_.VentoyGptChecked();
-    std::thread worker(&App::RunInstallThread, this, drive, format, runVentoy, pinVersion, ventoyInstall);
+
+    std::thread worker(&App::RunPreInstallThread, this, drive, format, runVentoy, pinVersion, ventoyInstall,
+                       archive);
     worker.detach();
 }
 
@@ -1295,6 +1330,54 @@ bool ReconcileDriveLetter(
 
 }  // namespace
 
+void App::RunPreInstallThread(std::wstring drive, const bool format, const bool runVentoy, std::wstring pinVersion,
+                               VentoyInstallOptions ventoyInstall, std::wstring archive) {
+    try {
+        if (headless_) {
+            WriteCliTip(i18n::Tr(L"status.verifying_archive"));
+        }
+
+        std::wstring archiveMessage;
+        std::wstring archiveTitle;
+        if (!IsMediCatArchiveReadyForInstall(
+                archive, archiveMessage, archiveTitle,
+                [this](const std::wstring& status) { PostStatusBar(status); },
+                [this](const std::wstring& msg) { log_->Info(msg); },
+                [this](const uint64_t bytesRead, const uint64_t totalBytes) {
+                    PostArchiveHashProgress(bytesRead, totalBytes);
+                })) {
+            PostArchiveCheckFailed(archiveMessage, archiveTitle);
+            return;
+        }
+
+        if (headless_) {
+            WriteCliProgressFinish();
+        }
+
+        if (!PromptWipeConfirm(drive, format, runVentoy)) {
+            log_->Info(L"User cancelled at wipe confirmation");
+            installing_ = false;
+            if (headless_) {
+                headlessResult_.completed = true;
+                headlessResult_.exitCode = 4;
+                return;
+            }
+            auto* payload = new DonePayload{};
+            payload->success = false;
+            PostToGui(gui_.Hwnd(), WM_MEDICAT_DONE, reinterpret_cast<LPARAM>(payload));
+            return;
+        }
+
+        PostSetBusyMode(BusyProgressMode::FileLog);
+        MarkOperationStart();
+        RunInstallThread(std::move(drive), format, runVentoy, std::move(pinVersion), ventoyInstall);
+    } catch (...) {
+        log_->Error(L"Pre-install thread crashed with an unexpected exception");
+        PostDone(false, i18n::Tr(L"messages.installation_error", L"unexpected error"),
+                 i18n::Tr(L"titles.installation_error"));
+    }
+}
+
 void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
                             VentoyInstallOptions ventoyInstall) {
     const std::wstring root = root_;
@@ -1309,15 +1392,15 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
     };
 
     LogMediCatArchiveDebug(archive);
-    std::wstring archiveMessage;
-    std::wstring archiveTitle;
-    if (!IsMediCatArchiveReadyForInstall(
-            archive, archiveMessage, archiveTitle,
-            [this](const std::wstring& status) { PostStatusBar(status); },
-            [this](const std::wstring& msg) { log_->Info(msg); })) {
-        fail(archiveMessage, archiveTitle);
-        return;
-    }
+    // std::wstring archiveMessage;
+    // std::wstring archiveTitle;
+    // if (!IsMediCatArchiveReadyForInstall(
+    //         archive, archiveMessage, archiveTitle,
+    //         [this](const std::wstring& status) { PostStatusBar(status); },
+    //         [this](const std::wstring& msg) { log_->Info(msg); })) {
+    //     fail(archiveMessage, archiveTitle);
+    //     return;
+    // }
 
     auto cancel = [&] {
         log_->Info(i18n::Tr(L"log.user_cancelled"));

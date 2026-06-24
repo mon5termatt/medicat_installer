@@ -30,6 +30,8 @@ enum class MessageDialogKind { Info, Warning, Error };
 
 enum class MessageDialogFooter { Ok, OkWithDiag, YesNo };
 
+enum class BusyProgressMode { FileLog, Verify, Download, None };
+
 struct ConfirmPromptState {
     HANDLE doneEvent = nullptr;
     std::atomic<bool> result{false};
@@ -66,12 +68,15 @@ struct ProgressPayload {
     // When true, only statusText is applied to the main-window status bar (see Gui::SetStatusBar).
     bool statusOnly = false;
     bool openFileLog = false;
+    bool setBusyMode = false;
+    BusyProgressMode busyProgressMode = BusyProgressMode::FileLog;
     std::wstring file;
     std::wstring statusText;
 };
 
 struct DonePayload {
     bool success = false;
+    bool refreshArchivePanel = false;
     std::wstring message;
     std::wstring title;
 };
@@ -100,8 +105,6 @@ struct FailureDiagPayload {
     bool uploadSucceeded = false;
     std::wstring keyword;
 };
-
-enum class BusyProgressMode { FileLog, Verify, Download, None };
 
 class Gui {
 public:
@@ -136,7 +139,8 @@ public:
     bool ShowConfirmDialog(const std::wstring& message, const std::wstring& title,
                            MessageDialogKind kind = MessageDialogKind::Warning);
     bool ShowHelpGateDialog(int failureCount);
-    void ShowDone(bool success, const std::wstring& message, const std::wstring& title = L"");
+    void ShowDone(bool success, const std::wstring& message, const std::wstring& title = L"",
+                  bool refreshArchivePanel = false);
     void UpdateArchivePanel();
     void SetInitialLanguage(const std::wstring& languageCode);
     std::wstring SelectedDrive() const;
