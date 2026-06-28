@@ -1324,7 +1324,7 @@ void Gui::LogDriveListSelection(const std::vector<DriveInfo>& drives, const int 
            std::wstring(ShowAllDrivesChecked() ? L"yes" : L"no") + L"):");
 
     if (drives.empty()) {
-        onLog_(L"  no eligible drives (USB/VHD/fixed >= 30 GiB; C: hidden)");
+        onLog_(L"  no eligible drives (USB/VHD/fixed >= 28 GiB; C: hidden)");
         onLog_(L"  default selection: none");
         return;
     }
@@ -3717,6 +3717,8 @@ void Gui::OnCommand(WPARAM wp) {
         return;
     }
     if (id == kShowAllDrivesCheckId) {
+        // Drop any in-flight scan started with the previous checkbox state.
+        ++driveListGeneration_;
         RefreshDrives();
         return;
     }

@@ -42,8 +42,8 @@ bool QueryDiskBusType(const DWORD diskNumber, STORAGE_BUS_TYPE& busType) {
     busType = BusTypeUnknown;
     std::wostringstream path;
     path << L"\\\\.\\PhysicalDrive" << diskNumber;
-    const HANDLE disk =
-        CreateFileW(path.str().c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+    const HANDLE disk = CreateFileW(path.str().c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                                    OPEN_EXISTING, 0, nullptr);
     if (disk == INVALID_HANDLE_VALUE) {
         return false;
     }
@@ -66,6 +66,32 @@ bool QueryDiskBusType(const DWORD diskNumber, STORAGE_BUS_TYPE& busType) {
     return true;
 }
 
+bool QueryDiskRemovableMedia(const DWORD diskNumber) {
+    std::wostringstream path;
+    path << L"\\\\.\\PhysicalDrive" << diskNumber;
+    const HANDLE disk = CreateFileW(path.str().c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                                    OPEN_EXISTING, 0, nullptr);
+    if (disk == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    STORAGE_PROPERTY_QUERY query{};
+    query.PropertyId = StorageDeviceProperty;
+    query.QueryType = PropertyStandardQuery;
+
+    BYTE buffer[1024]{};
+    DWORD returned = 0;
+    const BOOL ok = DeviceIoControl(disk, IOCTL_STORAGE_QUERY_PROPERTY, &query, sizeof(query), buffer,
+                                    sizeof(buffer), &returned, nullptr);
+    CloseHandle(disk);
+    if (!ok || returned < sizeof(STORAGE_DEVICE_DESCRIPTOR)) {
+        return false;
+    }
+
+    const auto* desc = reinterpret_cast<const STORAGE_DEVICE_DESCRIPTOR*>(buffer);
+    return desc->RemovableMedia != FALSE;
+}
+
 bool IsFileBackedVirtualDisk(const DWORD diskNumber) {
     STORAGE_BUS_TYPE busType = BusTypeUnknown;
     return QueryDiskBusType(diskNumber, busType) && busType == BusTypeFileBackedVirtual;
@@ -73,10 +99,13 @@ bool IsFileBackedVirtualDisk(const DWORD diskNumber) {
 
 bool IsUsbBusDisk(const DWORD diskNumber) {
     STORAGE_BUS_TYPE busType = BusTypeUnknown;
-    if (!QueryDiskBusType(diskNumber, busType)) {
-        return false;
+    if (QueryDiskBusType(diskNumber, busType)) {
+        if (busType == BusTypeUsb || busType == BusTypeSd || busType == BusTypeMmc) {
+            return true;
+        }
     }
-    return busType == BusTypeUsb || busType == BusTypeSd || busType == BusTypeMmc;
+    // Some USB sticks report as SATA/RAID fixed disks but set RemovableMedia.
+    return QueryDiskRemovableMedia(diskNumber);
 }
 
 std::set<wchar_t> GetVhdDriveLetters() {
@@ -144,7 +173,6 @@ bool TryAddDrive(std::vector<DriveInfo>& drives, wchar_t letter, const std::wstr
         return false;
     }
 
-    // MediCat requires at least 30 GiB total capacity (leeway below nominal 32 GB drives).
     if (totalBytes.QuadPart < kMinDriveCapacityBytes) {
         return false;
     }

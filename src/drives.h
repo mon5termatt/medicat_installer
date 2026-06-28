@@ -23,8 +23,8 @@ struct DriveIdentity {
     bool valid = false;
 };
 
-// Minimum total drive capacity (30 GiB — leeway below nominal 32 GB USB sticks).
-constexpr uint64_t kMinDriveCapacityBytes = 30ULL * 1024ULL * 1024ULL * 1024ULL;
+// Minimum total drive capacity (28 GiB — nominal "32 GB" sticks report ~29.8 GiB).
+constexpr uint64_t kMinDriveCapacityBytes = 28ULL * 1024ULL * 1024ULL * 1024ULL;
 
 // USB + mounted VHD/VHDX drives (excludes C:). Set includeAllDrives for fixed disks too.
 std::vector<DriveInfo> ListTargetDrives(bool includeAllDrives = false);
