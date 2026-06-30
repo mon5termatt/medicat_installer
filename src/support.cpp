@@ -11,6 +11,7 @@
 #include <rpc.h>
 #include <shlobj.h>
 
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <thread>
@@ -205,28 +206,28 @@ bool CopyFileShared(const std::wstring& sourcePath, const std::wstring& destinat
 }
 
 bool ClearDirectoryFiles(const std::wstring& directory) {
-    const std::wstring pattern = JoinPath(directory, L"*");
-    WIN32_FIND_DATAW fd{};
-    const HANDLE find = FindFirstFileW(pattern.c_str(), &fd);
-    if (find == INVALID_HANDLE_VALUE) {
-        return GetLastError() == ERROR_FILE_NOT_FOUND;
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (!fs::exists(directory, ec)) {
+        return true;
     }
 
-    do {
-        const std::wstring name = fd.cFileName;
-        if (name == L"." || name == L"..") {
-            continue;
-        }
-        const std::wstring fullPath = JoinPath(directory, name);
-        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            continue;
-        }
-        SetFileAttributesW(fullPath.c_str(), FILE_ATTRIBUTE_NORMAL);
-        DeleteFileW(fullPath.c_str());
-    } while (FindNextFileW(find, &fd));
-
-    FindClose(find);
+    for (const fs::directory_entry& entry : fs::directory_iterator(directory, ec)) {
+        fs::remove_all(entry.path(), ec);
+        ec.clear();
+    }
     return true;
+}
+
+bool EnsureParentDirectory(const std::wstring& filePath) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    const fs::path parent = fs::path(filePath).parent_path();
+    if (parent.empty()) {
+        return true;
+    }
+    fs::create_directories(parent, ec);
+    return !ec;
 }
 
 bool StageSupportLogFiles(const std::wstring& installerRoot, const std::vector<std::wstring>& logFiles,
@@ -238,6 +239,9 @@ bool StageSupportLogFiles(const std::wstring& installerRoot, const std::vector<s
     for (const std::wstring& name : logFiles) {
         const std::wstring sourcePath = JoinPath(installerRoot, name);
         const std::wstring destinationPath = JoinPath(stagingDir, name);
+        if (!EnsureParentDirectory(destinationPath)) {
+            continue;
+        }
         if (!CopyFileShared(sourcePath, destinationPath)) {
             continue;
         }
@@ -458,15 +462,24 @@ void PostSessionReportOnce(const SessionReportRequest& request, const SessionRep
 }
 
 std::vector<std::wstring> CollectSupportLogFiles(const std::wstring& installerRoot) {
-    static const wchar_t* kAllowed[] = {L"medicat_installer.log", L"ventoy.log",       L"extract.log",
-                                          L"reextract.log",         L"check.log",        L"failed_files.txt",
+    static const wchar_t* kRootFiles[] = {L"medicat_installer.log", L"ventoy.log", L"extract.log",
+                                          L"reextract.log",         L"check.log",  L"failed_files.txt",
                                           nullptr};
+    static const wchar_t* kVentoyCliFiles[] = {L"cli_log.txt", L"cli_done.txt", L"cli_percent.txt", nullptr};
+
     std::vector<std::wstring> files;
-    for (const wchar_t* const* name = kAllowed; *name != nullptr; ++name) {
-        const std::wstring path = JoinPath(installerRoot, *name);
+    auto tryAdd = [&](const std::wstring& relativePath) {
+        const std::wstring path = JoinPath(installerRoot, relativePath);
         if (FileExists(path) && GetFileSizeBytes(path) > 0) {
-            files.push_back(*name);
+            files.push_back(relativePath);
         }
+    };
+
+    for (const wchar_t* const* name = kRootFiles; *name != nullptr; ++name) {
+        tryAdd(*name);
+    }
+    for (const wchar_t* const* name = kVentoyCliFiles; *name != nullptr; ++name) {
+        tryAdd(JoinPath(L"Ventoy2Disk", *name));
     }
     return files;
 }

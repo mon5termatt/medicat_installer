@@ -42,7 +42,9 @@ Windows GUI installer for preparing a MediCat USB: Ventoy install/upgrade, optio
 
 ## Build from source
 
-Requires Visual Studio 2022 (or Build Tools), CMake 3.16+, Python 3, `bin/7z/x64/7za.exe` or `bin/7z/x32/7za.exe`, and `MedicatFiles.md5`.
+Requires Visual Studio 2022 or newer (or Build Tools), CMake 3.16+, Python 3, `bin/7z/x64/7za.exe` or `bin/7z/x32/7za.exe`, and `MedicatFiles.md5`.
+
+`rebuild.bat` picks the CMake generator from your installed Visual Studio (VS 2022 → `Visual Studio 17 2022`, VS 2026 → `Visual Studio 18 2026`). Override with `set MEDICAT_CMAKE_GENERATOR=...` if needed.
 
 **64-bit (default):**
 
@@ -51,7 +53,7 @@ cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
-Output: `build/Release/MedicatInstaller.exe`
+On VS 2026 use `-G "Visual Studio 18 2026"` instead. Or just run `rebuild.bat`.
 
 **32-bit:**
 
@@ -60,7 +62,7 @@ cmake -B build-x86 -G "Visual Studio 17 2022" -A Win32
 cmake --build build-x86 --config Release
 ```
 
-Output: `build/Release/MedicatInstaller.exe` or `build-x86/Release/MedicatInstaller-x86.exe`
+On VS 2026 use `-G "Visual Studio 18 2026"` instead.
 
 Each build embeds only the `7za.exe` for that CPU (x64 or x86).
 

@@ -38,6 +38,8 @@ exit /b 1
 :args_done
 
 call :close_running_installer
+call :detect_cmake_generator
+if errorlevel 1 goto fail
 
 echo Regenerating i18n...
 python "tools\i18n_codegen.py"
@@ -119,17 +121,55 @@ for %%P in (MedicatInstaller.exe MedicatInstaller-x86.exe) do (
 )
 exit /b 0
 
+:detect_cmake_generator
+if defined MEDICAT_CMAKE_GENERATOR (
+    set "CMAKE_GENERATOR=%MEDICAT_CMAKE_GENERATOR%"
+    echo Using CMake generator from MEDICAT_CMAKE_GENERATOR: %CMAKE_GENERATOR%
+    exit /b 0
+)
+set "CMAKE_GENERATOR="
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "%VSWHERE%" (
+    echo vswhere not found; defaulting to Visual Studio 17 2022
+    set "CMAKE_GENERATOR=Visual Studio 17 2022"
+    exit /b 0
+)
+set "VS_MAJOR="
+for /f "usebackq tokens=1 delims=." %%a in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion 2^>nul`) do set "VS_MAJOR=%%a"
+if "%VS_MAJOR%"=="18" (
+    set "CMAKE_GENERATOR=Visual Studio 18 2026"
+    goto generator_done
+)
+if "%VS_MAJOR%"=="17" (
+    set "CMAKE_GENERATOR=Visual Studio 17 2022"
+    goto generator_done
+)
+echo Could not detect a supported Visual Studio install ^(installationVersion major: %VS_MAJOR%^).
+echo Set MEDICAT_CMAKE_GENERATOR, e.g. Visual Studio 17 2022 or Visual Studio 18 2026
+exit /b 1
+
+:generator_done
+echo Using CMake generator: %CMAKE_GENERATOR%
+exit /b 0
+
 :configure_cmake
 set "BUILD_DIR=%~1"
 set "VS_ARCH=%~2"
+if not defined CMAKE_GENERATOR call :detect_cmake_generator
 if exist "%BUILD_DIR%\CMakeCache.txt" (
+    set "REMOVE_CACHE=0"
     findstr /I /C:"%SRC_DIR:\=/%" "%BUILD_DIR%\CMakeCache.txt" >nul 2>&1
-    if errorlevel 1 (
-        echo Removing stale CMake cache in %BUILD_DIR% ^(project moved or path changed^)...
+    if errorlevel 1 set "REMOVE_CACHE=1"
+    if "%REMOVE_CACHE%"=="0" (
+        findstr /C:"CMAKE_GENERATOR:INTERNAL=%CMAKE_GENERATOR%" "%BUILD_DIR%\CMakeCache.txt" >nul 2>&1
+        if errorlevel 1 set "REMOVE_CACHE=1"
+    )
+    if "%REMOVE_CACHE%"=="1" (
+        echo Removing stale CMake cache in %BUILD_DIR% ^(project moved, path changed, or generator mismatch^)...
         rmdir /s /q "%BUILD_DIR%" 2>nul
     )
 )
-cmake -S "%SRC_DIR%" -B "%BUILD_DIR%" -G "Visual Studio 17 2022" -A %VS_ARCH%
+cmake -S "%SRC_DIR%" -B "%BUILD_DIR%" -G "%CMAKE_GENERATOR%" -A %VS_ARCH%
 exit /b %ERRORLEVEL%
 
 :fail
