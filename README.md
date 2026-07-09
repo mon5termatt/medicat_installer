@@ -46,25 +46,30 @@ Requires Visual Studio 2022 or newer (or Build Tools), CMake 3.16+, Python 3, `b
 
 `rebuild.bat` picks the CMake generator from your installed Visual Studio (VS 2022 → `Visual Studio 17 2022`, VS 2026 → `Visual Studio 18 2026`). Override with `set MEDICAT_CMAKE_GENERATOR=...` if needed.
 
-**64-bit (default):**
+**Both architectures (recommended):**
 
 ```bat
-cmake -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
+rebuild.bat
 ```
 
-On VS 2026 use `-G "Visual Studio 18 2026"` instead. Or just run `rebuild.bat`.
+One configure + one build produces:
 
-**32-bit:**
+- `build/Release/MedicatInstaller.exe` (x64)
+- `build/Release/MedicatInstaller-x86.exe` (Win32)
+
+Per-arch outputs also land in `build/x64/Release/` and `build/x86/Release/`. Each exe embeds the matching `7za.exe` for its CPU.
+
+**Single architecture (manual):**
 
 ```bat
+cmake -B build-x64 -G "Visual Studio 17 2022" -A x64
+cmake --build build-x64 --config Release
+
 cmake -B build-x86 -G "Visual Studio 17 2022" -A Win32
 cmake --build build-x86 --config Release
 ```
 
 On VS 2026 use `-G "Visual Studio 18 2026"` instead.
-
-Each build embeds only the `7za.exe` for that CPU (x64 or x86).
 
 **Upload to GitHub prerelease** (after a successful build):
 

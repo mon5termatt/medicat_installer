@@ -1,5 +1,7 @@
 #pragma once
 
+#include <windows.h>
+
 #include <string>
 #include <vector>
 
@@ -18,6 +20,7 @@ std::wstring FormatDownloadSpeed(uint64_t bytesPerSecond);
 std::wstring FormatPercent(int percent);
 std::wstring ShortDisplayPath(const std::wstring& path, size_t maxLen = 60);
 std::vector<std::wstring> SplitLines(const std::wstring& text);
+std::wstring FormatWindowsError(DWORD error);
 
 bool IsProcessElevated();
 

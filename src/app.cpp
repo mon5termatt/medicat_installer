@@ -17,6 +17,7 @@
 #include "failure_tracker.h"
 #include "i18n.h"
 #include "offline.h"
+#include "sim_fail.h"
 #include "support.h"
 #include "util.h"
 #include "ventoy.h"
@@ -954,6 +955,10 @@ std::wstring FormatVentoyReadyFailure(const VentoyResult& ready) {
                 i18n::Tr(L"errors.ventoy_extract_failed", std::to_wstring(ready.exitCode >= 0 ? ready.exitCode : 0));
             return FormatDetailedError(summary, ready.error);
         }
+        case VentoyResult::FailureKind::Layout:
+            return FormatDetailedError(i18n::Tr(L"errors.ventoy_layout_failed"), ready.error);
+        case VentoyResult::FailureKind::Rename:
+            return FormatDetailedError(i18n::Tr(L"errors.ventoy_rename_failed"), ready.error);
         case VentoyResult::FailureKind::Prepare:
             return FormatDetailedError(i18n::Tr(L"errors.ventoy_not_found"), ready.error);
         default:
@@ -965,7 +970,25 @@ std::wstring VentoyReadyFailureTitle(const VentoyResult& ready) {
     if (ready.failureKind == VentoyResult::FailureKind::Extract) {
         return i18n::Tr(L"titles.extraction_failed");
     }
+    if (ready.failureKind == VentoyResult::FailureKind::Rename ||
+        ready.failureKind == VentoyResult::FailureKind::Layout) {
+        return i18n::Tr(L"titles.ventoy_prepare_failed");
+    }
     return i18n::Tr(L"titles.download_failed");
+}
+
+bool TriggerSimulatedInstallFailure(const SimulatedFailure kind, Logger* log,
+                                    const std::function<void(const std::wstring&, const std::wstring&)>& fail) {
+    if (!ConsumeSimulatedFailure(kind)) {
+        return false;
+    }
+    const std::optional<SimulatedInstallFailure> simulated = MakeSimulatedInstallFailure(kind);
+    if (!simulated) {
+        return false;
+    }
+    log->Info(std::wstring(L"[Debug] Simulating: ") + SimulatedFailureLabel(kind));
+    fail(simulated->message, simulated->title);
+    return true;
 }
 
 }  // namespace
@@ -1176,6 +1199,13 @@ void App::RunVerifyThread(std::wstring drive) {
     PostExtractProgress(0, L"", true);
 
     try {
+        if (TriggerSimulatedInstallFailure(SimulatedFailure::VerificationFailed, log_.get(),
+                                           [&](const std::wstring& msg, const std::wstring& title) {
+                                               PostDone(false, msg, title);
+                                           })) {
+            return;
+        }
+
         const VerificationOutcome outcome = VerifyDriveFiles(drive, true);
         if (IsCancelRequested() || (!outcome.success && outcome.message.empty() && outcome.title.empty())) {
             log_->Info(i18n::Tr(L"log.user_cancelled"));
@@ -1461,6 +1491,9 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
         }
 
         std::wstring netError;
+        if (TriggerSimulatedInstallFailure(SimulatedFailure::NoInternet, log_.get(), fail)) {
+            return;
+        }
         if (!CanInstallVentoyOffline(root, pinVersion) && !TestInternetConnection(netError)) {
             log_->Error(L"Internet check failed: " + netError);
             fail(FormatDetailedError(i18n::Tr(L"messages.no_internet"), netError), i18n::Tr(L"titles.download_failed"));
@@ -1521,6 +1554,10 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
         log_->Info(upgrade ? L"Running Ventoy upgrade" : L"Running Ventoy fresh install");
         log_->Info(L"Ventoy options: " + std::wstring(ventoyInstall.useGpt ? L"GPT" : L"MBR") + L", Secure Boot " +
                    (ventoyInstall.enableSecureBoot ? L"enabled" : L"disabled"));
+        if (TriggerSimulatedInstallFailure(upgrade ? SimulatedFailure::VentoyUpgrade : SimulatedFailure::VentoyInstall,
+                                           log_.get(), fail)) {
+            return;
+        }
         ventoyInstall.logPath = ventoyLogPath;
         const VentoyResult ventoy = RunVentoyInstall(ventoyExe, drive, upgrade, ventoyInstall);
         if (!ventoy.success) {
@@ -1561,6 +1598,9 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
     if (format) {
         PostProgress(0);
         log_->Info(L"Formatting " + drive);
+        if (TriggerSimulatedInstallFailure(SimulatedFailure::FormatFailed, log_.get(), fail)) {
+            return;
+        }
         if (!FormatDriveNtfs(drive)) {
             fail(FormatDetailedError(i18n::Tr(L"errors.format_failed", drive), L"NTFS format command failed."),
                  i18n::Tr(L"titles.installation_error"));
@@ -1595,6 +1635,10 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
 
     const std::wstring extractLogPath = JoinPath(root_, L"extract.log");
     log_->Info(L"Writing raw 7za output to " + extractLogPath);
+
+    if (TriggerSimulatedInstallFailure(SimulatedFailure::MediCatExtract, log_.get(), fail)) {
+        return;
+    }
 
     const ExtractResult extract = Extract7zArchive(
         sevenZip, archive, dest, totalBytes, initialFree,

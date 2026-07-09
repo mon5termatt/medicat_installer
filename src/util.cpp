@@ -323,4 +323,28 @@ std::wstring InstallerVersionLabel() {
     return L"v" + version;
 }
 
+std::wstring FormatWindowsError(const DWORD error) {
+    if (error == 0) {
+        return L"Unknown error";
+    }
+
+    wchar_t* message = nullptr;
+    const DWORD len = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                                         FORMAT_MESSAGE_IGNORE_INSERTS,
+                                     nullptr, error, 0, reinterpret_cast<LPWSTR>(&message), 0, nullptr);
+    std::wstring out;
+    if (len != 0 && message) {
+        out.assign(message, len);
+        while (!out.empty() && (out.back() == L'\r' || out.back() == L'\n')) {
+            out.pop_back();
+        }
+    } else {
+        out = L"Windows error " + std::to_wstring(error);
+    }
+    if (message) {
+        LocalFree(message);
+    }
+    return out;
+}
+
 }  // namespace medicat

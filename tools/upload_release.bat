@@ -23,7 +23,17 @@ if "%TAG%"=="" (
 )
 
 set "X64_EXE=build\Release\MedicatInstaller.exe"
-set "X86_EXE=build-x86\Release\MedicatInstaller-x86.exe"
+set "X86_EXE=build\Release\MedicatInstaller-x86.exe"
+
+if not exist "%X64_EXE%" if exist "build\x64\Release\MedicatInstaller.exe" (
+    set "X64_EXE=build\x64\Release\MedicatInstaller.exe"
+)
+if not exist "%X86_EXE%" if exist "build\x86\Release\MedicatInstaller-x86.exe" (
+    set "X86_EXE=build\x86\Release\MedicatInstaller-x86.exe"
+)
+if not exist "%X86_EXE%" if exist "build-x86\Release\MedicatInstaller-x86.exe" (
+    set "X86_EXE=build-x86\Release\MedicatInstaller-x86.exe"
+)
 
 if not exist "%X64_EXE%" (
     echo Missing x64 build: %X64_EXE%

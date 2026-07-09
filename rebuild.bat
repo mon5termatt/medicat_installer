@@ -60,26 +60,20 @@ set MEDICAT_BUILD_NUMBER_BUMPED=1
 set "SRC_DIR=%~dp0"
 if "%SRC_DIR:~-1%"=="\" set "SRC_DIR=%SRC_DIR:~0,-1%"
 
-echo Configuring x64 CMake...
-call :configure_cmake build x64
+echo Configuring unified CMake (x64 + Win32)...
+call :configure_unified_cmake build
 if errorlevel 1 goto fail
 
-echo Configuring Win32 CMake...
-call :configure_cmake build-x86 Win32
-if errorlevel 1 goto fail
-
-echo Building x64 Release...
-cmake --build build --config Release
-if errorlevel 1 goto fail
-
-echo Building Win32 Release...
-cmake --build build-x86 --config Release
+echo Building Release (x64 + Win32)...
+cmake --build build --config Release --target MedicatInstallerAll
 if errorlevel 1 goto fail
 
 echo.
 echo Build OK:
 echo   %~dp0build\Release\MedicatInstaller.exe
-echo   %~dp0build-x86\Release\MedicatInstaller-x86.exe
+echo   %~dp0build\Release\MedicatInstaller-x86.exe
+echo   %~dp0build\x64\Release\MedicatInstaller.exe
+echo   %~dp0build\x86\Release\MedicatInstaller-x86.exe
 
 if "%UPLOAD_RELEASE%"=="1" (
     call "tools\upload_release.bat" "%RELEASE_TAG%"
@@ -151,6 +145,26 @@ exit /b 1
 :generator_done
 echo Using CMake generator: %CMAKE_GENERATOR%
 exit /b 0
+
+:configure_unified_cmake
+set "BUILD_DIR=%~1"
+if not defined CMAKE_GENERATOR call :detect_cmake_generator
+set "UNIFIED_SRC=%SRC_DIR%\cmake\unified"
+if exist "%BUILD_DIR%\CMakeCache.txt" (
+    set "REMOVE_CACHE=0"
+    findstr /I /C:"%UNIFIED_SRC:\=/%" "%BUILD_DIR%\CMakeCache.txt" >nul 2>&1
+    if errorlevel 1 set "REMOVE_CACHE=1"
+    if "%REMOVE_CACHE%"=="0" (
+        findstr /C:"CMAKE_GENERATOR:INTERNAL=%CMAKE_GENERATOR%" "%BUILD_DIR%\CMakeCache.txt" >nul 2>&1
+        if errorlevel 1 set "REMOVE_CACHE=1"
+    )
+    if "%REMOVE_CACHE%"=="1" (
+        echo Removing stale CMake cache in %BUILD_DIR% ^(project moved, path changed, or generator mismatch^)...
+        rmdir /s /q "%BUILD_DIR%" 2>nul
+    )
+)
+cmake -S "%UNIFIED_SRC%" -B "%BUILD_DIR%" -G "%CMAKE_GENERATOR%"
+exit /b %ERRORLEVEL%
 
 :configure_cmake
 set "BUILD_DIR=%~1"

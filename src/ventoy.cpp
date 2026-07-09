@@ -1,10 +1,12 @@
 #include "ventoy.h"
 
+#include "cancel.h"
 #include "drives.h"
 #include "download.h"
 #include "extract.h"
 #include "offline.h"
 #include "resource.h"
+#include "sim_fail.h"
 #include "util.h"
 
 #include <windows.h>
@@ -408,6 +410,43 @@ int RunProcessWithLog(const std::wstring& commandLine, const std::wstring& worki
     return static_cast<int>(code);
 }
 
+bool PathExists(const std::wstring& path) {
+    return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES;
+}
+
+constexpr int kVentoyIoRetries = 3;
+constexpr DWORD kVentoyIoRetryDelayMs = 500;
+constexpr int kVentoyDownloadRetries = 3;
+constexpr DWORD kVentoyDownloadRetryDelayMs = 1500;
+constexpr int kVentoyExtractRetries = 2;
+constexpr DWORD kVentoyExtractRetryDelayMs = 1000;
+constexpr int kVentoyLayoutRetries = 4;
+constexpr DWORD kVentoyLayoutRetryDelayMs = 400;
+
+bool SleepUnlessCancelled(const DWORD delayMs) {
+    const DWORD step = 100;
+    for (DWORD waited = 0; waited < delayMs; waited += step) {
+        if (IsCancelRequested()) {
+            return false;
+        }
+        Sleep(step);
+    }
+    return !IsCancelRequested();
+}
+
+bool IsRetriableWin32Error(const DWORD error) {
+    switch (error) {
+        case ERROR_SHARING_VIOLATION:
+        case ERROR_ACCESS_DENIED:
+        case ERROR_LOCK_VIOLATION:
+        case ERROR_DIR_NOT_EMPTY:
+        case ERROR_USER_MAPPED_FILE:
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool RemoveDirectoryTree(const std::wstring& path) {
     if (path.empty() || path.size() < 3) {
         return false;
@@ -419,6 +458,7 @@ bool RemoveDirectoryTree(const std::wstring& path) {
         return RemoveDirectoryW(path.c_str()) != FALSE;
     }
 
+    bool ok = true;
     do {
         const std::wstring name = fd.cFileName;
         if (name == L"." || name == L"..") {
@@ -426,14 +466,319 @@ bool RemoveDirectoryTree(const std::wstring& path) {
         }
         const std::wstring full = JoinPath(path, name);
         if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            RemoveDirectoryTree(full);
+            if (!RemoveDirectoryTree(full)) {
+                ok = false;
+            }
         } else {
             SetFileAttributesW(full.c_str(), FILE_ATTRIBUTE_NORMAL);
-            DeleteFileW(full.c_str());
+            if (!DeleteFileW(full.c_str())) {
+                ok = false;
+            }
         }
     } while (FindNextFileW(find, &fd));
     FindClose(find);
-    return RemoveDirectoryW(path.c_str()) != FALSE;
+    if (!RemoveDirectoryW(path.c_str())) {
+        ok = false;
+    }
+    return ok;
+}
+
+void CleanupPartialVentoyExtract(const std::wstring& root, const std::wstring& targetVersion) {
+    const std::wstring preferred = JoinPath(root, L"ventoy-" + targetVersion);
+    if (PathExists(preferred)) {
+        RemoveDirectoryTree(preferred);
+    }
+}
+
+std::wstring ListDirectoryEntries(const std::wstring& path, const size_t maxEntries) {
+    const std::wstring pattern = JoinPath(path, L"*");
+    WIN32_FIND_DATAW fd{};
+    const HANDLE find = FindFirstFileW(pattern.c_str(), &fd);
+    if (find == INVALID_HANDLE_VALUE) {
+        return L"(empty or inaccessible)";
+    }
+
+    std::wstring listing;
+    size_t count = 0;
+    do {
+        const std::wstring name = fd.cFileName;
+        if (name == L"." || name == L"..") {
+            continue;
+        }
+        if (!listing.empty()) {
+            listing += L", ";
+        }
+        listing += name;
+        if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+            listing += L"/";
+        }
+        ++count;
+        if (count >= maxEntries) {
+            listing += L", ...";
+            break;
+        }
+    } while (FindNextFileW(find, &fd));
+    FindClose(find);
+    return listing.empty() ? L"(empty)" : listing;
+}
+
+std::wstring FindExtractedVentoyDir(const std::wstring& root, const std::wstring& preferred) {
+    if (FileExists(JoinPath(preferred, L"Ventoy2Disk.exe"))) {
+        return preferred;
+    }
+
+    const std::wstring pattern = JoinPath(root, L"*");
+    WIN32_FIND_DATAW fd{};
+    const HANDLE find = FindFirstFileW(pattern.c_str(), &fd);
+    if (find == INVALID_HANDLE_VALUE) {
+        return {};
+    }
+
+    std::wstring match;
+    do {
+        if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+            continue;
+        }
+        const std::wstring name = fd.cFileName;
+        if (name == L"." || name == L"..") {
+            continue;
+        }
+        const std::wstring candidate = JoinPath(root, name);
+        if (!FileExists(JoinPath(candidate, L"Ventoy2Disk.exe"))) {
+            continue;
+        }
+        if (name.rfind(L"ventoy-", 0) == 0 || name == L"Ventoy2Disk") {
+            return candidate;
+        }
+        if (match.empty()) {
+            match = candidate;
+        }
+    } while (FindNextFileW(find, &fd));
+    FindClose(find);
+    return match;
+}
+
+bool RelocateExistingDirectoryOnce(const std::wstring& path, std::wstring& errorDetail, DWORD& failureCode) {
+    failureCode = 0;
+    if (!PathExists(path)) {
+        return true;
+    }
+
+    if (RemoveDirectoryTree(path)) {
+        return true;
+    }
+
+    const std::wstring backup = path + L".old";
+    if (PathExists(backup)) {
+        RemoveDirectoryTree(backup);
+    }
+
+    if (MoveFileExW(path.c_str(), backup.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        return true;
+    }
+
+    failureCode = GetLastError();
+    errorDetail = L"Could not remove existing folder: " + ShortDisplayPath(path, 80) + L"\n";
+    errorDetail += L"Move aside failed: " + FormatWindowsError(failureCode) + L" (" +
+                   std::to_wstring(failureCode) + L")\n";
+    errorDetail += L"Contents: " + ListDirectoryEntries(path, 8);
+    errorDetail += L"\nClose other programs using Ventoy2Disk.exe, then retry.";
+    return false;
+}
+
+bool FinalizeVentoyExtract(const VentoyEnsureOptions& options, VentoyFileLog* fileLog, const std::wstring& extractedDir,
+                           const std::wstring& ventoyDir, std::wstring& errorDetail) {
+    DWORD failureCode = 0;
+    for (int attempt = 1; attempt <= kVentoyIoRetries; ++attempt) {
+        if (attempt > 1) {
+            LogLine(options, fileLog, L"Retrying Ventoy folder install (attempt " + std::to_wstring(attempt) + L"/" +
+                                             std::to_wstring(kVentoyIoRetries) + L")");
+            if (!SleepUnlessCancelled(kVentoyIoRetryDelayMs)) {
+                errorDetail = L"Cancelled";
+                return false;
+            }
+        }
+
+        std::wstring relocateError;
+        if (!RelocateExistingDirectoryOnce(ventoyDir, relocateError, failureCode)) {
+            errorDetail = relocateError;
+            if (attempt < kVentoyIoRetries && IsRetriableWin32Error(failureCode)) {
+                continue;
+            }
+            return false;
+        }
+
+        if (MoveFileW(extractedDir.c_str(), ventoyDir.c_str())) {
+            return true;
+        }
+
+        failureCode = GetLastError();
+        errorDetail = L"From: " + ShortDisplayPath(extractedDir, 80) + L"\n";
+        errorDetail += L"To: " + ShortDisplayPath(ventoyDir, 80) + L"\n";
+        errorDetail += FormatWindowsError(failureCode) + L" (" + std::to_wstring(failureCode) + L")";
+        if (attempt < kVentoyIoRetries && IsRetriableWin32Error(failureCode)) {
+            continue;
+        }
+        return false;
+    }
+    return false;
+}
+
+bool DownloadAndInstallVentoy(const VentoyEnsureOptions& options, VentoyFileLog* fileLog,
+                                const std::wstring& targetVersion, const std::wstring& ventoyDir,
+                                VentoyResult& result) {
+    const std::wstring cachedZip = GetOfflineVentoyZipPath(targetVersion);
+    const std::wstring workingZip = JoinPath(options.root, L"ventoy.zip");
+    std::wstring zipPath;
+    bool deleteWorkingZip = false;
+    const std::wstring zipUrl = L"https://github.com/ventoy/Ventoy/releases/download/v" + targetVersion + L"/ventoy-" +
+                                targetVersion + L"-windows.zip";
+
+    if (OfflineVentoyZipExists(targetVersion)) {
+        LogLine(options, fileLog, L"Using offline Ventoy cache for v" + targetVersion);
+        zipPath = cachedZip;
+    } else {
+        zipPath = workingZip;
+        deleteWorkingZip = true;
+
+        std::wstring downloadError;
+        bool downloaded = false;
+        for (int attempt = 1; attempt <= kVentoyDownloadRetries; ++attempt) {
+            if (IsCancelRequested()) {
+                return false;
+            }
+            if (attempt > 1) {
+                LogLine(options, fileLog, L"Retrying Ventoy download (attempt " + std::to_wstring(attempt) + L"/" +
+                                                 std::to_wstring(kVentoyDownloadRetries) + L")");
+                DeleteFileW(zipPath.c_str());
+                if (!SleepUnlessCancelled(kVentoyDownloadRetryDelayMs)) {
+                    return false;
+                }
+            }
+
+            SetStatus(options, L"downloading_ventoy:" + targetVersion);
+            if (HttpDownloadFile(zipUrl, zipPath, downloadError)) {
+                downloaded = true;
+                break;
+            }
+        }
+
+        if (!downloaded) {
+            result.failureKind = VentoyResult::FailureKind::Download;
+            result.error = downloadError;
+            return false;
+        }
+
+        CacheVentoyZip(targetVersion, zipPath);
+    }
+
+    ExtractResult extract;
+    bool extracted = false;
+    for (int attempt = 1; attempt <= kVentoyExtractRetries; ++attempt) {
+        if (IsCancelRequested()) {
+            return false;
+        }
+        if (attempt > 1) {
+            LogLine(options, fileLog, L"Retrying Ventoy extraction (attempt " + std::to_wstring(attempt) + L"/" +
+                                             std::to_wstring(kVentoyExtractRetries) + L")");
+            CleanupPartialVentoyExtract(options.root, targetVersion);
+            if (!SleepUnlessCancelled(kVentoyExtractRetryDelayMs)) {
+                return false;
+            }
+        }
+
+        SetStatus(options, L"extracting_ventoy");
+        if (attempt == 1) {
+            LogLine(options, fileLog, L"Extracting Ventoy archive");
+            if (fileLog) {
+                fileLog->WriteSection(L"Ventoy archive extract (7za)");
+            }
+        }
+
+        const std::wstring extractTmpLog = JoinPath(GetMedicatTempDir(), L"ventoy_7za_extract.log");
+        DeleteFileW(extractTmpLog.c_str());
+
+        extract = Extract7zArchive(
+            options.sevenZipExe, zipPath, options.root, 0, 0,
+            [&](const ExtractProgress& progress) {
+                if (progress.percent >= 0) {
+                    SetStatus(options, L"extracting_ventoy:" + std::to_wstring(progress.percent));
+                }
+            },
+            extractTmpLog, false);
+
+        if (fileLog) {
+            fileLog->AppendFile(extractTmpLog);
+            DeleteFileW(extractTmpLog.c_str());
+        }
+
+        if (extract.success) {
+            extracted = true;
+            break;
+        }
+    }
+
+    if (deleteWorkingZip) {
+        DeleteFileW(zipPath.c_str());
+    }
+
+    if (!extracted) {
+        result.failureKind = VentoyResult::FailureKind::Extract;
+        result.exitCode = extract.exitCode;
+        result.error = extract.error;
+        if (!extract.detail.empty()) {
+            result.error += L"\n" + extract.detail;
+        }
+        return false;
+    }
+
+    const std::wstring preferredDir = JoinPath(options.root, L"ventoy-" + targetVersion);
+    std::wstring extractedDir;
+    for (int attempt = 1; attempt <= kVentoyLayoutRetries; ++attempt) {
+        if (IsCancelRequested()) {
+            return false;
+        }
+        if (attempt > 1) {
+            LogLine(options, fileLog, L"Retrying Ventoy layout check (attempt " + std::to_wstring(attempt) + L"/" +
+                                             std::to_wstring(kVentoyLayoutRetries) + L")");
+            if (!SleepUnlessCancelled(kVentoyLayoutRetryDelayMs)) {
+                return false;
+            }
+        }
+
+        extractedDir = FindExtractedVentoyDir(options.root, preferredDir);
+        if (!extractedDir.empty()) {
+            break;
+        }
+    }
+
+    if (extractedDir.empty()) {
+        result.failureKind = VentoyResult::FailureKind::Layout;
+        result.error = L"Expected folder: ventoy-" + targetVersion + L"\n";
+        result.error += L"Extracted to: " + ShortDisplayPath(options.root, 80) + L"\n";
+        result.error += L"Contents: " + ListDirectoryEntries(options.root, 12);
+        LogLine(options, fileLog, L"Ventoy layout check failed — root listing: " +
+                                         ListDirectoryEntries(options.root, 12));
+        return false;
+    }
+
+    if (extractedDir != preferredDir) {
+        LogLine(options, fileLog, L"Using extracted Ventoy folder: " + extractedDir);
+    }
+
+    std::wstring installError;
+    if (!FinalizeVentoyExtract(options, fileLog, extractedDir, ventoyDir, installError)) {
+        if (installError == L"Cancelled") {
+            return false;
+        }
+        result.failureKind = VentoyResult::FailureKind::Rename;
+        result.error = installError;
+        LogLine(options, fileLog, L"Ventoy folder install failed: " + installError);
+        return false;
+    }
+
+    LogLine(options, fileLog, L"Ventoy v" + targetVersion + L" ready");
+    return true;
 }
 
 std::wstring ReadTextFile(const std::wstring& path) {
@@ -757,6 +1102,16 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
         LogLine(options, fileLogPtr, L"Using pinned Ventoy version: v" + targetVersion);
     }
 
+    const SimulatedFailure ventoyPrepareKinds[] = {SimulatedFailure::VentoyDownload, SimulatedFailure::VentoyExtract,
+                                                   SimulatedFailure::VentoyLayout, SimulatedFailure::VentoyRename,
+                                                   SimulatedFailure::VentoyPrepare};
+    for (const SimulatedFailure kind : ventoyPrepareKinds) {
+        if (ConsumeSimulatedFailure(kind)) {
+            LogLine(options, fileLogPtr, std::wstring(L"[Debug] Simulating: ") + SimulatedFailureLabel(kind));
+            return MakeSimulatedVentoyFailure(kind);
+        }
+    }
+
     const std::wstring ventoyDir = JoinPath(options.root, L"Ventoy2Disk");
     const std::wstring ventoyExe = JoinPath(ventoyDir, L"Ventoy2Disk.exe");
     const std::wstring versionFile = JoinPath(ventoyDir, L"ventoy\\version");
@@ -772,94 +1127,44 @@ VentoyResult EnsureVentoyReady(const VentoyEnsureOptions& options) {
             LogLine(options, fileLogPtr, L"Downloading Ventoy v" + targetVersion);
         }
 
-        const std::wstring cachedZip = GetOfflineVentoyZipPath(targetVersion);
-        const std::wstring workingZip = JoinPath(options.root, L"ventoy.zip");
-        std::wstring zipPath;
-        bool deleteWorkingZip = false;
-
-        if (OfflineVentoyZipExists(targetVersion)) {
-            LogLine(options, fileLogPtr, L"Using offline Ventoy cache for v" + targetVersion);
-            zipPath = cachedZip;
-        } else {
-            SetStatus(options, L"downloading_ventoy:" + targetVersion);
-
-            const std::wstring zipUrl = L"https://github.com/ventoy/Ventoy/releases/download/v" + targetVersion +
-                                        L"/ventoy-" + targetVersion + L"-windows.zip";
-            zipPath = workingZip;
-            deleteWorkingZip = true;
-
-            std::wstring error;
-            if (!HttpDownloadFile(zipUrl, zipPath, error)) {
-                result.failureKind = VentoyResult::FailureKind::Download;
-                result.error = error;
+        if (!DownloadAndInstallVentoy(options, fileLogPtr, targetVersion, ventoyDir, result)) {
+            if (IsCancelRequested()) {
                 return result;
             }
-
-            CacheVentoyZip(targetVersion, zipPath);
-        }
-
-        SetStatus(options, L"extracting_ventoy");
-        LogLine(options, fileLogPtr, L"Extracting Ventoy archive");
-        if (fileLogPtr) {
-            fileLogPtr->WriteSection(L"Ventoy archive extract (7za)");
-        }
-
-        const std::wstring extractTmpLog = JoinPath(GetMedicatTempDir(), L"ventoy_7za_extract.log");
-        DeleteFileW(extractTmpLog.c_str());
-
-        const ExtractResult extract = Extract7zArchive(
-            options.sevenZipExe, zipPath, options.root, 0, 0,
-            [&](const ExtractProgress& progress) {
-                if (progress.percent >= 0) {
-                    SetStatus(options, L"extracting_ventoy:" + std::to_wstring(progress.percent));
-                }
-            },
-            extractTmpLog, false);
-
-        if (fileLogPtr) {
-            fileLogPtr->AppendFile(extractTmpLog);
-            DeleteFileW(extractTmpLog.c_str());
-        }
-
-        if (deleteWorkingZip) {
-            DeleteFileW(zipPath.c_str());
-        }
-
-        if (!extract.success) {
-            result.failureKind = VentoyResult::FailureKind::Extract;
-            result.exitCode = extract.exitCode;
-            result.error = extract.error;
-            if (!extract.detail.empty()) {
-                result.error += L"\n" + extract.detail;
+            if (!result.error.empty() || result.failureKind != VentoyResult::FailureKind::None) {
+                return result;
             }
-            return result;
         }
-
-        const std::wstring extractedDir = JoinPath(options.root, L"ventoy-" + targetVersion);
-        if (!FileExists(JoinPath(extractedDir, L"Ventoy2Disk.exe"))) {
-            result.failureKind = VentoyResult::FailureKind::Prepare;
-            result.error = L"Ventoy archive did not contain Ventoy2Disk.exe";
-            return result;
-        }
-
-        if (FileExists(ventoyDir)) {
-            RemoveDirectoryTree(ventoyDir);
-        }
-
-        if (!MoveFileW(extractedDir.c_str(), ventoyDir.c_str())) {
-            result.failureKind = VentoyResult::FailureKind::Prepare;
-            result.error = L"Failed to rename extracted Ventoy folder";
-            return result;
-        }
-
-        LogLine(options, fileLogPtr, L"Ventoy v" + targetVersion + L" ready");
     } else {
         LogLine(options, fileLogPtr, L"Local Ventoy v" + localVersion + L" is up to date");
     }
 
     if (!FileExists(ventoyExe)) {
+        if (!needsDownload) {
+            LogLine(options, fileLogPtr,
+                    L"Ventoy2Disk.exe missing despite version file — clearing stale install and re-downloading");
+            RemoveDirectoryTree(ventoyDir);
+            if (!DownloadAndInstallVentoy(options, fileLogPtr, targetVersion, ventoyDir, result)) {
+                if (IsCancelRequested()) {
+                    return result;
+                }
+                if (!result.error.empty() || result.failureKind != VentoyResult::FailureKind::None) {
+                    return result;
+                }
+            }
+        }
+    }
+
+    if (!FileExists(ventoyExe)) {
         result.failureKind = VentoyResult::FailureKind::Prepare;
-        result.error = L"Ventoy2Disk.exe not found after download";
+        result.error = L"Expected: " + ShortDisplayPath(ventoyExe, 80);
+        if (!localVersion.empty()) {
+            result.error += L"\nVersion file reports v" + localVersion + L" but Ventoy2Disk.exe is missing.";
+        } else {
+            result.error += L"\nVentoy2Disk.exe is missing after prepare.";
+        }
+        result.error += L"\nFolder contents: " + ListDirectoryEntries(ventoyDir, 12);
+        LogLine(options, fileLogPtr, result.error);
         return result;
     }
 

@@ -7,6 +7,7 @@
 #include "i18n.h"
 #include "offline.h"
 #include "resource.h"
+#include "sim_fail.h"
 #include "theme.h"
 #include "util.h"
 #include "ventoy.h"
@@ -202,6 +203,9 @@ constexpr int kManualInstallBtnId = 1024;
 constexpr int kCreditsBtnId = 1025;
 constexpr int kFeedbackBtnId = 1026;
 constexpr int kDiscordFooterBtnId = 1027;
+constexpr int kLogoStaticId = 1028;
+constexpr int kDebugMenuBase = 4000;
+constexpr int kDebugMenuLast = kDebugMenuBase + static_cast<int>(SimulatedFailure::VerificationFailed);
 constexpr int kCreditsIntroId = 1130;
 constexpr int kCreditsSevenZipBtnId = 1131;
 constexpr int kCreditsVentoyBtnId = 1132;
@@ -3279,7 +3283,7 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             self->OnCreate(hwnd);
             return 0;
         case WM_COMMAND:
-            self->OnCommand(wp);
+            self->OnCommand(wp, lp);
             return 0;
         case WM_DEVICECHANGE:
             if (self->HandleDeviceChange(wp, lp)) {
@@ -3324,6 +3328,16 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_SIZE:
             self->LayoutHeader();
             return 0;
+        case WM_LBUTTONUP:
+            if ((GetKeyState(VK_SHIFT) & 0x8000) != 0) {
+                const int x = GET_X_LPARAM(lp);
+                const int y = GET_Y_LPARAM(lp);
+                if (self->LogoHitTest(hwnd, x, y)) {
+                    self->TryOpenDebugMenuFromLogoClick(hwnd);
+                    return 0;
+                }
+            }
+            break;
         case WM_PAINT: {
             PAINTSTRUCT ps{};
             const HDC hdc = BeginPaint(hwnd, &ps);
@@ -3481,8 +3495,9 @@ void Gui::OnCreate(HWND hwnd) {
     discordFooterIcon_ = theme::LoadEmbeddedIcon(instance_, IDI_DISCORD_ICON, kDiscordFooterIconSize);
     if (!logoBitmap_) {
         logoStatic_ = CreateWindowW(
-            L"STATIC", nullptr, WS_CHILD | WS_VISIBLE | SS_ICON | SS_LEFT,
-            kHeaderLogoX, kHeaderLogoY, kLogoMaxSize, kLogoMaxSize, hwnd, nullptr, instance_, nullptr);
+            L"STATIC", nullptr, WS_CHILD | WS_VISIBLE | SS_ICON | SS_LEFT | SS_NOTIFY,
+            kHeaderLogoX, kHeaderLogoY, kLogoMaxSize, kLogoMaxSize, hwnd,
+            reinterpret_cast<HMENU>(static_cast<INT_PTR>(kLogoStaticId)), instance_, nullptr);
         const HICON fallbackIcon = LoadIconW(instance_, MAKEINTRESOURCEW(IDI_APP_ICON));
         if (fallbackIcon) {
             SendMessageW(logoStatic_, STM_SETICON, 0, reinterpret_cast<LPARAM>(fallbackIcon));
@@ -3709,9 +3724,20 @@ void Gui::OnCreate(HWND hwnd) {
     RefreshTranslatedUi();
 }
 
-void Gui::OnCommand(WPARAM wp) {
+void Gui::OnCommand(WPARAM wp, LPARAM lp) {
     const int id = LOWORD(wp);
-    if (id == kLanguageComboId && HIWORD(wp) == CBN_SELCHANGE) {
+    const int code = HIWORD(wp);
+
+    if (id == kLogoStaticId && code == STN_CLICKED) {
+        TryOpenDebugMenuFromLogoClick(reinterpret_cast<HWND>(lp));
+        return;
+    }
+    if (id >= kDebugMenuBase && id <= kDebugMenuLast) {
+        HandleDebugMenuCommand(id);
+        return;
+    }
+
+    if (id == kLanguageComboId && code == CBN_SELCHANGE) {
         const int selected = static_cast<int>(SendMessageW(languageCombo_, CB_GETCURSEL, 0, 0));
         ApplyLanguageSelection(LanguageCodeForIndex(selected));
         return;
@@ -3726,7 +3752,7 @@ void Gui::OnCommand(WPARAM wp) {
         EnforceForcedDriveCheckboxes();
         return;
     }
-    if (id == kDriveComboId && HIWORD(wp) == CBN_SELCHANGE) {
+    if (id == kDriveComboId && code == CBN_SELCHANGE) {
         RefreshDriveVentoyStatus();
         return;
     }
@@ -3772,6 +3798,101 @@ void Gui::OnCommand(WPARAM wp) {
     }
     if (id == kAltDownloadOpenBtnId) {
         OpenSelectedAlternativeDownload();
+    }
+}
+
+bool Gui::LogoHitTest(const HWND hwnd, const int clientX, const int clientY) const {
+    if (!hwnd || !IsWindow(hwnd)) {
+        return false;
+    }
+
+    RECT clientRect{};
+    GetClientRect(hwnd, &clientRect);
+    const int contentLeft = ContentLeft(clientRect.right - clientRect.left);
+    const RECT logoRect{contentLeft, kHeaderLogoY, contentLeft + kLogoMaxSize, kHeaderLogoY + kLogoMaxSize};
+    const POINT pt{clientX, clientY};
+    return PtInRect(&logoRect, pt) != FALSE;
+}
+
+void Gui::TryOpenDebugMenuFromLogoClick(const HWND source) {
+    if ((GetKeyState(VK_SHIFT) & 0x8000) == 0) {
+        return;
+    }
+
+    POINT pt{};
+    if (source == logoStatic_ && logoStatic_ && IsWindow(logoStatic_)) {
+        RECT rc{};
+        GetWindowRect(logoStatic_, &rc);
+        pt.x = rc.left + kLogoMaxSize / 2;
+        pt.y = rc.bottom;
+    } else if (hwnd_ && IsWindow(hwnd_)) {
+        RECT clientRect{};
+        GetClientRect(hwnd_, &clientRect);
+        const int contentLeft = ContentLeft(clientRect.right - clientRect.left);
+        pt.x = contentLeft + kLogoMaxSize / 2;
+        pt.y = kHeaderLogoY + kLogoMaxSize;
+        ClientToScreen(hwnd_, &pt);
+    } else {
+        return;
+    }
+
+    OpenDebugMenu(pt.x, pt.y);
+}
+
+void Gui::OpenDebugMenu(const int screenX, const int screenY) {
+    HMENU menu = CreatePopupMenu();
+    if (!menu) {
+        return;
+    }
+
+    const SimulatedFailure active = ActiveSimulatedFailure();
+
+    auto addItem = [&](const SimulatedFailure failure, const wchar_t* label) {
+        UINT flags = MF_STRING;
+        if (active == failure) {
+            flags |= MF_CHECKED;
+        }
+        AppendMenuW(menu, flags, kDebugMenuBase + static_cast<int>(failure), label);
+    };
+
+    UINT clearFlags = MF_STRING;
+    if (active == SimulatedFailure::None) {
+        clearFlags |= MF_CHECKED;
+    }
+    AppendMenuW(menu, clearFlags, kDebugMenuBase, L"Clear simulation");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING | MF_DISABLED, 0, L"Ventoy prepare (next install)");
+    addItem(SimulatedFailure::VentoyDownload, L"Download failed");
+    addItem(SimulatedFailure::VentoyExtract, L"Extract failed");
+    addItem(SimulatedFailure::VentoyLayout, L"Layout / unexpected archive");
+    addItem(SimulatedFailure::VentoyRename, L"Rename failed");
+    addItem(SimulatedFailure::VentoyPrepare, L"Exe not found after prepare");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING | MF_DISABLED, 0, L"Ventoy on USB (next install)");
+    addItem(SimulatedFailure::VentoyInstall, L"Install failed");
+    addItem(SimulatedFailure::VentoyUpgrade, L"Upgrade failed");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING | MF_DISABLED, 0, L"Install (next install)");
+    addItem(SimulatedFailure::NoInternet, L"No internet");
+    addItem(SimulatedFailure::FormatFailed, L"Format failed");
+    addItem(SimulatedFailure::MediCatExtract, L"MediCat extract failed");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING | MF_DISABLED, 0, L"Verify (next verify)");
+    addItem(SimulatedFailure::VerificationFailed, L"Verification failed");
+
+    TrackPopupMenu(menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON, screenX, screenY, 0, hwnd_, nullptr);
+    DestroyMenu(menu);
+}
+
+void Gui::HandleDebugMenuCommand(const int id) {
+    if (id == kDebugMenuBase) {
+        ClearSimulatedFailure();
+    } else {
+        SetActiveSimulatedFailure(static_cast<SimulatedFailure>(id - kDebugMenuBase));
+    }
+
+    if (onLog_) {
+        onLog_(std::wstring(L"[Debug] Armed simulation: ") + SimulatedFailureLabel(ActiveSimulatedFailure()));
     }
 }
 

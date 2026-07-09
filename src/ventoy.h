@@ -9,7 +9,7 @@
 namespace medicat {
 
 struct VentoyResult {
-    enum class FailureKind { None, Download, Extract, Prepare };
+    enum class FailureKind { None, Download, Extract, Layout, Rename, Prepare };
 
     bool success = false;
     int exitCode = -1;

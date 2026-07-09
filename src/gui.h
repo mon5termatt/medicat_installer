@@ -164,7 +164,7 @@ private:
     static LRESULT CALLBACK MessageDialogWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     static LRESULT CALLBACK HelpGateWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     void OnCreate(HWND hwnd);
-    void OnCommand(WPARAM wp);
+    void OnCommand(WPARAM wp, LPARAM lp = 0);
     void RefreshDrives(bool fromDeviceChange = false);
     void RequestDriveRefresh(bool fromDeviceChange = false);
     void ApplyDriveList(DriveListPayload* payload);
@@ -215,6 +215,10 @@ private:
     void PopulateAlternativeDownloadCombo();
     void OpenSelectedAlternativeDownload();
     void ShowUpdatePrompt(const InstallerUpdateInfo& info);
+    bool LogoHitTest(HWND hwnd, int clientX, int clientY) const;
+    void TryOpenDebugMenuFromLogoClick(HWND source);
+    void OpenDebugMenu(int screenX, int screenY);
+    void HandleDebugMenuCommand(int id);
 
     HINSTANCE instance_ = nullptr;
     HWND hwnd_ = nullptr;
