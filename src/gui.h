@@ -212,8 +212,6 @@ private:
     void RefreshTranslatedUi();
     void StartMirrorDownload(const std::wstring& url, const std::wstring& mirrorName);
     void SetDownloadControlsEnabled(bool enabled);
-    void PopulateAlternativeDownloadCombo();
-    void OpenSelectedAlternativeDownload();
     void ShowUpdatePrompt(const InstallerUpdateInfo& info);
     bool LogoHitTest(HWND hwnd, int clientX, int clientY) const;
     void TryOpenDebugMenuFromLogoClick(HWND source);
@@ -249,8 +247,10 @@ private:
     HWND archiveMissingLabel_ = nullptr;
     HWND downloadMirror1Btn_ = nullptr;
     HWND downloadMirror2Btn_ = nullptr;
-    HWND altDownloadCombo_ = nullptr;
-    HWND altDownloadOpenBtn_ = nullptr;
+    HWND downloadTorrentBtn_ = nullptr;
+    HWND downloadMagnetBtn_ = nullptr;
+    HWND downloadGoogleDriveBtn_ = nullptr;
+    HWND downloadMegaBtn_ = nullptr;
     HWND fileLogWindow_ = nullptr;
     HWND fileLogList_ = nullptr;
     HWND creditsWindow_ = nullptr;

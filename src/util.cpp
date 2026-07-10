@@ -1,8 +1,10 @@
 #include "util.h"
 
+#include <shellapi.h>
 #include <shlwapi.h>
 #include <windows.h>
 
+#include <cwchar>
 #include <filesystem>
 #include <sstream>
 
@@ -345,6 +347,131 @@ std::wstring FormatWindowsError(const DWORD error) {
         LocalFree(message);
     }
     return out;
+}
+
+namespace {
+
+bool ShellOpenUrl(const wchar_t* url) {
+    const HINSTANCE result = ShellExecuteW(nullptr, L"open", url, nullptr, nullptr, SW_SHOWNORMAL);
+    return reinterpret_cast<INT_PTR>(result) > 32;
+}
+
+bool ShellOpenExecutableWithArg(const wchar_t* exe, const wchar_t* arg) {
+    const HINSTANCE result = ShellExecuteW(nullptr, nullptr, exe, arg, nullptr, SW_SHOWNORMAL);
+    return reinterpret_cast<INT_PTR>(result) > 32;
+}
+
+bool IsBrowserExecutable(const wchar_t* path) {
+    if (!path || !*path) {
+        return false;
+    }
+
+    const wchar_t* name = PathFindFileNameW(path);
+    return _wcsicmp(name, L"chrome.exe") == 0 || _wcsicmp(name, L"msedge.exe") == 0 ||
+           _wcsicmp(name, L"firefox.exe") == 0 || _wcsicmp(name, L"opera.exe") == 0 ||
+           _wcsicmp(name, L"brave.exe") == 0 || _wcsicmp(name, L"iexplore.exe") == 0 ||
+           _wcsicmp(name, L"vivaldi.exe") == 0;
+}
+
+std::wstring ExpandEnvironmentPath(const wchar_t* pathTemplate) {
+    if (!pathTemplate || !*pathTemplate) {
+        return {};
+    }
+
+    wchar_t expanded[MAX_PATH]{};
+    const DWORD length = ExpandEnvironmentStringsW(pathTemplate, expanded, MAX_PATH);
+    if (length == 0 || length > MAX_PATH) {
+        return {};
+    }
+    return expanded;
+}
+
+bool TryKnownTorrentClients(const wchar_t* magnetUrl) {
+    static const wchar_t* kTorrentClientPaths[] = {
+        L"%LocalAppData%\\Programs\\qBittorrent\\qbittorrent.exe",
+        L"%ProgramFiles%\\qBittorrent\\qbittorrent.exe",
+        L"%ProgramFiles(x86)%\\qBittorrent\\qbittorrent.exe",
+        L"%AppData%\\uTorrent\\uTorrent.exe",
+        L"%ProgramFiles%\\BitTorrent\\BitTorrent.exe",
+        L"%ProgramFiles(x86)%\\BitTorrent\\BitTorrent.exe",
+        L"%ProgramFiles%\\Deluge\\deluge.exe",
+        L"%ProgramFiles(x86)%\\Deluge\\deluge.exe",
+        L"%ProgramFiles%\\Transmission\\transmission-qt.exe",
+        L"%ProgramFiles(x86)%\\Transmission\\transmission-qt.exe",
+    };
+
+    for (const wchar_t* pathTemplate : kTorrentClientPaths) {
+        const std::wstring path = ExpandEnvironmentPath(pathTemplate);
+        if (path.empty() || !FileExists(path)) {
+            continue;
+        }
+        if (ShellOpenExecutableWithArg(path.c_str(), magnetUrl)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+}  // namespace
+
+bool OpenMagnetUrl(const wchar_t* url) {
+    if (!url || _wcsnicmp(url, L"magnet:", 7) != 0) {
+        return false;
+    }
+
+    wchar_t handlerExe[MAX_PATH]{};
+    DWORD handlerExeLength = static_cast<DWORD>(std::size(handlerExe));
+    const HRESULT assocResult =
+        AssocQueryStringW(ASSOCF_NONE, ASSOCSTR_EXECUTABLE, L"magnet", url, handlerExe, &handlerExeLength);
+    if (SUCCEEDED(assocResult) && handlerExe[0] != L'\0' && !IsBrowserExecutable(handlerExe)) {
+        if (ShellOpenUrl(url)) {
+            return true;
+        }
+        if (ShellOpenExecutableWithArg(handlerExe, url)) {
+            return true;
+        }
+    }
+
+    if (TryKnownTorrentClients(url)) {
+        return true;
+    }
+
+    if (FAILED(assocResult) || handlerExe[0] == L'\0') {
+        return ShellOpenUrl(url);
+    }
+
+    return false;
+}
+
+bool CopyTextToClipboard(HWND owner, const std::wstring& text) {
+    if (text.empty()) {
+        return false;
+    }
+    if (!OpenClipboard(owner)) {
+        return false;
+    }
+    EmptyClipboard();
+    const size_t bytes = (text.size() + 1) * sizeof(wchar_t);
+    HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, bytes);
+    if (!memory) {
+        CloseClipboard();
+        return false;
+    }
+    void* locked = GlobalLock(memory);
+    if (!locked) {
+        GlobalFree(memory);
+        CloseClipboard();
+        return false;
+    }
+    memcpy(locked, text.c_str(), bytes);
+    GlobalUnlock(memory);
+    if (!SetClipboardData(CF_UNICODETEXT, memory)) {
+        GlobalFree(memory);
+        CloseClipboard();
+        return false;
+    }
+    CloseClipboard();
+    return true;
 }
 
 }  // namespace medicat

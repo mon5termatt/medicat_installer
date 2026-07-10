@@ -12,11 +12,9 @@ constexpr uint64_t kMediCatArchiveFullBytes = 22994783619ULL;
 constexpr uint64_t kMediCatArchiveMinBytes = kMediCatArchiveFullBytes * 95 / 100;
 constexpr char kMediCatArchiveMd5[] = "db50f96a5c7b5ec6dc9ed77ea29fffb0";
 
-constexpr wchar_t kDownloadMirror1Name[] = L"files.medicatusb.com";
 constexpr wchar_t kDownloadMirror1Url[] =
     L"https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z";
 
-constexpr wchar_t kDownloadMirror2Name[] = L"files.dog";
 constexpr wchar_t kDownloadMirror2Url[] =
     L"https://files.dog/OD%20Rips/MediCat/v21.12/MediCat.USB.v21.12.7z";
 
@@ -33,19 +31,6 @@ constexpr wchar_t kBetaFeedbackUrl[] = L"https://url.medicatusb.com/betafeedback
 constexpr wchar_t kDiscordSupportUrl[] = L"https://url.medicatusb.com/discord";
 constexpr wchar_t kSevenZipProjectUrl[] = L"https://www.7-zip.org/";
 constexpr wchar_t kVentoyProjectUrl[] = L"https://www.ventoy.net/en/index.html";
-
-struct AlternativeDownloadOption {
-    const wchar_t* labelKey;
-    const wchar_t* url;
-};
-
-constexpr AlternativeDownloadOption kAlternativeDownloads[] = {
-    {L"ui.download_torrent", kDownloadTorrentUrl},
-    {L"ui.download_magnet", kDownloadMagnetUrl},
-    {L"ui.download_google_drive", kDownloadGoogleDriveUrl},
-    {L"ui.download_mega", kDownloadMegaUrl},
-    {L"ui.download_all", kDownloadAllUrl},
-};
 
 inline bool OpenBrowserUrl(const wchar_t* url) {
     if (!url || !*url) {

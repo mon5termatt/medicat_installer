@@ -34,4 +34,7 @@ extern const int kInstallerBuildNumber;
 std::wstring InstallerVersionWide();
 std::wstring InstallerVersionLabel();
 
+bool OpenMagnetUrl(const wchar_t* url);
+bool CopyTextToClipboard(HWND owner, const std::wstring& text);
+
 }  // namespace medicat
