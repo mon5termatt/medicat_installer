@@ -52,7 +52,7 @@ add_custom_command(
     OUTPUT "${_STAGED_X64}"
     DEPENDS medicat_installer_x64
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/Release"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_BUILT_X64}" "${_STAGED_X64}"
+    COMMAND ${CMAKE_COMMAND} -E copy "${_BUILT_X64}" "${_STAGED_X64}"
     COMMENT "Staging x64 MedicatInstaller.exe"
 )
 
@@ -60,7 +60,7 @@ add_custom_command(
     OUTPUT "${_STAGED_X86}"
     DEPENDS medicat_installer_x86
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/Release"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_BUILT_X86}" "${_STAGED_X86}"
+    COMMAND ${CMAKE_COMMAND} -E copy "${_BUILT_X86}" "${_STAGED_X86}"
     COMMENT "Staging Win32 MedicatInstaller-x86.exe"
 )
 

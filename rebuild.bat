@@ -68,6 +68,9 @@ echo Building Release (x64 + Win32)...
 cmake --build build --config Release --target MedicatInstallerAll
 if errorlevel 1 goto fail
 
+call :stage_release_exes
+if errorlevel 1 goto fail
+
 echo.
 echo Build OK:
 echo   %~dp0build\Release\MedicatInstaller.exe
@@ -78,15 +81,17 @@ echo   %~dp0build\x86\Release\MedicatInstaller-x86.exe
 if "%UPLOAD_RELEASE%"=="1" (
     call "tools\upload_release.bat" "%RELEASE_TAG%"
     if errorlevel 1 goto fail
-) else if "%PIN_BUILD%"=="0" (
+    goto push_manifest
+)
+
+if "%PIN_BUILD%"=="0" (
     echo Publishing update manifest...
     python "tools\publish_update_manifest.py" --build-number "build_number.txt" --build-version "generated\build_version.cpp" --output "update.json"
     if errorlevel 1 goto fail
+    goto push_manifest
 )
 
-if "%UPLOAD_RELEASE%"=="1" goto push_manifest
-if "%PIN_BUILD%"=="0" goto push_manifest
-echo Skipping update manifest push for pinned test build %PIN_BUILD%.
+echo Skipping update manifest push for pinned test build %PIN_BUILD% ^(no release^).
 set "MEDICAT_PIN_BUILD="
 exit /b 0
 
@@ -165,6 +170,29 @@ if exist "%BUILD_DIR%\CMakeCache.txt" (
 )
 cmake -S "%UNIFIED_SRC%" -B "%BUILD_DIR%" -G "%CMAKE_GENERATOR%"
 exit /b %ERRORLEVEL%
+
+:stage_release_exes
+set "STAGE_DIR=%~dp0build\Release"
+set "X64_EXE=%~dp0build\x64\Release\MedicatInstaller.exe"
+set "X86_EXE=%~dp0build\x86\Release\MedicatInstaller-x86.exe"
+if not exist "%X64_EXE%" (
+    echo Missing x64 build output: %X64_EXE%
+    exit /b 1
+)
+if not exist "%X86_EXE%" (
+    echo Missing Win32 build output: %X86_EXE%
+    exit /b 1
+)
+if not exist "%STAGE_DIR%" mkdir "%STAGE_DIR%"
+echo Staging installers to build\Release...
+copy /Y "%X64_EXE%" "%STAGE_DIR%\MedicatInstaller.exe" >nul
+if errorlevel 1 exit /b 1
+copy /Y "%X86_EXE%" "%STAGE_DIR%\MedicatInstaller-x86.exe" >nul
+if errorlevel 1 exit /b 1
+set "STAGED_VERSION="
+if exist "%~dp0build_number.txt" set /p STAGED_VERSION=<"%~dp0build_number.txt"
+if defined STAGED_VERSION echo Staged installer version: v%STAGED_VERSION%
+exit /b 0
 
 :configure_cmake
 set "BUILD_DIR=%~1"

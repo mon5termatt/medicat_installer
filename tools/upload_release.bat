@@ -22,18 +22,31 @@ if "%TAG%"=="" (
     exit /b 1
 )
 
+set "X64_SRC=build\x64\Release\MedicatInstaller.exe"
+set "X86_SRC=build\x86\Release\MedicatInstaller-x86.exe"
 set "X64_EXE=build\Release\MedicatInstaller.exe"
 set "X86_EXE=build\Release\MedicatInstaller-x86.exe"
 
-if not exist "%X64_EXE%" if exist "build\x64\Release\MedicatInstaller.exe" (
-    set "X64_EXE=build\x64\Release\MedicatInstaller.exe"
+if not exist "%X64_SRC%" if exist "%X64_EXE%" set "X64_SRC=%X64_EXE%"
+if not exist "%X86_SRC%" if exist "%X86_EXE%" set "X86_SRC=%X86_EXE%"
+if not exist "%X86_SRC%" if exist "build-x86\Release\MedicatInstaller-x86.exe" (
+    set "X86_SRC=build-x86\Release\MedicatInstaller-x86.exe"
 )
-if not exist "%X86_EXE%" if exist "build\x86\Release\MedicatInstaller-x86.exe" (
-    set "X86_EXE=build\x86\Release\MedicatInstaller-x86.exe"
+
+if not exist "%X64_SRC%" (
+    echo Missing x64 build: %X64_SRC%
+    echo Run rebuild.bat first.
+    exit /b 1
 )
-if not exist "%X86_EXE%" if exist "build-x86\Release\MedicatInstaller-x86.exe" (
-    set "X86_EXE=build-x86\Release\MedicatInstaller-x86.exe"
+if not exist "%X86_SRC%" (
+    echo Missing Win32 build: %X86_SRC%
+    echo Run rebuild.bat first.
+    exit /b 1
 )
+
+if not exist "build\Release" mkdir "build\Release"
+copy /Y "%X64_SRC%" "%X64_EXE%" >nul
+copy /Y "%X86_SRC%" "%X86_EXE%" >nul
 
 if not exist "%X64_EXE%" (
     echo Missing x64 build: %X64_EXE%
