@@ -407,37 +407,34 @@ std::string BuildSessionReportJson(const SessionReportRequest& request) {
 }
 
 void LogTelemetry(const SessionReportLogger& logLine, const std::wstring& message, const bool isError = false) {
-    if (logLine) {
-        logLine(message, isError);
+    if (logLine && isError) {
+        logLine(message, true);
     }
 }
 
-std::wstring TelemetrySessionLabel(const std::string& sessionId) {
-    if (sessionId.size() <= 8) {
-        return Utf8ToWide(sessionId);
+void LogUploadTelemetry(const SessionReportLogger& logLine, const std::wstring& message, const bool isError = false) {
+    if (!logLine) {
+        return;
     }
-    return Utf8ToWide(sessionId.substr(0, 8)) + L"…";
+    if (isError) {
+        logLine(message, true);
+        return;
+    }
+    logLine(message, false);
 }
 
 void PostSessionReportOnce(const SessionReportRequest& request, const SessionReportLogger& logLine) {
     if (!HasIngestToken()) {
-        LogTelemetry(logLine, L"Session report skipped — no ingest token configured at build time");
         return;
     }
 
     const std::string ingestToken = GetIngestToken();
-    const std::wstring sessionLabel = TelemetrySessionLabel(request.sessionId);
-    LogTelemetry(logLine, L"Session report upload attempted — target " + Utf8ToWide(MEDICAT_SESSIONS_URL) +
-                               L", session " + sessionLabel + L", operation=" + Utf8ToWide(request.operation) +
-                               L", outcome=" + Utf8ToWide(request.outcome));
 
     const std::string body = BuildSessionReportJson(request);
     std::wstring error;
     const int status = HttpPostJson(Utf8ToWide(MEDICAT_SESSIONS_URL), body, Utf8ToWide(ingestToken), error);
 
     if (status >= 200 && status < 300) {
-        LogTelemetry(logLine, L"Session report accepted by server (HTTP " + std::to_wstring(status) +
-                                   L") — ingest token OK");
         return;
     }
 
@@ -457,7 +454,8 @@ void PostSessionReportOnce(const SessionReportRequest& request, const SessionRep
     }
 
     LogTelemetry(logLine, L"Session report rejected (HTTP " + std::to_wstring(status) + L")" +
-                               (error.empty() ? L"" : L": " + error),
+                               (error.empty() ? L"" : L": " + error) + L" — operation=" +
+                               Utf8ToWide(request.operation) + L", outcome=" + Utf8ToWide(request.outcome),
                  true);
 }
 
@@ -584,24 +582,21 @@ void UploadFailureLogsOnce(const FailureLogUploadRequest& request, const Session
         }
     };
     if (!HasIngestToken()) {
-        LogTelemetry(logLine, L"Failure log upload skipped — no ingest token configured at build time");
         finish(false, L"");
         return;
     }
     if (!ReadPreferencesFailureLogAutoUploadEnabled()) {
-        LogTelemetry(logLine, L"Failure log upload skipped — disabled in preferences");
         finish(false, L"");
         return;
     }
     if (request.sessionId.empty() || request.installerRoot.empty() || request.sevenZa.empty()) {
-        LogTelemetry(logLine, L"Failure log upload skipped — missing session or tools");
         finish(false, L"");
         return;
     }
 
     std::vector<std::wstring> logFiles = CollectSupportLogFiles(request.installerRoot);
     if (logFiles.empty()) {
-        LogTelemetry(logLine, L"Failure log upload skipped — no log files found", true);
+        LogUploadTelemetry(logLine, L"Failure log upload skipped — no log files found", true);
         finish(false, L"");
         return;
     }
@@ -609,7 +604,7 @@ void UploadFailureLogsOnce(const FailureLogUploadRequest& request, const Session
     const std::wstring stagingDir = JoinPath(GetMedicatTempDir(), L"support_upload_staging");
     std::vector<std::wstring> stagedFiles;
     if (!StageSupportLogFiles(request.installerRoot, logFiles, stagingDir, stagedFiles)) {
-        LogTelemetry(logLine, L"Failure log upload skipped — could not stage log files for upload", true);
+        LogUploadTelemetry(logLine, L"Failure log upload skipped — could not stage log files for upload", true);
         finish(false, L"");
         return;
     }
@@ -619,7 +614,7 @@ void UploadFailureLogsOnce(const FailureLogUploadRequest& request, const Session
     {
         std::ofstream manifestOut(WideToUtf8(manifestPath), std::ios::binary);
         if (!manifestOut) {
-            LogTelemetry(logLine, L"Failure log upload skipped — could not write manifest", true);
+            LogUploadTelemetry(logLine, L"Failure log upload skipped — could not write manifest", true);
             finish(false, L"");
             return;
         }
@@ -630,17 +625,17 @@ void UploadFailureLogsOnce(const FailureLogUploadRequest& request, const Session
     DeleteFileW(zipPath.c_str());
     int zipExitCode = -1;
     if (!CreateSupportLogZip(request, stagingDir, stagedFiles, zipPath, zipExitCode)) {
-        LogTelemetry(logLine, L"Failure log upload skipped — could not create zip bundle (7za exit " +
-                                   std::to_wstring(zipExitCode) + L")",
-                     true);
+        LogUploadTelemetry(logLine, L"Failure log upload skipped — could not create zip bundle (7za exit " +
+                                         std::to_wstring(zipExitCode) + L")",
+                           true);
         finish(false, L"");
         return;
     }
 
     const uint64_t zipBytes = GetFileSizeBytes(zipPath);
-    LogTelemetry(logLine, L"Failure log upload attempted — " + std::to_wstring(stagedFiles.size()) +
-                               L" file(s), " + std::to_wstring(zipBytes) + L" bytes, target " +
-                               Utf8ToWide(MEDICAT_UPLOADS_URL));
+    LogUploadTelemetry(logLine, L"Failure log upload attempted — " + std::to_wstring(stagedFiles.size()) +
+                                     L" file(s), " + std::to_wstring(zipBytes) + L" bytes, target " +
+                                     Utf8ToWide(MEDICAT_UPLOADS_URL));
     const HttpMultipartResult upload = HttpPostMultipartUpload(
         Utf8ToWide(MEDICAT_UPLOADS_URL), Utf8ToWide(GetIngestToken()), Utf8ToWide(request.sessionId), manifestJson,
         zipPath);
@@ -649,15 +644,14 @@ void UploadFailureLogsOnce(const FailureLogUploadRequest& request, const Session
     ClearDirectoryFiles(stagingDir);
 
     if (upload.statusCode >= 200 && upload.statusCode < 300) {
-        LogTelemetry(logLine, L"Failure logs accepted by server (HTTP " + std::to_wstring(upload.statusCode) +
-                                   L")" + (upload.keyword.empty() ? L"" : L" — keyword " + upload.keyword));
         finish(!upload.keyword.empty(), upload.keyword);
         return;
     }
 
-    LogTelemetry(logLine, L"Failure log upload failed — " +
-                               (upload.error.empty() ? L"HTTP " + std::to_wstring(upload.statusCode) : upload.error),
-                 true);
+    LogUploadTelemetry(logLine, L"Failure log upload failed — " +
+                                     (upload.error.empty() ? L"HTTP " + std::to_wstring(upload.statusCode)
+                                                           : upload.error),
+                       true);
     finish(false, L"");
 }
 
@@ -808,12 +802,7 @@ bool SessionReportsEnabled() {
 
 void SendSessionReport(const SessionReportRequest& request, const bool waitForCompletion,
                        SessionReportLogger logLine) {
-    if (!SessionReportsEnabled()) {
-        LogTelemetry(logLine, L"Session report skipped — disabled in preferences");
-        return;
-    }
-    if (request.sessionId.empty()) {
-        LogTelemetry(logLine, L"Session report skipped — no session id");
+    if (!SessionReportsEnabled() || request.sessionId.empty()) {
         return;
     }
 
@@ -822,7 +811,6 @@ void SendSessionReport(const SessionReportRequest& request, const bool waitForCo
         return;
     }
 
-    LogTelemetry(logLine, L"Session report queued (background upload)");
     std::thread worker(PostSessionReportOnce, request, logLine);
     worker.detach();
 }
@@ -833,7 +821,6 @@ bool FailureLogAutoUploadEnabled() {
 
 void SendFailureLogUpload(const FailureLogUploadRequest& request, SessionReportLogger logLine,
                           FailureLogUploadCompleteCallback onComplete) {
-    LogTelemetry(logLine, L"Failure log upload queued (background upload)");
     std::thread worker(
         [](FailureLogUploadRequest uploadRequest, SessionReportLogger uploadLogLine,
            FailureLogUploadCompleteCallback completeCallback) {

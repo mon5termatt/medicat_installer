@@ -96,6 +96,16 @@ bool ReadContentRangeHeader(HINTERNET request, uint64_t& start, uint64_t& end, u
     return ParseContentRange(rangeText, start, end, total);
 }
 
+void AppendFailedUrl(std::wstring& error, const std::wstring& url) {
+    if (url.empty() || error.empty()) {
+        return;
+    }
+    if (error.find(url) != std::wstring::npos) {
+        return;
+    }
+    error += L" — " + url;
+}
+
 bool OpenHttpGetRequest(const std::wstring& url, HINTERNET& outRequest, HINTERNET& outConnect,
                         HINTERNET& outSession, uint64_t& contentLength, std::wstring& error) {
     contentLength = 0;
@@ -105,6 +115,7 @@ bool OpenHttpGetRequest(const std::wstring& url, HINTERNET& outRequest, HINTERNE
 
     UrlParts parts;
     if (!ParseUrl(url, parts, error)) {
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -112,6 +123,7 @@ bool OpenHttpGetRequest(const std::wstring& url, HINTERNET& outRequest, HINTERNE
                              WINHTTP_NO_PROXY_BYPASS, 0);
     if (!outSession) {
         error = L"WinHttpOpen failed";
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -120,6 +132,7 @@ bool OpenHttpGetRequest(const std::wstring& url, HINTERNET& outRequest, HINTERNE
     outConnect = WinHttpConnect(outSession, parts.host.c_str(), parts.port, 0);
     if (!outConnect) {
         error = L"WinHttpConnect failed";
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -128,6 +141,7 @@ bool OpenHttpGetRequest(const std::wstring& url, HINTERNET& outRequest, HINTERNE
                                     WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
     if (!outRequest) {
         error = L"WinHttpOpenRequest failed";
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -138,6 +152,7 @@ bool OpenHttpGetRequest(const std::wstring& url, HINTERNET& outRequest, HINTERNE
     if (!WinHttpSendRequest(outRequest, headers, static_cast<DWORD>(-1), WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
         !WinHttpReceiveResponse(outRequest, nullptr)) {
         error = L"HTTP request failed";
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -147,6 +162,7 @@ bool OpenHttpGetRequest(const std::wstring& url, HINTERNET& outRequest, HINTERNE
                              WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX) ||
         statusCode < 200 || statusCode >= 300) {
         error = L"HTTP request returned status " + std::to_wstring(statusCode);
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -166,6 +182,7 @@ bool OpenHttpDownloadRequest(const std::wstring& url, const uint64_t resumeFrom,
 
     UrlParts parts;
     if (!ParseUrl(url, parts, error)) {
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -173,6 +190,7 @@ bool OpenHttpDownloadRequest(const std::wstring& url, const uint64_t resumeFrom,
                              WINHTTP_NO_PROXY_BYPASS, 0);
     if (!outSession) {
         error = L"WinHttpOpen failed";
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -181,6 +199,7 @@ bool OpenHttpDownloadRequest(const std::wstring& url, const uint64_t resumeFrom,
     outConnect = WinHttpConnect(outSession, parts.host.c_str(), parts.port, 0);
     if (!outConnect) {
         error = L"WinHttpConnect failed";
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -189,6 +208,7 @@ bool OpenHttpDownloadRequest(const std::wstring& url, const uint64_t resumeFrom,
                                     WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
     if (!outRequest) {
         error = L"WinHttpOpenRequest failed";
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -203,6 +223,7 @@ bool OpenHttpDownloadRequest(const std::wstring& url, const uint64_t resumeFrom,
     if (!WinHttpSendRequest(outRequest, headers.c_str(), static_cast<DWORD>(-1), WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
         !WinHttpReceiveResponse(outRequest, nullptr)) {
         error = L"HTTP request failed";
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -210,6 +231,7 @@ bool OpenHttpDownloadRequest(const std::wstring& url, const uint64_t resumeFrom,
     if (!WinHttpQueryHeaders(outRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
                              WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX)) {
         error = L"HTTP request failed";
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -226,6 +248,7 @@ bool OpenHttpDownloadRequest(const std::wstring& url, const uint64_t resumeFrom,
         }
 
         error = L"Partial response missing size headers";
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -237,6 +260,7 @@ bool OpenHttpDownloadRequest(const std::wstring& url, const uint64_t resumeFrom,
 
     if (statusCode < 200 || statusCode >= 300) {
         error = L"HTTP request returned status " + std::to_wstring(statusCode);
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -295,6 +319,9 @@ bool HttpRequest(const std::wstring& url, std::vector<BYTE>& body, std::wstring&
 
     const bool ok = ReadResponse(request, body, error);
     CloseHttpHandles(request, connect, session);
+    if (!ok) {
+        AppendFailedUrl(error, url);
+    }
     return ok;
 }
 
@@ -318,6 +345,7 @@ int HttpPostJsonInternal(const std::wstring& url, const std::string& jsonBody, c
     error.clear();
     UrlParts parts;
     if (!ParseUrl(url, parts, error)) {
+        AppendFailedUrl(error, url);
         return 0;
     }
 
@@ -325,6 +353,7 @@ int HttpPostJsonInternal(const std::wstring& url, const std::string& jsonBody, c
                                     WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!session) {
         error = L"WinHttpOpen failed";
+        AppendFailedUrl(error, url);
         return 0;
     }
     WinHttpSetTimeouts(session, 5000, 5000, 5000, 5000);
@@ -332,6 +361,7 @@ int HttpPostJsonInternal(const std::wstring& url, const std::string& jsonBody, c
     HINTERNET connect = WinHttpConnect(session, parts.host.c_str(), parts.port, 0);
     if (!connect) {
         error = L"WinHttpConnect failed";
+        AppendFailedUrl(error, url);
         WinHttpCloseHandle(session);
         return 0;
     }
@@ -342,6 +372,7 @@ int HttpPostJsonInternal(const std::wstring& url, const std::string& jsonBody, c
                            WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
     if (!request) {
         error = L"WinHttpOpenRequest failed";
+        AppendFailedUrl(error, url);
         CloseHttpHandles(nullptr, connect, session);
         return 0;
     }
@@ -357,6 +388,7 @@ int HttpPostJsonInternal(const std::wstring& url, const std::string& jsonBody, c
         static_cast<DWORD>(jsonBody.size()), static_cast<DWORD>(jsonBody.size()), 0);
     if (!sent || !WinHttpReceiveResponse(request, nullptr)) {
         error = L"HTTP POST failed";
+        AppendFailedUrl(error, url);
         CloseHttpHandles(request, connect, session);
         return 0;
     }
@@ -369,6 +401,9 @@ int HttpPostJsonInternal(const std::wstring& url, const std::string& jsonBody, c
     std::vector<BYTE> ignored;
     ReadResponse(request, ignored, error);
     CloseHttpHandles(request, connect, session);
+    if (!error.empty()) {
+        AppendFailedUrl(error, url);
+    }
     return static_cast<int>(statusCode);
 }
 
@@ -446,6 +481,7 @@ HttpMultipartResult HttpPostMultipartUpload(const std::wstring& url, const std::
 
     UrlParts parts;
     if (!ParseUrl(url, parts, result.error)) {
+        AppendFailedUrl(result.error, url);
         return result;
     }
 
@@ -453,6 +489,7 @@ HttpMultipartResult HttpPostMultipartUpload(const std::wstring& url, const std::
                                     WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!session) {
         result.error = L"WinHttpOpen failed";
+        AppendFailedUrl(result.error, url);
         return result;
     }
     WinHttpSetTimeouts(session, 30000, 30000, 120000, 120000);
@@ -460,6 +497,7 @@ HttpMultipartResult HttpPostMultipartUpload(const std::wstring& url, const std::
     HINTERNET connect = WinHttpConnect(session, parts.host.c_str(), parts.port, 0);
     if (!connect) {
         result.error = L"WinHttpConnect failed";
+        AppendFailedUrl(result.error, url);
         WinHttpCloseHandle(session);
         return result;
     }
@@ -470,6 +508,7 @@ HttpMultipartResult HttpPostMultipartUpload(const std::wstring& url, const std::
                            WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
     if (!request) {
         result.error = L"WinHttpOpenRequest failed";
+        AppendFailedUrl(result.error, url);
         CloseHttpHandles(nullptr, connect, session);
         return result;
     }
@@ -484,6 +523,7 @@ HttpMultipartResult HttpPostMultipartUpload(const std::wstring& url, const std::
                                          static_cast<DWORD>(payload.size()), 0);
     if (!sent || !WinHttpReceiveResponse(request, nullptr)) {
         result.error = L"HTTP multipart upload failed";
+        AppendFailedUrl(result.error, url);
         CloseHttpHandles(request, connect, session);
         return result;
     }
@@ -518,6 +558,10 @@ HttpMultipartResult HttpPostMultipartUpload(const std::wstring& url, const std::
         result.error = readError;
     } else if (result.statusCode == 0) {
         result.error = L"HTTP upload failed";
+    }
+
+    if (!result.error.empty()) {
+        AppendFailedUrl(result.error, url);
     }
 
     return result;
@@ -562,12 +606,14 @@ bool HttpDownloadFileWithProgress(const std::wstring& url, const std::wstring& o
             return true;
         }
         error = L"Server rejected resume request";
+        AppendFailedUrl(error, url);
         return false;
     }
 
     if (statusCode != 200 && statusCode != 206) {
         CloseHttpHandles(request, connect, session);
         error = L"HTTP request returned status " + std::to_wstring(statusCode);
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -585,6 +631,7 @@ bool HttpDownloadFileWithProgress(const std::wstring& url, const std::wstring& o
     if (!out) {
         CloseHttpHandles(request, connect, session);
         error = L"Could not open output file";
+        AppendFailedUrl(error, url);
         return false;
     }
 
@@ -600,6 +647,7 @@ bool HttpDownloadFileWithProgress(const std::wstring& url, const std::wstring& o
             out.close();
             CloseHttpHandles(request, connect, session);
             error = L"WinHttpQueryDataAvailable failed";
+            AppendFailedUrl(error, url);
             return false;
         }
         if (avail == 0) {
@@ -612,6 +660,7 @@ bool HttpDownloadFileWithProgress(const std::wstring& url, const std::wstring& o
             out.close();
             CloseHttpHandles(request, connect, session);
             error = L"WinHttpReadData failed";
+            AppendFailedUrl(error, url);
             return false;
         }
 
@@ -620,6 +669,7 @@ bool HttpDownloadFileWithProgress(const std::wstring& url, const std::wstring& o
             out.close();
             CloseHttpHandles(request, connect, session);
             error = L"Failed to write output file";
+            AppendFailedUrl(error, url);
             return false;
         }
 
@@ -635,10 +685,12 @@ bool HttpDownloadFileWithProgress(const std::wstring& url, const std::wstring& o
     const uint64_t finalSize = GetFileSizeBytes(outputPath);
     if (finalSize == 0) {
         error = L"Download was empty";
+        AppendFailedUrl(error, url);
         return false;
     }
     if (totalFileSize > 0 && finalSize < totalFileSize) {
         error = L"Download incomplete";
+        AppendFailedUrl(error, url);
         return false;
     }
 

@@ -61,6 +61,20 @@ std::wstring BuildWipeDetails(const bool format, const bool runVentoy) {
     return details;
 }
 
+SessionReportLogger TelemetryFileLogger(Logger* log) {
+    return [log](const std::wstring& line, const bool isError) {
+        if (!log) {
+            return;
+        }
+        const std::wstring prefixed = L"[Telemetry] " + line;
+        if (isError) {
+            log->Error(prefixed);
+        } else {
+            log->Info(prefixed);
+        }
+    };
+}
+
 }  // namespace
 
 struct MedicatTempDirGuard {
@@ -510,6 +524,9 @@ void App::PostOpenFileLog() {
 }
 
 void App::PostFailureDiagCode(const bool uploadSucceeded, const std::wstring& keyword) {
+    if (uploadSucceeded && !keyword.empty()) {
+        log_->Info(L"[Telemetry] Support diag code: " + keyword);
+    }
     if (headless_) {
         if (uploadSucceeded && !keyword.empty()) {
             std::wcerr << L"Diag code: " << keyword << L"\n";
@@ -548,14 +565,7 @@ void App::SubmitLaunchSessionReport() {
     request.headless = headless_;
     request.diagnostic = BuildDiagnosticContext();
 
-    SendSessionReport(request, false, [this](const std::wstring& line, const bool isError) {
-        const std::wstring prefixed = L"[Telemetry] " + line;
-        if (isError) {
-            log_->Error(prefixed);
-        } else {
-            log_->Info(prefixed);
-        }
-    });
+    SendSessionReport(request, false, TelemetryFileLogger(log_.get()));
 }
 
 void App::SubmitSessionReport(const bool success, const std::wstring& message, const std::wstring& title,
@@ -590,26 +600,14 @@ void App::SubmitSessionReport(const bool success, const std::wstring& message, c
         request.errorDetail = SanitizeTelemetryTextEnglish(message, 900);
     }
 
-    SendSessionReport(request, headless_, [this](const std::wstring& line, const bool isError) {
-        const std::wstring prefixed = L"[Telemetry] " + line;
-        if (isError) {
-            log_->Error(prefixed);
-        } else {
-            log_->Info(prefixed);
-        }
-    });
+    SendSessionReport(request, headless_, TelemetryFileLogger(log_.get()));
     sessionId_.clear();
     sessionStart_ = {};
 }
 
 void App::QueueFailureLogUpload(const std::string& sessionId, const std::wstring& message,
                                 const std::wstring& title) {
-    if (sessionId.empty()) {
-        log_->Debug(L"[Telemetry] Failure log upload skipped — no session id");
-        return;
-    }
-    if (sevenZa_.empty()) {
-        log_->Debug(L"[Telemetry] Failure log upload skipped — 7za not available");
+    if (sessionId.empty() || sevenZa_.empty()) {
         return;
     }
 
@@ -630,15 +628,7 @@ void App::QueueFailureLogUpload(const std::string& sessionId, const std::wstring
     }
 
     SendFailureLogUpload(
-        request,
-        [this](const std::wstring& line, const bool isError) {
-            const std::wstring prefixed = L"[Telemetry] " + line;
-            if (isError) {
-                log_->Error(prefixed);
-            } else {
-                log_->Info(prefixed);
-            }
-        },
+        request, TelemetryFileLogger(log_.get()),
         [this](const bool success, const std::wstring& keyword) { PostFailureDiagCode(success, keyword); });
 }
 
