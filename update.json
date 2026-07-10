@@ -1,8 +1,8 @@
 {
   "channel": "prerelease",
   "release_tag": "3521-BETA",
-  "version": "1.0.39",
-  "build": 39,
+  "version": "1.0.38",
+  "build": 38,
   "release_notes_url": "https://github.com/mon5termatt/medicat_installer/releases/tag/3521-BETA",
   "assets": {
     "x64": {
