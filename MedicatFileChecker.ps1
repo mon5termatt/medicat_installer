@@ -1,6 +1,10 @@
 # MediCat File Checker - Standalone File Verification Tool
 # PowerShell-based file checker with MD5 verification and re-extraction support
 
+# Some systems don't negotiate TLS 1.2 by default, which raw.githubusercontent.com requires,
+# causing WebClient downloads (the MD5 manifest) to fail with a generic WebException.
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 # Ensure we're in the correct directory (script directory)
 $scriptPath = $MyInvocation.MyCommand.Path
 if (-not $scriptPath) {
