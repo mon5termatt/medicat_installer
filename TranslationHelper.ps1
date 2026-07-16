@@ -12,12 +12,12 @@ function Load-Translations {
     )
 
     $translationsPath = Join-Path $PSScriptRoot "translations.json"
-    if (-not (Test-Path $translationsPath)) {
+    if (-not (Test-Path -LiteralPath $translationsPath)) {
         Write-Warning "translations.json not found at $translationsPath. Falling back to raw keys."
         return $false
     }
 
-    $allTranslations = Get-Content $translationsPath -Raw | ConvertFrom-Json
+    $allTranslations = Get-Content -LiteralPath $translationsPath -Raw | ConvertFrom-Json
     $script:TranslationLanguage = if ($allTranslations.$Language) { $Language } else { "en" }
     $script:TranslationRoot = $allTranslations.$($script:TranslationLanguage)
     return $true

@@ -22,7 +22,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Load translation helper
 $translationHelperPath = Join-Path $PSScriptRoot "TranslationHelper.ps1"
-if (Test-Path $translationHelperPath) {
+if (Test-Path -LiteralPath $translationHelperPath) {
     . $translationHelperPath
     # Detect system language and load translations
     $culture = [System.Globalization.CultureInfo]::CurrentCulture
@@ -399,8 +399,8 @@ function Invoke-Download {
         $webClient = New-Object System.Net.WebClient
         $webClient.DownloadFile($Url, $OutputPath)
         
-        if (Test-Path $OutputPath) {
-            $actualSize = (Get-Item $OutputPath).Length
+        if (Test-Path -LiteralPath $OutputPath) {
+            $actualSize = (Get-Item -LiteralPath $OutputPath).Length
             Write-Log "Downloaded: $OutputPath ($actualSize bytes)"
             
             if ($ExpectedSize -and $actualSize -ne $ExpectedSize) {
@@ -490,10 +490,10 @@ function Start-FileCheck {
                     }
                     
                     # Check if file exists
-                    if (Test-Path $filePath) {
+                    if (Test-Path -LiteralPath $filePath) {
                         # Calculate MD5 hash using PowerShell
                         try {
-                            $actualHash = (Get-FileHash -Path $filePath -Algorithm MD5).Hash.ToLower()
+                            $actualHash = (Get-FileHash -LiteralPath $filePath -Algorithm MD5).Hash.ToLower()
                             
                             if ($actualHash -eq $expectedHash) {
                                 $verifiedFiles++
@@ -556,8 +556,8 @@ function Start-FileCheck {
             }
             
             # Clean up MD5 file
-            if (Test-Path $md5File) {
-                Remove-Item $md5File -Force
+            if (Test-Path -LiteralPath $md5File) {
+                Remove-Item -LiteralPath $md5File -Force
                 Write-Log "Cleaned up temporary MD5 file"
             }
         } else {
@@ -602,14 +602,14 @@ function Start-ReExtractFiles {
         # If not in PATH, check bin folder
         if (-not $sevenZipPath) {
             $binPath = ".\bin\7z.exe"
-            if (Test-Path $binPath) {
+            if (Test-Path -LiteralPath $binPath) {
                 $sevenZipPath = (Resolve-Path $binPath).Path
                 Write-Log "Found 7z.exe in bin folder: $sevenZipPath"
             }
         }
         
         # If still not found, error out
-        if (-not $sevenZipPath -or -not (Test-Path $sevenZipPath)) {
+        if (-not $sevenZipPath -or -not (Test-Path -LiteralPath $sevenZipPath)) {
             Write-Log "ERROR: 7z.exe not found in PATH or bin folder"
             Show-MessageBox -Message (Get-MessageTranslation -Key "7zip_not_found") -Title (Get-TitleTranslation -Key "7zip_not_found") -Icon "Error"
             return $false
@@ -619,7 +619,7 @@ function Start-ReExtractFiles {
         $archiveFile = Join-Path $PWD "MediCat.USB.v$script:MediCatVersion.7z"
         
         # If not found in current directory, prompt user to select the file
-        if (-not (Test-Path $archiveFile)) {
+        if (-not (Test-Path -LiteralPath $archiveFile)) {
             Write-Log "Archive not found in current directory, prompting user to select file..."
             Update-Status (Get-StatusTranslation -Key "select_archive")
             
@@ -639,7 +639,7 @@ function Start-ReExtractFiles {
             }
         }
         
-        if (-not (Test-Path $archiveFile)) {
+        if (-not (Test-Path -LiteralPath $archiveFile)) {
             Write-Log "ERROR: Source archive not found: $archiveFile"
             Show-MessageBox -Message (Get-MessageTranslation -Key "archive_not_found" -FormatArgs $archiveFile) -Title (Get-TitleTranslation -Key "archive_not_found") -Icon "Error"
             return $false
@@ -709,7 +709,7 @@ function Start-ReExtractFiles {
                 $failedExtract = @()
                 foreach ($file in $normalizedFiles) {
                     $fullPath = Join-Path $outputDir $file
-                    if (Test-Path $fullPath) {
+                    if (Test-Path -LiteralPath $fullPath) {
                         $extractedCount++
                     } else {
                         $failedExtract += $file
@@ -732,8 +732,8 @@ function Start-ReExtractFiles {
             $extractedCount = 0
         } finally {
             # Clean up file list if it still exists
-            if (Test-Path $fileListPath) {
-                Remove-Item $fileListPath -ErrorAction SilentlyContinue
+            if (Test-Path -LiteralPath $fileListPath) {
+                Remove-Item -LiteralPath $fileListPath -ErrorAction SilentlyContinue
             }
         }
         
