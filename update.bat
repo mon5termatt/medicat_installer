@@ -9,13 +9,6 @@ echo  Updating MediCat Installer to the C++ release...
 echo  (replacing the legacy batch installer)
 echo.
 
-REM --- Backup legacy names (historical spellings) ---
-if exist "Medicat Installer.exe" copy /Y "Medicat Installer.exe" "Medicat Installer.exe.bak" >nul
-if exist "MediCat_Installer.exe" copy /Y "MediCat_Installer.exe" "MediCat_Installer.exe.bak" >nul
-if exist "Medicat Installer.bat" copy /Y "Medicat Installer.bat" "Medicat Installer.bat.bak" >nul
-if exist "Medicat_Installer.bat" copy /Y "Medicat_Installer.bat" "Medicat_Installer.bat.bak" >nul
-if exist "MediCat_Installer.bat" copy /Y "MediCat_Installer.bat" "MediCat_Installer.bat.bak" >nul
-
 REM --- Architecture ---
 set "ARCH=x86"
 if /I "%PROCESSOR_ARCHITECTURE%"=="AMD64" set "ARCH=x64"
@@ -100,26 +93,76 @@ if errorlevel 1 (
 
 echo.
 echo  Download complete: %OUT%
-echo  Starting the new installer...
+echo  Cleaning up legacy batch files...
 echo.
 
-REM Launch C++ GUI; quote path for spaces under G:\ etc.
+REM Immediate cleanup of non-self files (safe while update.bat still running).
+call :cleanup_legacy_now
+
+echo  Starting the new installer...
+echo.
 start "" "%~dp0%OUT%"
 
 echo.
 echo  Update complete. This window will close shortly.
 timeout /t 3 /nobreak >nul
 
-REM Deleting this bat while it is still running causes "The batch file cannot be found."
-REM Schedule delete after we exit.
-start "" /min cmd /c "timeout /t 2 /nobreak >nul & del /f /q \"%~f0\" >nul 2>&1"
+REM Schedule delayed removal of anything still locked + this script itself.
+REM Deleting update.bat while running causes "The batch file cannot be found."
+set "CLEAN=%TEMP%\medicat_legacy_cleanup.cmd"
+(
+    echo @echo off
+    echo timeout /t 2 /nobreak ^>nul
+    echo cd /d "%~dp0"
+    echo if exist "bin" rmdir /s /q "bin" 2^>nul
+    echo if exist "Medicat_Installer.bat" del /f /q "Medicat_Installer.bat" 2^>nul
+    echo if exist "Medicat_Installer.bat.bak" del /f /q "Medicat_Installer.bat.bak" 2^>nul
+    echo if exist "MediCat_Installer.bat" del /f /q "MediCat_Installer.bat" 2^>nul
+    echo if exist "MediCat_Installer.bat.bak" del /f /q "MediCat_Installer.bat.bak" 2^>nul
+    echo if exist "Medicat Installer.bat" del /f /q "Medicat Installer.bat" 2^>nul
+    echo if exist "Medicat Installer.bat.bak" del /f /q "Medicat Installer.bat.bak" 2^>nul
+    echo if exist "update.bat" del /f /q "update.bat" 2^>nul
+    echo if exist "update_url.ini" del /f /q "update_url.ini" 2^>nul
+    echo if exist "curver.ini" del /f /q "curver.ini" 2^>nul
+    echo if exist "ventoyversion.txt" del /f /q "ventoyversion.txt" 2^>nul
+    echo if exist "tor.bat" del /f /q "tor.bat" 2^>nul
+    echo if exist "cdn.bat" del /f /q "cdn.bat" 2^>nul
+    echo if exist "drive.bat" del /f /q "drive.bat" 2^>nul
+    echo if exist "ipfs.bat" del /f /q "ipfs.bat" 2^>nul
+    echo if exist "drivefiles.md5" del /f /q "drivefiles.md5" 2^>nul
+    echo del /f /q "%%~f0" 2^>nul
+) > "%CLEAN%"
+start "" /min cmd /c "%CLEAN%"
 
 endlocal
 exit 0
 
+:cleanup_legacy_now
+if exist "bin" (
+    rmdir /s /q "bin" 2>nul
+    if exist "bin" echo   note: bin\ still locked; delayed cleanup will retry
+)
+for %%F in (
+    "Medicat_Installer.bat"
+    "Medicat_Installer.bat.bak"
+    "MediCat_Installer.bat"
+    "MediCat_Installer.bat.bak"
+    "Medicat Installer.bat"
+    "Medicat Installer.bat.bak"
+    "update_url.ini"
+    "curver.ini"
+    "ventoyversion.txt"
+    "tor.bat"
+    "cdn.bat"
+    "drive.bat"
+    "ipfs.bat"
+    "drivefiles.md5"
+) do if exist %%F del /f /q %%F 2>nul
+exit /b 0
+
 :fail
 echo.
-echo  Update failed. Your previous Medicat_Installer.bat backup ^(if any^) was left as *.bak
+echo  Update failed. Legacy files were left in place.
 echo  You can also download the C++ installer manually from:
 echo  https://github.com/mon5termatt/medicat_installer/releases
 echo.
