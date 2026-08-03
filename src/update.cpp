@@ -18,7 +18,7 @@ namespace medicat {
 namespace {
 
 constexpr wchar_t kUpdateManifestUrl[] =
-    L"https://raw.githubusercontent.com/mon5termatt/medicat_installer/cpp/update.json";
+    L"https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.json";
 constexpr wchar_t kGitHubReleasesApiUrl[] =
     L"https://api.github.com/repos/mon5termatt/medicat_installer/releases?per_page=10";
 

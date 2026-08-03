@@ -96,7 +96,7 @@ set "MEDICAT_PIN_BUILD="
 exit /b 0
 
 :push_manifest
-echo Pushing update manifest to origin/cpp...
+echo Pushing update manifest to origin/main...
 call "tools\push_update_manifest.bat"
 if errorlevel 1 (
     echo Warning: update manifest push failed.

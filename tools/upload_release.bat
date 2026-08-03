@@ -78,5 +78,5 @@ echo   %X64_EXE%
 echo   %X86_EXE%
 echo   update.json
 echo Release: https://github.com/mon5termatt/medicat_installer/releases/tag/%TAG%
-echo rebuild.bat will push update.json to origin/cpp next.
+echo rebuild.bat will push update.json to origin/main next.
 exit /b 0

@@ -34,16 +34,16 @@ if errorlevel 1 (
 )
 
 for /f "usebackq delims=" %%B in (`git rev-parse --abbrev-ref HEAD`) do set "BRANCH=%%B"
-if /i not "%BRANCH%"=="cpp" (
-    echo Pushing update.json to origin/cpp ^(current branch: %BRANCH%^)...
-    git push origin HEAD:cpp
+if /i not "%BRANCH%"=="main" (
+    echo Pushing update.json to origin/main ^(current branch: %BRANCH%^)...
+    git push origin HEAD:main
 ) else (
-    git push origin cpp
+    git push origin main
 )
 if errorlevel 1 (
     echo Manifest push failed.
     exit /b 1
 )
 
-echo Pushed %MANIFEST% to origin/cpp
+echo Pushed %MANIFEST% to origin/main
 exit /b 0
