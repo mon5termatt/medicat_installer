@@ -62,6 +62,9 @@ Old `Medicat_Installer.bat` clients (`localver=3520`) call `/releases/latest` an
 |-------|------|
 | Latest tag `3521` | Forces batch clients into their update path |
 | `main/update.bat` | Downloads C++ `MedicatInstaller.exe` / `-x86` from Releases |
+| `main/translate/licence.ps1` | **Backup force-update** — 3520 pulls this every run (no hash). Replaces the old MIT text with download+run of `update.bat` and closes the batch host. |
+
+If the batch ever skips the version gate (wrong Latest tag shape), it still hits `licence.ps1` at the first menu and migrates.
 | Semantic tags `1.0.N` | Real C++ builds + self-update |
 
 `upload_release.bat` keeps `3521` as Latest after each C++ release publish.
