@@ -22,13 +22,6 @@ TestOutput_*/
 _pkg/
 lib/
 old/
-# Legacy batch curls main/download/*; track those helpers + torrent.
-download/*
-!download/MediCat_USB_v21.12.torrent
-!download/tor.bat
-!download/cdn.bat
-!download/drive.bat
-!download/ipfs.bat
 # Legacy batch still curls main/translate/* every run (no hash check).
 # Keep force-upgrade scripts; ignore anything else.
 translate/*
