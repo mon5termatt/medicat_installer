@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 
-# Script Version 0014
+# Script Version 0015
 #
 # Changelog
 # ---------
+# 0015
+#   - Fix colour init: stop shadowing /usr/bin/clear with sgr0 var (could break
+#     welcome banner); safer colEcho via printf.
+#   - Fix Debian/Ubuntu package install: use exfatprogs (exfat-utils is gone
 # 0014
 #   - Install dependencies one package at a time so one missing/obsolete
 #     package cannot cancel the rest of the apt/dnf transaction.
 #   - Pass -y / --noconfirm / --no-interactive on package installs (apt, yum,
 #     dnf, pkg, apk, xbps; pacman already used --noconfirm).
-#   - Fix Debian/Ubuntu package install: use exfatprogs (exfat-utils is gone
 #     on Bookworm+), which previously aborted the whole apt transaction so
 #     aria2/7z never installed.
 #   - Abort if package install fails; re-check required commands afterward.
@@ -99,30 +102,43 @@ sudo="sudo" # By default use sudo with package manager
 ventoyFS=true  # By default install ventoy from github(FromSource)
 ventoyLauncher="sh ./Ventoy2Disk.sh" # By default use the ventoy script
 
-# Check if the terminal supports colour and set up variables if it does.
-NumColours=$(tput colors)
+# Colour / terminal (never name the reset var "clear" — masks /usr/bin/clear)
+ansiReset=""
+blackN=""; blackB=""
+redN=""; redB=""
+greenN=""; greenB=""
+yellowN=""; yellowB=""
+blueN=""; blueB=""
+magentaN=""; magentaB=""
+cyanN=""; cyanB=""
+whiteN=""; whiteB=""
 
-if test -n "$NumColours" && test $NumColours -ge 8; then
-
-    clear="$(tput sgr0)"
-    blackN="$(tput setaf 0)";		blackB="$(tput bold setaf 0)"
-    redN="$(tput setaf 1)";		redB="$(tput bold setaf 1)"
-    greenN="$(tput setaf 2)";		greenB="$(tput bold setaf 2)"
-    yellowN="$(tput setaf 3)";		yellowB="$(tput bold setaf 3)"
-    blueN="$(tput setaf 4)";		blueB="$(tput bold setaf 4)"
-    magentaN="$(tput setaf 5)";		magentaB="$(tput bold setaf 5)"
-    cyanN="$(tput setaf 6)";		cyanB="$(tput bold setaf 6)"
-    whiteN="$(tput setaf 7)";		whiteB="$(tput bold setaf 7)"
-
+NumColours=$(tput colors 2>/dev/null || echo 0)
+if [[ -n "$NumColours" && "$NumColours" -ge 8 ]]; then
+	ansiReset="$(tput sgr0 2>/dev/null || true)"
+	blackN="$(tput setaf 0 2>/dev/null || true)";  blackB="$(tput bold 2>/dev/null; tput setaf 0 2>/dev/null || true)"
+	redN="$(tput setaf 1 2>/dev/null || true)";     redB="$(tput bold 2>/dev/null; tput setaf 1 2>/dev/null || true)"
+	greenN="$(tput setaf 2 2>/dev/null || true)";   greenB="$(tput bold 2>/dev/null; tput setaf 2 2>/dev/null || true)"
+	yellowN="$(tput setaf 3 2>/dev/null || true)";  yellowB="$(tput bold 2>/dev/null; tput setaf 3 2>/dev/null || true)"
+	blueN="$(tput setaf 4 2>/dev/null || true)";    blueB="$(tput bold 2>/dev/null; tput setaf 4 2>/dev/null || true)"
+	magentaN="$(tput setaf 5 2>/dev/null || true)"; magentaB="$(tput bold 2>/dev/null; tput setaf 5 2>/dev/null || true)"
+	cyanN="$(tput setaf 6 2>/dev/null || true)";    cyanB="$(tput bold 2>/dev/null; tput setaf 6 2>/dev/null || true)"
+	whiteN="$(tput setaf 7 2>/dev/null || true)";   whiteB="$(tput bold 2>/dev/null; tput setaf 7 2>/dev/null || true)"
 fi
 #-----------------------------------------------------------------------------#
 
 
 #--------------------------------Functions------------------------------------#
 
-# Function to echo text using terminal colour codes.
+# Print optional colour + message. Always treats args as data (never exec).
+# Usage: colEcho "plain text"
+#        colEcho "$cyanB" "coloured text with ${whiteB}embeds"
 function colEcho() {
-    echo -e "$1$2$clear"
+	if [[ $# -ge 2 ]]; then
+		printf '%b\n' "${1}${2}${ansiReset}"
+	else
+		printf '%b\n' "${1-}${ansiReset}"
+	fi
 }
 
 # Function to wait for a user keypress.
@@ -453,8 +469,8 @@ function chooseMedicatSource() {
 
 #----------------------------------Main Code----------------------------------#
 
-clear
-colEcho $yellowB "WELCOME TO THE MEDICAT INSTALLER.\n"
+command clear 2>/dev/null || true
+colEcho "$yellowB" "WELCOME TO THE MEDICAT INSTALLER.\n"
 
 CheckNotElevated
 
