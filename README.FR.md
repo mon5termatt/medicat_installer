@@ -42,7 +42,7 @@ Fichier principal pour l’installation via la ligne de commande Linux
 ou
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/heads/main/Medicat_Installer.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/linux/Medicat_Installer.sh | bash
 ```
 
 # Programmes inclus / téléchargés pendant l’installation

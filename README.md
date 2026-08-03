@@ -1,4 +1,15 @@
-### Work on this script is currently on pause. Im working full time being a IT tech and Trainer, along with going back to college, Sorry.
+# MediCat USB — Linux installer branch
+
+This branch is the home of **Medicat_Installer.sh** (Linux). Windows development lives on other branches.
+
+| Branch | Platform |
+|--------|----------|
+| **linux** (this branch) | Linux bash installer |
+| [cpp](https://github.com/mon5termatt/medicat_installer/tree/cpp) | Windows C++ GUI/CLI (active) |
+| [main](https://github.com/mon5termatt/medicat_installer/tree/main) | Legacy Windows batch installer |
+| [pwsh](https://github.com/mon5termatt/medicat_installer/tree/pwsh) | Legacy PowerShell installer |
+
+---
 
 # Medicat Installer
 ![Logo](icon.png)
@@ -13,7 +24,7 @@ If you want to help us improve Medicat installer, you can:
 
 OR:
 
-* Fork this project, and create a pull request with modified files.
+* Fork this project, and open a pull request against the **linux** branch for shell installer changes.
 
 # Compatibility
 * Windows 10/11 (Insider builds might break the installer)
@@ -41,7 +52,7 @@ Main file for installing via Linux command-line
 or
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/heads/main/Medicat_Installer.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/linux/Medicat_Installer.sh | bash
 ```
 
 # Programs Included / Downloaded during install

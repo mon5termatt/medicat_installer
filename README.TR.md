@@ -40,7 +40,7 @@ Linux komut satırı ile kurulum için ana dosya.
 Veya 
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/refs/heads/main/Medicat_Installer.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mon5termatt/medicat_installer/linux/Medicat_Installer.sh | bash
 ```
 
 # Kurulum İçinde Bulunan ve Kurulum sırasında İndirilen Programlar
