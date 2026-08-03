@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 
-# Script Version 0012
+# Script Version 0013
 #
 # Changelog
 # ---------
+# 0013
+#   - Allow running as root/sudo after an explicit warning confirmation
+#     (useful for root-only test VMs). Privileged commands use $sudo so
+#     they work when already root (empty sudo) or as a normal user.
 # 0012
 #   - Offer download method choice: direct HTTP (aria2c multi-connection),
 #     BitTorrent, or local path when the MediCat archive is missing.
@@ -152,11 +156,19 @@ function YesNo() {
 	done
 }
 
-# Function to check we are not running with the elevated privileges.
+# Warn if running as root/sudo; allow continue with confirmation.
+# As root, clear $sudo so package/privilege calls do not require the sudo binary.
 function CheckNotElevated {
     if (( "$EUID" == "0" )); then
-        colEcho $redB "ERROR: Running with elevated privileges - do not run using sudo\n"
-        exit 1
+        colEcho $redB "WARNING: Running as root (or via sudo)."
+        colEcho $yellowB "This script is meant to run as a normal user and elevate only when needed."
+        colEcho $yellowB "Running fully as root can break package installs, file ownership, or Ventoy paths."
+        if ! YesNo "Continue anyway? Things may break. (Y/N) "; then
+            colEcho $cyanB "Exiting. Re-run without sudo/root if possible."
+            exit 1
+        fi
+        sudo=""
+        colEcho $yellowB "Continuing as root (elevation prefix disabled).\n"
     fi
 }
 
@@ -556,14 +568,14 @@ cd ventoy #Thanks camellia from Medicat Discord for helping work around Ventoy's
 
 if YesNo "Device partition layout defaults to MBR.  Would you like to use GPT instead? (Y/N) "; then
 	colEcho $yellowB "Using GPT"
-	sudo $ventoyLauncher -I -g $drive
+	$sudo $ventoyLauncher -I -g $drive
 	if [ "$?" != "0" ]; then
 		colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
 		exit 1
 	fi
 else
 	colEcho $yellowB "Using MBR"
-	sudo $ventoyLauncher -I $drive
+	$sudo $ventoyLauncher -I $drive
 	if [ "$?" != "0" ]; then
 		colEcho $redB "ERROR: Unable to install Ventoy. Exiting..."
 		exit 1
@@ -573,10 +585,10 @@ fi
 cd ..
 
 colEcho $cyanB "Unmounting drive$whiteB $drive"
-sudo umount $drive
+$sudo umount $drive
 
 colEcho $cyanB "Creating Medicat NTFS file system on drive$whiteB $drive2"
-sudo mkntfs --fast --label Medicat $drive2
+$sudo mkntfs --fast --label Medicat $drive2
 
 # Create a mountpoint folder for the Medicat NTFS volume
 if ! [[ -d MedicatUSB/ ]] ; then
@@ -585,7 +597,7 @@ if ! [[ -d MedicatUSB/ ]] ; then
 fi
 
 colEcho $cyanB "Mounting Medicat NTFS volume..."
-sudo mount $drive2 ./MedicatUSB -o user,auto,fmask=0111,dmask=0000
+$sudo mount $drive2 ./MedicatUSB -o user,auto,fmask=0111,dmask=0000
 
 colEcho $cyanB "Extracting Medicat to NTFS volume..."
 7z x -o./MedicatUSB "$location"
@@ -594,7 +606,7 @@ colEcho $cyanB "MedicatUSB has been created."
 
 if YesNo "Would you like to unmount ./MedicatUSB? (Y/N) "; then
 	colEcho $cyanB "Unmounting MedicatUSB..."
-	sudo umount ./MedicatUSB
+	$sudo umount ./MedicatUSB
 	colEcho $cyanB "Unmounted."
 else
 	colEcho $cyanB "MedicatUSB will not be unmounted."
