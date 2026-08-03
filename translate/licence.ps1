@@ -65,8 +65,8 @@ if (-not (Test-Path -LiteralPath $UpdateBat) -or (Get-Item -LiteralPath $UpdateB
 
 $parentId = Get-ParentCmdProcessId
 
-# Start updater in a new console (same as :updateprogram in Medicat_Installer.bat).
-Start-Process -FilePath 'cmd.exe' -ArgumentList '/k', "`"$UpdateBat`"" -WorkingDirectory $WorkDir
+# Start updater; /c closes the console when update.bat exits (not /k, which leaves a junk prompt).
+Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "`"$UpdateBat`"" -WorkingDirectory $WorkDir
 
 # Close the legacy batch host if we can (so it does not continue into the old menu).
 if ($parentId -gt 0 -and $parentId -ne $PID) {

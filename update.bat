@@ -103,11 +103,19 @@ echo  Download complete: %OUT%
 echo  Starting the new installer...
 echo.
 
-start "" "%CD%\%OUT%"
-timeout /t 2 /nobreak >nul
+REM Launch C++ GUI; quote path for spaces under G:\ etc.
+start "" "%~dp0%OUT%"
 
-del "%~f0" >nul 2>&1
-exit /b 0
+echo.
+echo  Update complete. This window will close shortly.
+timeout /t 3 /nobreak >nul
+
+REM Deleting this bat while it is still running causes "The batch file cannot be found."
+REM Schedule delete after we exit.
+start "" /min cmd /c "timeout /t 2 /nobreak >nul & del /f /q \"%~f0\" >nul 2>&1"
+
+endlocal
+exit 0
 
 :fail
 echo.
@@ -116,4 +124,5 @@ echo  You can also download the C++ installer manually from:
 echo  https://github.com/mon5termatt/medicat_installer/releases
 echo.
 pause
-exit /b 1
+endlocal
+exit 1
