@@ -125,8 +125,7 @@ Creates the `1.0.N` release if needed and uploads both exes as GitHub Latest. Re
 
 See [`FEATURES.md`](FEATURES.md) for the feature checklist and [`TODO.md`](TODO.md) for planned work.  
 Developer architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).  
-Updater: [`UPDATER.md`](UPDATER.md).  
-Website links (for maintainers/agents): [`docs/WEBSITE.md`](docs/WEBSITE.md).
+Updater: [`UPDATER.md`](UPDATER.md).
 
 ## Logs (beside the exe)
 
