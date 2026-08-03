@@ -4,8 +4,6 @@ Bash installer for MediCat USB on Linux: **`Medicat_Installer.sh`**.
 
 Website: [medicatusb.com](https://medicatusb.com/) · Discord: [url.medicatusb.com/discord](https://url.medicatusb.com/discord)
 
-> Read in: [![French](https://img.shields.io/badge/French-blue)](README.FR.md) [![Spanish](https://img.shields.io/badge/Spanish-blue)](README.ES.md) [![Turkish](https://img.shields.io/badge/Turkish-blue)](README.TR.md)
-
 ## Quick start
 
 ```bash
