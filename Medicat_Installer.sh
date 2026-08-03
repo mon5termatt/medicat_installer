@@ -1,7 +1,23 @@
 #!/usr/bin/env bash
 
-# Script Version 0010
+# Script Version 0012
+#
+# Changelog
+# ---------
+# 0012
+#   - Offer download method choice: direct HTTP (aria2c multi-connection),
+#     BitTorrent, or local path when the MediCat archive is missing.
+#   - Primary direct mirror: files.medicatusb.com (aria2c -x32 -s32 -k1M -c).
+#   - Fallback mirror: files.dog (known broken SSL; aria2c without cert check).
+# 0011
+#   - Fix YesNo infinite loop: empty/EOF input no longer spins forever on
+#     "Invalid input". read failures exit cleanly; non-TTY stdin falls back
+#     to /dev/tty (curl|bash, pipelines).
+#   - YesNo returns exit status (0=yes, 1=no) instead of echoing true/false;
+#     call sites no longer use command substitution $(YesNo ...).
+#   - Trim CR/whitespace; accept Y/Yes and N/No (case-insensitive prefix).
 
+#
 #--------------------------------Variables------------------------------------#
 
 # Key variables used throughout the script to make maintenance easier.
@@ -9,6 +25,13 @@ MedicatVersion="v21.12"
 Medicat256Hash='a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4'
 Medicat7zFile="MediCat.USB.$MedicatVersion.7z"
 Medicat7zFull=''MediCat\ USB\ $MedicatVersion/MediCat.USB.$MedicatVersion.7z''
+# Direct download mirrors (order = try order). files.dog needs insecure SSL.
+MedicatUrlMedicatusb="https://files.medicatusb.com/files/${MedicatVersion}/${Medicat7zFile}"
+MedicatUrlFilesDog="https://files.dog/OD%20Rips/MediCat/${MedicatVersion}/${Medicat7zFile}"
+MedicatTorrentUrl="https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_${MedicatVersion}.torrent"
+needMedicatDownload=false
+location=""
+DownloadMethod=""
 
 # Dependencies
 declare -A depCommands
@@ -86,18 +109,46 @@ function UserWait() {
     echo -e "\r                         \r"
 }
 
-# Function to ask a Yes/No question and return true or false.
+# Function to ask a Yes/No question.
+# Returns 0 for Yes, 1 for No. Exit 1 on unrecoverable input failure.
+# Prefer: if YesNo "prompt? (Y/N) "; then ...
+# Avoid: if $(YesNo ...); then  # subshell + captures stdout; can hide prompts/EOF loops
 function YesNo() {
 	local setCheck=""
-	while [[ "$setCheck" != [NnYy]* ]]; do
-		read -e -p "$1" setCheck
-		if [[ $setCheck == [Yy]* ]]; then
-			echo true
-		elif [[ $setCheck == [Nn]* ]]; then	
-			echo false
-		else
-			colEcho $redB "Invalid input. Please enter 'Y' or 'N'." > /dev/stderr
+	local inputFd=0
+
+	# Prompt on the real terminal when stdin is redirected (curl|bash, pipelines, etc.).
+	# Without this, `read` can hit EOF immediately and spin on "Invalid input" forever.
+	if [[ ! -t 0 ]] && [[ -r /dev/tty ]]; then
+		inputFd=3
+		exec 3</dev/tty
+	fi
+
+	while true; do
+		if ! read -r -p "$1" setCheck <&"$inputFd"; then
+			colEcho $redB "ERROR: Failed to read input (EOF). Exiting..." >&2
+			[[ "$inputFd" -ne 0 ]] && exec 3<&-
+			exit 1
 		fi
+
+		# Strip CR (Windows / paste) and surrounding whitespace.
+		setCheck="${setCheck//$'\r'/}"
+		setCheck="${setCheck#"${setCheck%%[![:space:]]*}"}"
+		setCheck="${setCheck%"${setCheck##*[![:space:]]}"}"
+
+		case "$setCheck" in
+			[Yy]|[Yy][Ee][Ss])
+				[[ "$inputFd" -ne 0 ]] && exec 3<&-
+				return 0
+				;;
+			[Nn]|[Nn][Oo])
+				[[ "$inputFd" -ne 0 ]] && exec 3<&-
+				return 1
+				;;
+			*)
+				colEcho $redB "Invalid input. Please enter 'Y' or 'N'." >&2
+				;;
+		esac
 	done
 }
 
@@ -161,6 +212,160 @@ function downloadVentoy() {
 
 	colEcho $cyanB "Renaming ventoy folder to remove the version number..."
 	mv ventoy-${venver: -6} ventoy
+}
+
+# Read a line from the terminal (uses /dev/tty when stdin is redirected).
+function ReadPrompt() {
+	local __prompt="$1"
+	local __resultVar="$2"
+	local __line=""
+	local inputFd=0
+
+	if [[ ! -t 0 ]] && [[ -r /dev/tty ]]; then
+		inputFd=3
+		exec 3</dev/tty
+	fi
+
+	if ! read -r -p "$__prompt" __line <&"$inputFd"; then
+		[[ "$inputFd" -ne 0 ]] && exec 3<&-
+		colEcho $redB "ERROR: Failed to read input (EOF). Exiting..." >&2
+		exit 1
+	fi
+	[[ "$inputFd" -ne 0 ]] && exec 3<&-
+
+	__line="${__line//$'\r'/}"
+	printf -v "$__resultVar" '%s' "$__line"
+}
+
+# Download the MediCat archive over HTTP with aria2c multi-connection.
+# $1=url  $2=mirror name  $3=insecure (true|false) — skip TLS verify when true
+function downloadMedicatHttp() {
+	local url="$1"
+	local mirrorName="$2"
+	local insecure="$3"
+	local ariaArgs=(-x32 -s32 -k1M -c --file-allocation=none --summary-interval=5 -o "$Medicat7zFile")
+
+	colEcho $cyanB "\nDirect download from$whiteB $mirrorName"
+	colEcho $cyanB "URL:$whiteB $url"
+
+	if [[ "$insecure" == "true" ]]; then
+		colEcho $yellowB "Note: this mirror has known TLS certificate issues; certificate checking is disabled for this download only."
+		ariaArgs+=(--check-certificate=false)
+	fi
+
+	if aria2c "${ariaArgs[@]}" -- "$url"; then
+		if [[ -f "$Medicat7zFile" ]]; then
+			location="$Medicat7zFile"
+			colEcho $greenB "Download finished:$whiteB $location"
+			return 0
+		fi
+		colEcho $redB "aria2c reported success but $Medicat7zFile was not found."
+	else
+		colEcho $redB "Download from $mirrorName failed."
+	fi
+	return 1
+}
+
+# Download MediCat via BitTorrent (aria2c).
+function downloadMedicatTorrent() {
+	colEcho $cyanB "\nStarting MediCat download via BitTorrent..."
+	if ! wget -q --show-progress "$MedicatTorrentUrl" -O medicat.torrent; then
+		colEcho $redB "ERROR: Failed to download torrent file from:$whiteB $MedicatTorrentUrl"
+		return 1
+	fi
+
+	if ! aria2c --file-allocation=none --seed-time=0 --summary-interval=15 medicat.torrent; then
+		colEcho $redB "ERROR: BitTorrent download failed."
+		rm -f medicat.torrent
+		return 1
+	fi
+	rm -f medicat.torrent
+
+	if [[ -f "$Medicat7zFull" ]]; then
+		location="$Medicat7zFull"
+	elif [[ -f "$Medicat7zFile" ]]; then
+		location="$Medicat7zFile"
+	else
+		colEcho $redB "ERROR: Torrent finished but $Medicat7zFile was not found."
+		return 1
+	fi
+
+	colEcho $greenB "Medicat successfully downloaded:$whiteB $location"
+	return 0
+}
+
+# Try direct mirrors in order, then offer torrent on total failure.
+function downloadMedicatDirect() {
+	# Primary official CDN — preferred.
+	if downloadMedicatHttp "$MedicatUrlMedicatusb" "files.medicatusb.com" "false"; then
+		return 0
+	fi
+
+	# files.dog often fails with wget TLS errors; aria2c + --check-certificate=false is the workaround.
+	colEcho $yellowB "\nPrimary mirror failed. Trying fallback (files.dog)..."
+	if downloadMedicatHttp "$MedicatUrlFilesDog" "files.dog" "true"; then
+		return 0
+	fi
+
+	colEcho $redB "\nAll direct download mirrors failed."
+	if YesNo "Try BitTorrent instead? (Y/N) "; then
+		downloadMedicatTorrent
+		return $?
+	fi
+	return 1
+}
+
+# Prompt how to obtain the archive when it is not already on disk.
+function chooseMedicatSource() {
+	local choice=""
+	local pathInput=""
+
+	while true; do
+		colEcho $cyanB "\nHow would you like to get$whiteB $Medicat7zFile$cyanB?"
+		colEcho $whiteB "  1)$cyanB Direct download (multi-connection HTTPS via aria2c) [recommended]"
+		colEcho $whiteB "  2)$cyanB BitTorrent"
+		colEcho $whiteB "  3)$cyanB Enter path to an existing file"
+		ReadPrompt "Choice [1/2/3]: " choice
+		choice="${choice#"${choice%%[![:space:]]*}"}"
+		choice="${choice%"${choice##*[![:space:]]}"}"
+
+		case "$choice" in
+			1)
+				DownloadMethod="direct"
+				needMedicatDownload=true
+				return 0
+				;;
+			2)
+				DownloadMethod="torrent"
+				needMedicatDownload=true
+				return 0
+				;;
+			3)
+				ReadPrompt "Path to $Medicat7zFile: " pathInput
+				pathInput="${pathInput//$'\r'/}"
+				pathInput="${pathInput#"${pathInput%%[![:space:]]*}"}"
+				pathInput="${pathInput%"${pathInput##*[![:space:]]}"}"
+				# Expand ~ if present
+				pathInput="${pathInput/#\~/$HOME}"
+				if [[ -z "$pathInput" ]]; then
+					colEcho $redB "No path entered."
+					continue
+				fi
+				if [[ ! -f "$pathInput" ]]; then
+					colEcho $redB "File not found:$whiteB $pathInput"
+					continue
+				fi
+				location="$pathInput"
+				DownloadMethod="local"
+				needMedicatDownload=false
+				colEcho $cyanB "Using local file:$whiteB $location"
+				return 0
+				;;
+			*)
+				colEcho $redB "Invalid choice. Enter 1, 2, or 3."
+				;;
+		esac
+	done
 }
 #-----------------------------------------------------------------------------#
 
@@ -245,28 +450,28 @@ fi
 
 colEcho $cyanB "Operating System Identified as:$whiteB $os"
 
-# Ensure dependencies are installed: wget, 7z, mkntfs, and aria2c only if Medicat 7z file is not present
+# Ensure dependencies are installed: wget, 7z, mkntfs, and aria2c if MediCat will be downloaded
 colEcho $cyanB "\nLocating the Medicat 7z file..."
 
 if [[ -f "$Medicat7zFile" ]]; then
 	location="$Medicat7zFile"
 	colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFile\n"
-elif  [[ -f "$Medicat7zFull" ]]; then
+elif [[ -f "$Medicat7zFull" ]]; then
 	location="$Medicat7zFull"
 	colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFull\n"
 else
-	colEcho $cyanB "Please enter the location of$whiteB $Medicat7zFile$cyanB if it exists or just press enter to download it via bittorrent."
-	read location
+	colEcho $yellowB "Medicat archive not found in the current directory."
+	chooseMedicatSource
 fi
 
 colEcho $cyanB "Acquiring any dependencies..."
 
-if [ -z "$location" ] ; then
+if $needMedicatDownload ; then
 	depCommands["aria2c"]="aria"
 fi
 
 if $ventoyFS ; then
-    dependenciesHandler
+	dependenciesHandler
 	downloadVentoy
 else
 	colEcho $cyanB "INFO: Handling ventoy as a package."
@@ -275,13 +480,31 @@ else
 	ventoyLauncher="ventoy"
 fi
 
-# Download the missing Medicat 7z file
-if [ -z "$location" ] ; then
-	colEcho $cyanB "Starting to download Medicat via bittorrent"
-	wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_$MedicatVersion.torrent -O medicat.torrent
-	aria2c --file-allocation=none --seed-time=0 medicat.torrent
-	location="$Medicat7zFull"
-	colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"
+# Download the missing Medicat 7z file when requested
+if $needMedicatDownload ; then
+	case "$DownloadMethod" in
+		direct)
+			if ! downloadMedicatDirect; then
+				colEcho $redB "ERROR: Unable to obtain MediCat archive. Exiting..."
+				exit 1
+			fi
+			;;
+		torrent)
+			if ! downloadMedicatTorrent; then
+				colEcho $redB "ERROR: Unable to obtain MediCat archive. Exiting..."
+				exit 1
+			fi
+			;;
+		*)
+			colEcho $redB "ERROR: Unknown download method. Exiting..."
+			exit 1
+			;;
+	esac
+fi
+
+if [[ -z "$location" ]] || [[ ! -f "$location" ]]; then
+	colEcho $redB "ERROR: MediCat archive path is missing or invalid:$whiteB ${location:-"(empty)"}"
+	exit 1
 fi
 
 # Check the SHA256 hash of the Medicat zip file.
@@ -317,7 +540,7 @@ read letter
 drive=/dev/$letter
 drive2="$drive""1"
 
-if $(YesNo "You want to install Ventoy and Medicat to $drive / $drive2? (Y/N) "); then
+if YesNo "You want to install Ventoy and Medicat to $drive / $drive2? (Y/N) "; then
 	colEcho $cyanB "Installation confirmed and will commence in 5 seconds..."
 	sleep 5
 else
@@ -331,7 +554,7 @@ colEcho $blueB "MBR at max can do up to approximately 2.2 TB and will work with 
 
 cd ventoy #Thanks camellia from Medicat Discord for helping work around Ventoy's bullshit
 
-if $(YesNo "Device partition layout defaults to MBR.  Would you like to use GPT instead? (Y/N)"); then
+if YesNo "Device partition layout defaults to MBR.  Would you like to use GPT instead? (Y/N) "; then
 	colEcho $yellowB "Using GPT"
 	sudo $ventoyLauncher -I -g $drive
 	if [ "$?" != "0" ]; then
@@ -369,7 +592,7 @@ colEcho $cyanB "Extracting Medicat to NTFS volume..."
 
 colEcho $cyanB "MedicatUSB has been created."
 
-if $(YesNo "Would you like to unmount ./MedicatUSB? (Y/N) "); then
+if YesNo "Would you like to unmount ./MedicatUSB? (Y/N) "; then
 	colEcho $cyanB "Unmounting MedicatUSB..."
 	sudo umount ./MedicatUSB
 	colEcho $cyanB "Unmounted."

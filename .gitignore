@@ -1,3 +1,6 @@
+# ---------------------------------------------------------------------------
+# Archives / large media (never commit)
+# ---------------------------------------------------------------------------
 *.zip.*
 *.zip
 *.tar.gz
@@ -6,3 +9,96 @@
 
 # Local-only copy of legacy Windows installer assets (not tracked)
 archive/
+
+# ---------------------------------------------------------------------------
+# C++ Windows installer (cpp branch) — ignore if present on this (linux) branch
+# ---------------------------------------------------------------------------
+
+# Build trees & CMake output
+build/
+build-x86/
+build_x86/
+cmake/
+generated/
+CMakeLists.txt
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+install_manifest.txt
+_deps/
+
+# MSVC / linker / object artifacts
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.suo
+*.sdf
+*.opensdf
+*.user
+*.ncb
+*.aps
+*.obj
+*.o
+*.a
+*.lib
+*.dll
+*.exp
+*.ilk
+*.pdb
+*.idb
+*.ipdb
+*.iobj
+*.pch
+*.pdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.log
+*.tlog
+*.lastbuildstate
+*.recipe
+*.res
+*.rc
+*.manifest
+*.exe
+*.map
+*.ipch
+*.VC.db
+*.VC.VC.opendb
+.vs/
+ipch/
+x64/
+x86/
+Win32/
+Debug/
+Release/
+out/
+
+# C++ source tree & tooling (active on cpp branch, not linux)
+src/
+res/
+i18n/
+tools/
+docs/
+bin/
+hasher/
+download/
+translate/
+data/
+FEATURES.md
+TODO.md
+rebuild.bat
+build_number.txt
+
+# Nested / separate repos often dropped beside the tree
+support-server/
+.cursor/
