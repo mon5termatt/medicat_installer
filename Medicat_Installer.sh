@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ScriptVersion="0016"
+ScriptVersion="0018"
 
 # See CHANGELOG.md for changes.
 #
@@ -612,8 +612,8 @@ UserWait "Press any key when ready..."
 
 letter=""
 while true; do
-	colEcho $yellowB "\nPlease find the ID of your USB drive below:"
-	lsblk --nodeps --output "NAME,SIZE,VENDOR,MODEL,SERIAL" | grep -v loop || true
+	colEcho $yellowB "\nPlease find the ID of your USB drive below (look for TRAN=usb):"
+	lsblk --nodeps --output "NAME,SIZE,TRAN,VENDOR,MODEL,SERIAL" | grep -v loop || true
 
 	colEcho $yellowB "Enter the device name NOT including /dev/ or the partition number."
 	colEcho $yellowB "For example: sda  or  sdb  or  nvme0n1"
@@ -641,6 +641,28 @@ if [[ "$letter" =~ [0-9]$ ]]; then
 	drive2="${drive}p1"
 else
 	drive2="${drive}1"
+fi
+
+# Warn when the chosen disk is not USB (internal HDD/SSD/NVMe wipe risk).
+driveTran=$(lsblk -ndo TRAN "$drive" 2>/dev/null | head -n1 | tr '[:upper:]' '[:lower:]')
+driveSize=$(lsblk -ndo SIZE "$drive" 2>/dev/null | head -n1)
+driveModel=$(lsblk -ndo MODEL "$drive" 2>/dev/null | head -n1)
+driveModel="${driveModel#"${driveModel%%[![:space:]]*}"}"
+driveModel="${driveModel%"${driveModel##*[![:space:]]}"}"
+if [[ "$driveTran" != "usb" ]]; then
+	colEcho $redB "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	colEcho $redB " WARNING: $drive does not look like a USB drive."
+	colEcho $redB " Transport:$whiteB ${driveTran:-unknown}$redB  Size:$whiteB ${driveSize:-unknown}$redB  Model:$whiteB ${driveModel:-unknown}"
+	colEcho $redB " Installing here will ERASE this disk (internal HDD/SSD/NVMe)."
+	colEcho $redB " MediCat is meant for a removable USB stick — double-check the device name."
+	colEcho $redB "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	colEcho $redB "To continue, type CONFIRM in all caps (anything else cancels).\n"
+	confirmWipe=""
+	ReadPrompt "Type CONFIRM to wipe $drive: " confirmWipe
+	if [[ "$confirmWipe" != "CONFIRM" ]]; then
+		colEcho $yellowB "Confirmation text did not match. Installation Cancelled."
+		exit 0
+	fi
 fi
 
 if YesNo "You want to install Ventoy and Medicat to $drive / $drive2? (Y/N) "; then

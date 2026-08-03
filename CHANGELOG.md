@@ -2,6 +2,15 @@
 
 All notable changes to `Medicat_Installer.sh` (linux branch).
 
+## 0018
+
+- Non-USB wipe gate requires typing exact `CONFIRM` (not Y/N) before the normal install prompt.
+
+## 0017
+
+- Warn and require an extra confirmation when the selected disk is not USB (`TRAN!=usb`), to reduce accidental wipes of internal HDD/SSD/NVMe.
+- Include `TRAN` in the drive list so USB devices are easier to spot.
+
 ## 0016
 
 - All interactive prompts (keypress wait, Yes/No, device name) always read from `/dev/tty` so they never skip under `curl | bash`, pipes, or empty stdin.
