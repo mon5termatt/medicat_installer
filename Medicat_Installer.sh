@@ -362,7 +362,7 @@ if ! [[ -d MedicatUSB/ ]] ; then
 fi
 
 colEcho $cyanB "Mounting Medicat NTFS volume..."
-sudo mount $drive2 ./MedicatUSB
+sudo mount $drive2 ./MedicatUSB -o user,auto,fmask=0111,dmask=0000
 
 colEcho $cyanB "Extracting Medicat to NTFS volume..."
 7z x -o./MedicatUSB "$location"
