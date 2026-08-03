@@ -278,7 +278,7 @@ fi
 # Download the missing Medicat 7z file
 if [ -z "$location" ] ; then
 	colEcho $cyanB "Starting to download Medicat via bittorrent"
-	wget https://github.com/mon5termatt/medicat_installer/raw/linux/download/MediCat_USB_$MedicatVersion.torrent -O medicat.torrent
+	wget https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_$MedicatVersion.torrent -O medicat.torrent
 	aria2c --file-allocation=none --seed-time=0 medicat.torrent
 	location="$Medicat7zFull"
 	colEcho $cyanB "Medicat successfully downloaded:$whiteB $location"

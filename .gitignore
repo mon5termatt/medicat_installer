@@ -3,3 +3,6 @@
 *.tar.gz
 *.torrent
 *.7z
+
+# Local-only copy of legacy Windows installer assets (not tracked)
+archive/
