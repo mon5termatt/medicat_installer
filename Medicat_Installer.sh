@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ScriptVersion="0018"
+ScriptVersion="0019"
 
 # See CHANGELOG.md for changes.
 #
@@ -18,6 +18,11 @@ MedicatTorrentUrl="https://github.com/mon5termatt/medicat_installer/raw/main/dow
 needMedicatDownload=false
 location=""
 DownloadMethod=""
+
+# Free-space gates (bytes). Low disk is a common cause of truncated .7z / failed apt / failed extract.
+MedicatDownloadMinFreeBytes=$((22 * 1024 * 1024 * 1024)) # room for the archive in the working dir
+MedicatWorkMinFreeBytes=$((1 * 1024 * 1024 * 1024))      # deps, Ventoy tar, mountpoint on cwd
+MedicatUsbMinFreeBytes=$((26 * 1024 * 1024 * 1024))      # extract onto Ventoy data partition (32GB sticks OK)
 
 # Dependencies
 declare -A depCommands
@@ -395,6 +400,77 @@ function downloadMedicatDirect() {
 	return 1
 }
 
+# Available bytes on the filesystem that holds $1 (GNU df). Prints nothing / fails on error.
+function getAvailBytes() {
+	local path="$1"
+	df -B1 --output=avail "$path" 2>/dev/null | awk 'NR==2 {print $1; exit}'
+}
+
+# Human-readable size from byte count (approx GiB/MiB).
+function humanBytes() {
+	local bytes="${1:-0}"
+	if (( bytes >= 1024 * 1024 * 1024 )); then
+		awk -v b="$bytes" 'BEGIN { printf "%.1f GiB", b / (1024*1024*1024) }'
+	elif (( bytes >= 1024 * 1024 )); then
+		awk -v b="$bytes" 'BEGIN { printf "%.1f MiB", b / (1024*1024) }'
+	else
+		printf "%s B" "$bytes"
+	fi
+}
+
+# Warn (or optionally abort) when path has less than minBytes free.
+# $1=path  $2=minBytes  $3=purpose label  $4=fatal|warn
+# fatal: exit 1 unless user continues after extra confirm (still discouraged)
+# warn:  YesNo to continue; decline exits 0
+function requireFreeSpace() {
+	local path="$1"
+	local minBytes="$2"
+	local purpose="$3"
+	local mode="${4:-warn}"
+	local avail
+
+	if [[ ! -e "$path" ]]; then
+		colEcho $yellowB "WARNING: Cannot check free space; path does not exist yet:$whiteB $path"
+		return 0
+	fi
+
+	avail=$(getAvailBytes "$path")
+	if [[ -z "$avail" || ! "$avail" =~ ^[0-9]+$ ]]; then
+		colEcho $yellowB "WARNING: Unable to read free space for$whiteB $path$yellowB (df failed). Continuing..."
+		return 0
+	fi
+
+	colEcho $cyanB "Free space on$whiteB $path$cyanB:$whiteB $(humanBytes "$avail")$cyanB (need ~$whiteB$(humanBytes "$minBytes")$cyanB for $purpose)"
+
+	if (( avail >= minBytes )); then
+		return 0
+	fi
+
+	colEcho $redB "\nWARNING: Not enough free space for $purpose."
+	colEcho $redB "  Path:$whiteB $path"
+	colEcho $redB "  Available:$whiteB $(humanBytes "$avail")"
+	colEcho $redB "  Recommended:$whiteB $(humanBytes "$minBytes")"
+	colEcho $yellowB "Low space often causes truncated MediCat downloads, apt failures, or extract errors."
+	colEcho $yellowB "Free space, move the archive to a larger disk, or download to another path.\n"
+	df -h "$path" 2>/dev/null || true
+
+	if [[ "$mode" == "fatal" ]]; then
+		if ! YesNo "Continue anyway? A failed/truncated download is likely. (Y/N) "; then
+			colEcho $cyanB "Exiting so you can free space first."
+			exit 1
+		fi
+		colEcho $yellowB "Continuing despite low free space...\n"
+		return 0
+	fi
+
+	if ! YesNo "Continue anyway? (Y/N) "; then
+		colEcho $cyanB "Exiting so you can free space first."
+		exit 0
+	fi
+	colEcho $yellowB "Continuing despite low free space...\n"
+	return 0
+}
+
 # Prompt how to obtain the archive when it is not already on disk.
 function chooseMedicatSource() {
 	local choice=""
@@ -547,6 +623,9 @@ fi
 
 colEcho $cyanB "Acquiring any dependencies..."
 
+# Working directory needs headroom for packages / Ventoy tarball / mountpoint.
+requireFreeSpace "." "$MedicatWorkMinFreeBytes" "installer working files" "warn"
+
 if $needMedicatDownload ; then
 	depCommands["aria2c"]="aria"
 fi
@@ -563,6 +642,8 @@ fi
 
 # Download the missing Medicat 7z file when requested
 if $needMedicatDownload ; then
+	# Archive lands in the current directory — low space here truncates the .7z.
+	requireFreeSpace "." "$MedicatDownloadMinFreeBytes" "MediCat archive download" "fatal"
 	case "$DownloadMethod" in
 		direct)
 			if ! downloadMedicatDirect; then
@@ -607,6 +688,7 @@ fi
 
 # Advise user to connect and select the required USB device.
 colEcho $yellowB "\nPlease plug your USB in now if it is not already connected..."
+colEcho $yellowB "NOTE: A 32GB stick works, but only just barely — prefer 64GB+ if you have one."
 colEcho $yellowB "Press any key once it has been detected by your system..."
 UserWait "Press any key when ready..."
 
@@ -704,6 +786,7 @@ colEcho $cyanB "Creating Medicat NTFS file system on drive$whiteB $drive2"
 $sudo mkntfs --fast --label Medicat $drive2
 
 # Create a mountpoint folder for the Medicat NTFS volume
+requireFreeSpace "." "$MedicatWorkMinFreeBytes" "MedicatUSB mountpoint" "fatal"
 if ! [[ -d MedicatUSB/ ]] ; then
 	colEcho $cyanB "Creating a mountpoint for the Medicat NTFS volume..."
 	mkdir MedicatUSB
@@ -711,6 +794,10 @@ fi
 
 colEcho $cyanB "Mounting Medicat NTFS volume..."
 $sudo mount $drive2 ./MedicatUSB -o user,auto,fmask=0111,dmask=0000
+
+# Target USB must have room for the extracted MediCat tree.
+colEcho $yellowB "NOTE: 32GB USBs are fine but JUST BARELY — little room left after extract."
+requireFreeSpace "./MedicatUSB" "$MedicatUsbMinFreeBytes" "MediCat extract onto USB" "fatal"
 
 colEcho $cyanB "Extracting Medicat to NTFS volume..."
 7z x -o./MedicatUSB "$location"

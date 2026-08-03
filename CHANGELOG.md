@@ -2,6 +2,11 @@
 
 All notable changes to `Medicat_Installer.sh` (linux branch).
 
+## 0019
+
+- Warn when free space is low: working directory (~1 GiB), MediCat download (~22 GiB), and USB extract (~26 GiB). Shows `df` and asks before continuing; download/extract gates use a stronger confirm.
+- Note that 32GB sticks work but are just barely enough (prefer 64GB+).
+
 ## 0018
 
 - Non-USB wipe gate requires typing exact `CONFIRM` (not Y/N) before the normal install prompt.
