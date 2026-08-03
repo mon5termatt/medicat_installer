@@ -19,6 +19,7 @@ Native Win32 build. Ships **GUI + command-line** in one exe — no batch or Powe
 |------|----------|
 | `MedicatInstaller.exe` | Windows x64 |
 | `MedicatInstaller-x86.exe` | Windows 32-bit (x86) |
+| `Medicat_Installer.sh` | Linux (from branch [`linux`](https://github.com/mon5termatt/medicat_installer/tree/linux); attached on each release) |
 
 ## What it does
 
@@ -120,11 +121,12 @@ rebuild.bat as 1.0.42 release 1.0.42
 tools\upload_release.bat
 ```
 
-Creates the `1.0.N` release if needed, uploads both exes, then re-promotes the legacy bridge tag `3521` as GitHub Latest for old batch clients. Requires [`gh`](https://cli.github.com/) authenticated for the repo.
+Creates the `1.0.N` release if needed and uploads both exes as GitHub Latest. Requires [`gh`](https://cli.github.com/) authenticated for the repo.
 
 See [`FEATURES.md`](FEATURES.md) for the feature checklist and [`TODO.md`](TODO.md) for planned work.  
 Developer architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).  
-Updater: [`UPDATER.md`](UPDATER.md).
+Updater: [`UPDATER.md`](UPDATER.md).  
+Website links (for maintainers/agents): [`docs/WEBSITE.md`](docs/WEBSITE.md).
 
 ## Logs (beside the exe)
 

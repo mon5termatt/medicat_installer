@@ -2,10 +2,6 @@
 setlocal
 cd /d "%~dp0\.."
 
-REM Fixed tag for fielded Medicat_Installer.bat clients (localver=3520).
-REM They compare localver to the last 4 chars of /releases/latest tag_name.
-REM Tag 3521 -> remver=3521 -> UPDATE. Do not use 1.0.N as Latest for them.
-set "BRIDGE_TAG=3521"
 set "REPO=mon5termatt/medicat_installer"
 
 set "TAG=%~1"
@@ -59,28 +55,37 @@ echo Run rebuild.bat first.
 exit /b 1
 
 :have_staged_x64
-if exist "%X86_EXE%" goto do_upload
+if exist "%X86_EXE%" goto fetch_linux
 echo Missing Win32 build: %X86_EXE%
 echo Run rebuild.bat first.
 exit /b 1
 
-:do_upload
-if /I "%TAG%"=="%BRIDGE_TAG%" goto skip_version_conflict
-goto version_ok
+:fetch_linux
+REM Always ship the community Linux installer from the linux branch tip.
+set "LINUX_SH=build\Release\Medicat_Installer.sh"
+set "LINUX_URL=https://raw.githubusercontent.com/%REPO%/linux/Medicat_Installer.sh"
+echo Fetching Linux installer from branch linux...
+curl -fsSL -o "%LINUX_SH%" "%LINUX_URL%"
+if errorlevel 1 goto linux_fetch_failed
+if not exist "%LINUX_SH%" goto linux_fetch_failed
+for %%I in ("%LINUX_SH%") do if %%~zI==0 goto linux_fetch_failed
+echo   %LINUX_SH% ready (from linux branch)
+goto do_upload
 
-:skip_version_conflict
-echo ERROR: C++ release tag cannot be the bridge tag %BRIDGE_TAG%.
+:linux_fetch_failed
+echo Failed to download Medicat_Installer.sh from:
+echo   %LINUX_URL%
+echo Ensure branch linux is published and the file exists.
 exit /b 1
 
-:version_ok
+:do_upload
 gh release view "%TAG%" --repo "%REPO%" >nul 2>&1
 if errorlevel 1 goto create_release
 goto upload_assets
 
 :create_release
 echo Creating GitHub release %TAG%...
-REM Do not use --latest here; the bridge release must remain Latest for batch clients.
-gh release create "%TAG%" --title "%TAG%" --generate-notes --repo "%REPO%"
+gh release create "%TAG%" --title "%TAG%" --generate-notes --latest --repo "%REPO%"
 if errorlevel 1 goto create_failed
 goto upload_assets
 
@@ -90,58 +95,18 @@ exit /b 1
 
 :upload_assets
 echo Uploading assets to GitHub release %TAG%...
-gh release upload "%TAG%" "%X64_EXE%" "%X86_EXE%" --clobber --repo "%REPO%"
+gh release upload "%TAG%" "%X64_EXE%" "%X86_EXE%" "%LINUX_SH%" --clobber --repo "%REPO%"
 if errorlevel 1 goto upload_failed
 
 echo.
 echo Uploaded:
 echo   %X64_EXE%
 echo   %X86_EXE%
-echo Release: https://github.com/mon5termatt/medicat_installer/releases/tag/%TAG%
-echo Installer self-update discovers these assets via the GitHub Releases API.
-
-call :ensure_legacy_bridge
-if errorlevel 1 goto bridge_failed
+echo   %LINUX_SH%  ^(from branch linux^)
+echo Release: https://github.com/%REPO%/releases/tag/%TAG%
+echo Installer self-update discovers Windows assets via the GitHub Releases API.
 exit /b 0
 
 :upload_failed
 echo Release upload failed.
 exit /b 1
-
-:bridge_failed
-echo C++ release uploaded, but legacy bridge Latest promotion failed.
-exit /b 1
-
-REM --- Legacy batch bridge: keep a numeric Latest tag for Medicat_Installer.bat ---
-:ensure_legacy_bridge
-set "NOTES=%TEMP%\medicat_bridge_release_notes.md"
-> "%NOTES%" echo ## Legacy batch bridge
->> "%NOTES%" echo.
->> "%NOTES%" echo This release is GitHub **Latest** so fielded `Medicat_Installer.bat` clients
->> "%NOTES%" echo ^(localver=3520^) take the last 4 characters of the tag name ^(%BRIDGE_TAG%^)
->> "%NOTES%" echo and run their update path.
->> "%NOTES%" echo.
->> "%NOTES%" echo They then download:
->> "%NOTES%" echo https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.bat
->> "%NOTES%" echo which installs the current C++ build from semantic release **%TAG%**.
->> "%NOTES%" echo.
->> "%NOTES%" echo No installer assets belong on this tag. C++ self-update uses `1.0.N` releases only.
->> "%NOTES%" echo Re-promoted automatically by tools/upload_release.bat after each C++ upload.
-
-gh release view "%BRIDGE_TAG%" --repo "%REPO%" >nul 2>&1
-if errorlevel 1 goto create_bridge
-
-echo Re-promoting bridge release %BRIDGE_TAG% as GitHub Latest...
-gh release edit "%BRIDGE_TAG%" --latest --notes-file "%NOTES%" --repo "%REPO%"
-if errorlevel 1 exit /b 1
-goto bridge_done
-
-:create_bridge
-echo Creating bridge release %BRIDGE_TAG% as GitHub Latest...
-gh release create "%BRIDGE_TAG%" --title "Legacy bridge - update to C++ installer" --latest --notes-file "%NOTES%" --repo "%REPO%"
-if errorlevel 1 exit /b 1
-
-:bridge_done
-echo Bridge Latest: https://github.com/%REPO%/releases/tag/%BRIDGE_TAG%
-echo   /releases/latest -^> %BRIDGE_TAG%  ^|  C++ assets on %TAG%
-exit /b 0
