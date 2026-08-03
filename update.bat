@@ -23,7 +23,11 @@ if /I "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "ARCH=x64"
 if defined PROCESSOR_ARCHITEW6432 if /I "%PROCESSOR_ARCHITEW6432%"=="AMD64" set "ARCH=x64"
 
 set "OUT=MedicatInstaller.exe"
-if /I "%ARCH%"=="x86" set "OUT=MedicatInstaller-x86.exe"
+set "ASSET=MedicatInstaller.exe"
+if /I "%ARCH%"=="x86" (
+    set "OUT=MedicatInstaller-x86.exe"
+    set "ASSET=MedicatInstaller-x86.exe"
+)
 
 echo  Detected arch: %ARCH%
 echo  Target file : %OUT%
@@ -41,22 +45,23 @@ if errorlevel 1 (
     goto fail
 )
 
-echo  Reading update manifest...
-set "MANIFEST_URL=https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.json"
+echo  Looking up GitHub releases for %ASSET%...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ErrorActionPreference = 'Stop';" ^
-  "$arch = $env:ARCH;" ^
-  "if (-not $arch) { $arch = 'x64' };" ^
-  "$m = Invoke-RestMethod -Uri $env:MANIFEST_URL -UseBasicParsing;" ^
-  "$asset = if ($arch -eq 'x86') { $m.assets.x86 } else { $m.assets.x64 };" ^
-  "if (-not $asset -or [string]::IsNullOrWhiteSpace($asset.url)) { throw 'No download URL in update.json for ' + $arch };" ^
-  "$asset.url.Trim() | Out-File -FilePath '.\update_url.ini' -Encoding ascii -NoNewline;" ^
-  "Write-Host ('  Version : ' + $m.version);" ^
-  "Write-Host ('  Tag     : ' + $m.release_tag);" ^
-  "Write-Host ('  Channel : ' + $m.channel);"
+  "$assetName = $env:ASSET;" ^
+  "$releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/mon5termatt/medicat_installer/releases?per_page=20' -Headers @{ 'User-Agent' = 'MedicatInstaller-Update' } -UseBasicParsing;" ^
+  "$withAsset = @($releases | Where-Object { -not $_.draft -and ($_.assets | Where-Object { $_.name -eq $assetName }) });" ^
+  "$pick = $withAsset | Where-Object { -not $_.prerelease } | Select-Object -First 1;" ^
+  "if (-not $pick) { $pick = $withAsset | Select-Object -First 1 };" ^
+  "if (-not $pick) { throw 'No release publishes ' + $assetName };" ^
+  "$url = ($pick.assets | Where-Object { $_.name -eq $assetName } | Select-Object -First 1).browser_download_url;" ^
+  "$url.Trim() | Out-File -FilePath '.\update_url.ini' -Encoding ascii -NoNewline;" ^
+  "Write-Host ('  Tag     : ' + $pick.tag_name);" ^
+  "Write-Host ('  Release : ' + $pick.name);" ^
+  "if ($pick.prerelease) { Write-Host '  Channel : prerelease' } else { Write-Host '  Channel : stable' }"
 
 if errorlevel 1 (
-    echo ERROR: Could not read update.json from the main branch.
+    echo ERROR: Could not find a GitHub release with %ASSET%.
     goto fail
 )
 
@@ -101,7 +106,6 @@ echo.
 start "" "%CD%\%OUT%"
 timeout /t 2 /nobreak >nul
 
-REM Self-delete when possible; leave backups of the old bat files.
 del "%~f0" >nul 2>&1
 exit /b 0
 

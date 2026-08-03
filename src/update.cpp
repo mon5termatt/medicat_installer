@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cwctype>
+#include <functional>
 #include <vector>
 
 #ifndef INSTALLER_RELEASE_TAG
@@ -17,20 +18,18 @@ namespace medicat {
 
 namespace {
 
-constexpr wchar_t kUpdateManifestUrl[] =
-    L"https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.json";
+// Newest first. Prefer stable full releases that ship the C++ installer assets;
+// fall back to prereleases with those assets.
 constexpr wchar_t kGitHubReleasesApiUrl[] =
-    L"https://api.github.com/repos/mon5termatt/medicat_installer/releases?per_page=10";
+    L"https://api.github.com/repos/mon5termatt/medicat_installer/releases?per_page=20";
 
 #if defined(_WIN64)
 constexpr wchar_t kInstallerAssetName[] = L"MedicatInstaller.exe";
-constexpr wchar_t kManifestAssetKey[] = L"x64";
 #else
 constexpr wchar_t kInstallerAssetName[] = L"MedicatInstaller-x86.exe";
-constexpr wchar_t kManifestAssetKey[] = L"x86";
 #endif
 
-std::wstring Utf8ToWide(const std::string& text) {
+std::wstring Utf8ToWideLocal(const std::string& text) {
     if (text.empty()) {
         return {};
     }
@@ -66,12 +65,47 @@ std::wstring ParseJsonStringField(const std::wstring& json, const std::wstring& 
     }
     ++index;
 
-    const size_t start = index;
-    const size_t end = json.find(L'"', start);
-    if (end == std::wstring::npos || end <= start) {
-        return {};
+    std::wstring out;
+    while (index < json.size()) {
+        const wchar_t ch = json[index++];
+        if (ch == L'\\') {
+            if (index >= json.size()) {
+                break;
+            }
+            const wchar_t esc = json[index++];
+            switch (esc) {
+                case L'"':
+                case L'\\':
+                case L'/':
+                    out.push_back(esc);
+                    break;
+                case L'n':
+                    out.push_back(L'\n');
+                    break;
+                case L'r':
+                    out.push_back(L'\r');
+                    break;
+                case L't':
+                    out.push_back(L'\t');
+                    break;
+                case L'u':
+                    // Skip unicode escapes (four hex digits).
+                    for (int i = 0; i < 4 && index < json.size(); ++i) {
+                        ++index;
+                    }
+                    break;
+                default:
+                    out.push_back(esc);
+                    break;
+            }
+            continue;
+        }
+        if (ch == L'"') {
+            break;
+        }
+        out.push_back(ch);
     }
-    return json.substr(start, end - start);
+    return out;
 }
 
 bool ParseJsonBoolField(const std::wstring& json, const std::wstring& key, bool& value) {
@@ -104,37 +138,6 @@ bool ParseJsonBoolField(const std::wstring& json, const std::wstring& key, bool&
     return false;
 }
 
-int ParseJsonIntField(const std::wstring& json, const std::wstring& key) {
-    const std::wstring needle = L"\"" + key + L"\":";
-    const size_t pos = json.find(needle);
-    if (pos == std::wstring::npos) {
-        return -1;
-    }
-
-    size_t index = pos + needle.size();
-    while (index < json.size() && iswspace(json[index])) {
-        ++index;
-    }
-
-    bool negative = false;
-    if (index < json.size() && json[index] == L'-') {
-        negative = true;
-        ++index;
-    }
-
-    int value = 0;
-    bool any = false;
-    while (index < json.size() && iswdigit(json[index])) {
-        any = true;
-        value = value * 10 + (json[index] - L'0');
-        ++index;
-    }
-    if (!any) {
-        return -1;
-    }
-    return negative ? -value : value;
-}
-
 int ParseReleaseTagNumber(const std::wstring& tag) {
     int value = 0;
     bool any = false;
@@ -149,37 +152,6 @@ int ParseReleaseTagNumber(const std::wstring& tag) {
     return any ? value : 0;
 }
 
-std::wstring ParseAssetUrlFromManifest(const std::wstring& json, const std::wstring& assetKey) {
-    const std::wstring sectionNeedle = L"\"" + assetKey + L"\"";
-    const size_t sectionPos = json.find(sectionNeedle);
-    if (sectionPos == std::wstring::npos) {
-        return {};
-    }
-
-    const size_t sectionEnd = json.find(L'}', sectionPos);
-    const std::wstring section = sectionEnd == std::wstring::npos
-                                     ? json.substr(sectionPos)
-                                     : json.substr(sectionPos, sectionEnd - sectionPos);
-    return ParseJsonStringField(section, L"url");
-}
-
-bool ParseManifestUpdate(const std::wstring& json, InstallerUpdateInfo& info) {
-    const int remoteBuild = ParseJsonIntField(json, L"build");
-    if (remoteBuild < 0) {
-        return false;
-    }
-
-    info.remoteBuild = remoteBuild;
-    info.version = ParseJsonStringField(json, L"version");
-    info.releaseTag = ParseJsonStringField(json, L"release_tag");
-    info.releaseUrl = ParseJsonStringField(json, L"release_notes_url");
-    info.downloadUrl = ParseAssetUrlFromManifest(json, kManifestAssetKey);
-    if (info.releaseUrl.empty() && !info.releaseTag.empty()) {
-        info.releaseUrl = L"https://github.com/mon5termatt/medicat_installer/releases/tag/" + info.releaseTag;
-    }
-    return true;
-}
-
 std::wstring FindAssetDownloadUrl(const std::wstring& block, const std::wstring& assetName) {
     size_t from = 0;
     while (from < block.size()) {
@@ -191,8 +163,10 @@ std::wstring FindAssetDownloadUrl(const std::wstring& block, const std::wstring&
         const std::wstring name = ParseJsonStringField(block, L"name", pos);
         if (name == assetName) {
             const size_t assetStart = block.rfind(L'{', pos);
-            const size_t searchEnd = std::min(block.size(), pos + 6000);
-            const std::wstring section = block.substr(assetStart, searchEnd - assetStart);
+            const size_t searchEnd = std::min(block.size(), pos + 8000);
+            const std::wstring section =
+                assetStart == std::wstring::npos ? block.substr(0, searchEnd)
+                                                 : block.substr(assetStart, searchEnd - assetStart);
             const std::wstring url = ParseJsonStringField(section, L"browser_download_url");
             if (!url.empty()) {
                 return url;
@@ -204,7 +178,33 @@ std::wstring FindAssetDownloadUrl(const std::wstring& block, const std::wstring&
     return {};
 }
 
-bool ParseGitHubPrerelease(const std::wstring& json, InstallerUpdateInfo& info) {
+struct ParsedRelease {
+    bool prerelease = false;
+    std::wstring tag;
+    std::wstring htmlUrl;
+    std::wstring downloadUrl;
+    std::wstring name;
+};
+
+bool ParseReleaseBlock(const std::wstring& block, ParsedRelease& out) {
+    out = {};
+    if (!ParseJsonBoolField(block, L"prerelease", out.prerelease)) {
+        out.prerelease = false;
+    }
+    bool draft = false;
+    if (ParseJsonBoolField(block, L"draft", draft) && draft) {
+        return false;
+    }
+
+    out.tag = ParseJsonStringField(block, L"tag_name");
+    out.htmlUrl = ParseJsonStringField(block, L"html_url");
+    out.name = ParseJsonStringField(block, L"name");
+    out.downloadUrl = FindAssetDownloadUrl(block, kInstallerAssetName);
+    return !out.tag.empty() && !out.downloadUrl.empty();
+}
+
+// Walk release objects (API returns newest first). Call visitor(block); return true to stop.
+void ForEachReleaseBlock(const std::wstring& json, const std::function<bool(const std::wstring&)>& visitor) {
     size_t from = 0;
     while (from < json.size()) {
         const size_t tagKeyPos = json.find(L"\"tag_name\"", from);
@@ -215,78 +215,86 @@ bool ParseGitHubPrerelease(const std::wstring& json, InstallerUpdateInfo& info) 
         const size_t blockStart = tagKeyPos > 0 ? json.rfind(L'{', tagKeyPos) : 0;
         const size_t nextTag = json.find(L"\"tag_name\"", tagKeyPos + 10);
         const size_t blockEnd = nextTag == std::wstring::npos ? json.size() : nextTag;
-        const std::wstring block = json.substr(blockStart, blockEnd - blockStart);
+        const std::wstring block =
+            blockStart == std::wstring::npos ? json.substr(0, blockEnd) : json.substr(blockStart, blockEnd - blockStart);
 
-        bool prerelease = false;
-        if (!ParseJsonBoolField(block, L"prerelease", prerelease) || !prerelease) {
-            from = tagKeyPos + 10;
-            continue;
+        if (visitor(block)) {
+            return;
         }
+        from = tagKeyPos + 10;
+    }
+}
 
-        info.releaseTag = ParseJsonStringField(block, L"tag_name");
-        info.version = info.releaseTag;
-        info.releaseUrl = ParseJsonStringField(block, L"html_url");
-        info.downloadUrl = FindAssetDownloadUrl(block, kInstallerAssetName);
+bool FindBestInstallerRelease(const std::wstring& json, ParsedRelease& best) {
+    ParsedRelease firstStable{};
+    ParsedRelease firstPrerelease{};
+    bool haveStable = false;
+    bool havePrerelease = false;
 
-        if (info.releaseUrl.empty() && !info.releaseTag.empty()) {
-            info.releaseUrl = L"https://github.com/mon5termatt/medicat_installer/releases/tag/" + info.releaseTag;
+    ForEachReleaseBlock(json, [&](const std::wstring& block) {
+        ParsedRelease release{};
+        if (!ParseReleaseBlock(block, release)) {
+            return false;
         }
-        return !info.releaseTag.empty() && !info.downloadUrl.empty();
+        if (!release.prerelease) {
+            if (!haveStable) {
+                firstStable = release;
+                haveStable = true;
+            }
+        } else if (!havePrerelease) {
+            firstPrerelease = release;
+            havePrerelease = true;
+        }
+        // Keep scanning until we have a stable candidate (API is newest-first).
+        return haveStable;
+    });
+
+    if (haveStable) {
+        best = firstStable;
+        return true;
+    }
+    if (havePrerelease) {
+        best = firstPrerelease;
+        return true;
     }
     return false;
 }
 
 bool IsRemoteUpdateNewer(const InstallerUpdateInfo& info) {
-    if (info.remoteBuild > kInstallerBuildNumber) {
+    if (info.remoteBuild > 0 && info.remoteBuild > kInstallerBuildNumber) {
         return true;
     }
 
-    const std::wstring localTag = Utf8ToWide(INSTALLER_RELEASE_TAG);
-    const int localTagNumber = ParseReleaseTagNumber(localTag);
-    const int remoteTagNumber = ParseReleaseTagNumber(info.releaseTag);
-    if (remoteTagNumber > localTagNumber) {
-        return true;
+    const std::wstring localTag = Utf8ToWideLocal(INSTALLER_RELEASE_TAG);
+    if (!info.releaseTag.empty() && !localTag.empty() &&
+        _wcsicmp(info.releaseTag.c_str(), localTag.c_str()) != 0) {
+        const int localTagNumber = ParseReleaseTagNumber(localTag);
+        const int remoteTagNumber = ParseReleaseTagNumber(info.releaseTag);
+        if (remoteTagNumber > localTagNumber) {
+            return true;
+        }
+        // Same numeric prefix (e.g. 3521 vs 3521-BETA): treat different tags as updates when remote builds are newer
+        // isn't known — use lexicographic tag compare only if both non-empty for equal numbers.
+        if (remoteTagNumber == localTagNumber && remoteTagNumber > 0) {
+            // Prefer full (stable) release_tag over local BETA when tags differ only by suffix:
+            // e.g. remote 3521 vs local 3521-BETA -> update; remote 3521-BETA vs local 3521 -> no.
+            const bool localBeta = localTag.find(L"BETA") != std::wstring::npos ||
+                                   localTag.find(L"beta") != std::wstring::npos ||
+                                   localTag.find(L'-') != std::wstring::npos;
+            const bool remoteBeta = info.releaseTag.find(L"BETA") != std::wstring::npos ||
+                                    info.releaseTag.find(L"beta") != std::wstring::npos ||
+                                    info.releaseTag.find(L'-') != std::wstring::npos;
+            if (localBeta && !remoteBeta) {
+                return true;
+            }
+            if (!localBeta && remoteBeta) {
+                return false;
+            }
+            return info.releaseTag > localTag;
+        }
     }
 
     return false;
-}
-
-UpdateCheckResult CheckManifestUpdate() {
-    UpdateCheckResult result;
-    std::wstring body;
-    std::wstring error;
-    if (!HttpGet(kUpdateManifestUrl, body, error)) {
-        result.error = error;
-        return result;
-    }
-
-    if (!ParseManifestUpdate(body, result.info)) {
-        result.error = L"Could not parse update manifest";
-        return result;
-    }
-
-    result.info.updateAvailable = IsRemoteUpdateNewer(result.info);
-    result.success = true;
-    return result;
-}
-
-UpdateCheckResult CheckGitHubUpdate() {
-    UpdateCheckResult result;
-    std::wstring body;
-    std::wstring error;
-    if (!HttpGet(kGitHubReleasesApiUrl, body, error)) {
-        result.error = error;
-        return result;
-    }
-
-    if (!ParseGitHubPrerelease(body, result.info)) {
-        result.error = L"Could not find a prerelease in GitHub releases";
-        return result;
-    }
-
-    result.info.updateAvailable = IsRemoteUpdateNewer(result.info);
-    result.success = true;
-    return result;
 }
 
 }  // namespace
@@ -404,7 +412,7 @@ bool DownloadAndRelaunchInstallerUpdate(
     const InstallerUpdateInfo& info, const std::function<void(uint64_t downloaded, uint64_t total)>& onProgress,
     const std::function<void(const std::wstring&)>& onLog, std::wstring& error) {
     if (info.downloadUrl.empty()) {
-        error = L"No download URL in update manifest";
+        error = L"No download URL for installer update";
         return false;
     }
 
@@ -457,28 +465,30 @@ bool DownloadAndRelaunchInstallerUpdate(
 }
 
 UpdateCheckResult CheckForInstallerUpdate() {
-    UpdateCheckResult githubResult = CheckGitHubUpdate();
-    if (githubResult.success && !githubResult.info.downloadUrl.empty()) {
-        const UpdateCheckResult manifestResult = CheckManifestUpdate();
-        if (manifestResult.success) {
-            if (!manifestResult.info.version.empty()) {
-                githubResult.info.version = manifestResult.info.version;
-            }
-            if (manifestResult.info.remoteBuild > 0) {
-                githubResult.info.remoteBuild = manifestResult.info.remoteBuild;
-            }
-            githubResult.info.updateAvailable = IsRemoteUpdateNewer(githubResult.info);
-        }
-        return githubResult;
-    }
-
-    UpdateCheckResult manifestResult = CheckManifestUpdate();
-    if (manifestResult.success) {
-        return manifestResult;
-    }
-
     UpdateCheckResult result;
-    result.error = githubResult.error.empty() ? manifestResult.error : githubResult.error;
+    std::wstring body;
+    std::wstring error;
+    if (!HttpGet(kGitHubReleasesApiUrl, body, error)) {
+        result.error = error.empty() ? L"Could not query GitHub releases" : error;
+        return result;
+    }
+
+    ParsedRelease release{};
+    if (!FindBestInstallerRelease(body, release)) {
+        result.error = L"No GitHub release publishes " + GetInstallerAssetFileName();
+        return result;
+    }
+
+    result.info.releaseTag = release.tag;
+    result.info.version = !release.name.empty() ? release.name : release.tag;
+    result.info.releaseUrl = release.htmlUrl;
+    if (result.info.releaseUrl.empty()) {
+        result.info.releaseUrl = L"https://github.com/mon5termatt/medicat_installer/releases/tag/" + release.tag;
+    }
+    result.info.downloadUrl = release.downloadUrl;
+    result.info.remoteBuild = 0;
+    result.info.updateAvailable = IsRemoteUpdateNewer(result.info);
+    result.success = true;
     return result;
 }
 

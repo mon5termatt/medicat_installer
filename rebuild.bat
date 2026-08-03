@@ -81,26 +81,10 @@ echo   %~dp0build\x86\Release\MedicatInstaller-x86.exe
 if "%UPLOAD_RELEASE%"=="1" (
     call "tools\upload_release.bat" "%RELEASE_TAG%"
     if errorlevel 1 goto fail
-    goto push_manifest
+    if not "%PIN_BUILD%"=="0" set "MEDICAT_PIN_BUILD="
+    exit /b 0
 )
 
-if "%PIN_BUILD%"=="0" (
-    echo Publishing update manifest...
-    python "tools\publish_update_manifest.py" --build-number "build_number.txt" --build-version "generated\build_version.cpp" --output "update.json"
-    if errorlevel 1 goto fail
-    goto push_manifest
-)
-
-echo Skipping update manifest push for pinned test build %PIN_BUILD% ^(no release^).
-set "MEDICAT_PIN_BUILD="
-exit /b 0
-
-:push_manifest
-echo Pushing update manifest to origin/main...
-call "tools\push_update_manifest.bat"
-if errorlevel 1 (
-    echo Warning: update manifest push failed.
-)
 if not "%PIN_BUILD%"=="0" set "MEDICAT_PIN_BUILD="
 exit /b 0
 
