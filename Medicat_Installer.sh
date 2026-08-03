@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
 
-# Script Version 0013
+# Script Version 0014
 #
 # Changelog
 # ---------
+# 0014
+#   - Install dependencies one package at a time so one missing/obsolete
+#     package cannot cancel the rest of the apt/dnf transaction.
+#   - Pass -y / --noconfirm / --no-interactive on package installs (apt, yum,
+#     dnf, pkg, apk, xbps; pacman already used --noconfirm).
+#   - Fix Debian/Ubuntu package install: use exfatprogs (exfat-utils is gone
+#     on Bookworm+), which previously aborted the whole apt transaction so
+#     aria2/7z never installed.
+#   - Abort if package install fails; re-check required commands afterward.
+#   - Direct download falls back to wget when aria2c is missing.
+#   - Increase aria2c download concurrency to -x16 -s16 (was -x32 -s32).
 # 0013
 #   - Allow running as root/sudo after an explicit warning confirmation
 #     (useful for root-only test VMs). Privileged commands use $sudo so
@@ -11,7 +22,7 @@
 # 0012
 #   - Offer download method choice: direct HTTP (aria2c multi-connection),
 #     BitTorrent, or local path when the MediCat archive is missing.
-#   - Primary direct mirror: files.medicatusb.com (aria2c -x32 -s32 -k1M -c).
+#   - Primary direct mirror: files.medicatusb.com (aria2c -x16 -s16 -k1M -c).
 #   - Fallback mirror: files.dog (known broken SSL; aria2c without cert check).
 # 0011
 #   - Fix YesNo infinite loop: empty/EOF input no longer spins forever on
@@ -73,8 +84,15 @@ ventoy["default"]="ventoy"
 declare -A parted
 parted["default"]="parted"
 declare -A exfat
-exfat["fedora"]="exfatprogfs"
-exfat["default"]="exfat-utils"
+# Bookworm+/Ubuntu: exfat-utils removed; exfatprogs provides mkfs.exfat
+exfat["ubuntu"]="exfatprogs"
+exfat["debian"]="exfatprogs"
+exfat["fedora"]="exfatprogs"
+exfat["centos"]="exfatprogs"
+exfat["arch"]="exfatprogs"
+exfat["alpine"]="exfatprogs"
+exfat["void"]="exfatprogs"
+exfat["default"]="exfatprogs"
 
 # Other Variables
 sudo="sudo" # By default use sudo with package manager
@@ -175,27 +193,62 @@ function CheckNotElevated {
 # Function to handle dependecies list
 function dependenciesHandler() {
 	$sudo $pkgmgr $update_arg
-	local toInstall=""
+	local toInstall=()
+	local command pkg
+	local failedPkgs=()
+
 	for command in "${!depCommands[@]}"; do
-		if ! [ $(which $command 2>/dev/null) ]; then
-		    declare -n ref="${depCommands[$command]}"
+		if ! command -v "$command" >/dev/null 2>&1; then
+			declare -n ref="${depCommands[$command]}"
+			local pkgList
 			if [ -z "${ref[$os]}" ]; then
-				toInstall+=" "${ref['default']}
+				pkgList="${ref['default']}"
 			else
-				toInstall+=" "${ref[$os]}
+				pkgList="${ref[$os]}"
 			fi
+			# Expand multi-package entries (e.g. "p7zip p7zip-plugins") into one-by-one installs
+			# shellcheck disable=SC2206
+			local pkgs=( $pkgList )
+			for pkg in "${pkgs[@]}"; do
+				toInstall+=("$pkg")
+			done
 		fi
 	done
-	if [ "$toInstall" != "" ]; then
-		if [ $os == "unknown" ]; then
-			colEcho $redB "ERROR: Distro is unknown and some dependencies were not found. \n Please install the following dependencies manually: $toInstall"
+
+	if (( ${#toInstall[@]} > 0 )); then
+		if [ "$os" == "unknown" ]; then
+			colEcho $redB "ERROR: Distro is unknown and some dependencies were not found."
+			colEcho $redB "Please install the following packages manually:$whiteB ${toInstall[*]}"
 			exit 1
 		fi
-		colEcho $cyanB "The following dependencies will be installed: $toInstall"
+		colEcho $cyanB "The following dependencies will be installed (one at a time):$whiteB ${toInstall[*]}"
 		UserWait
-		$sudo $pkgmgr $install_arg $toInstall
+		for pkg in "${toInstall[@]}"; do
+			colEcho $cyanB "Installing$whiteB $pkg$cyanB..."
+			# shellcheck disable=SC2086
+			if ! $sudo $pkgmgr $install_arg $pkg; then
+				colEcho $yellowB "WARNING: Failed to install $pkg — continuing with remaining packages."
+				failedPkgs+=("$pkg")
+			fi
+		done
+		if (( ${#failedPkgs[@]} > 0 )); then
+			colEcho $yellowB "Some packages failed:$whiteB ${failedPkgs[*]}"
+		fi
 	else
 		colEcho $cyanB "All dependencies are already installed.\n"
+	fi
+
+	# Only hard-fail for commands that are still missing after best-effort install.
+	local stillMissing=""
+	for command in "${!depCommands[@]}"; do
+		if ! command -v "$command" >/dev/null 2>&1; then
+			stillMissing+=" $command"
+		fi
+	done
+	if [ -n "$stillMissing" ]; then
+		colEcho $redB "ERROR: Required commands still missing after install:$whiteB$stillMissing"
+		colEcho $redB "Install them manually (or install an equivalent package), then re-run this script."
+		exit 1
 	fi
 }
 
@@ -249,32 +302,49 @@ function ReadPrompt() {
 	printf -v "$__resultVar" '%s' "$__line"
 }
 
-# Download the MediCat archive over HTTP with aria2c multi-connection.
+# Download the MediCat archive over HTTP (aria2c multi-connection preferred; wget fallback).
 # $1=url  $2=mirror name  $3=insecure (true|false) — skip TLS verify when true
 function downloadMedicatHttp() {
 	local url="$1"
 	local mirrorName="$2"
 	local insecure="$3"
-	local ariaArgs=(-x32 -s32 -k1M -c --file-allocation=none --summary-interval=5 -o "$Medicat7zFile")
+	local ok=1
 
 	colEcho $cyanB "\nDirect download from$whiteB $mirrorName"
 	colEcho $cyanB "URL:$whiteB $url"
 
-	if [[ "$insecure" == "true" ]]; then
-		colEcho $yellowB "Note: this mirror has known TLS certificate issues; certificate checking is disabled for this download only."
-		ariaArgs+=(--check-certificate=false)
+	if command -v aria2c >/dev/null 2>&1; then
+		# aria2 caps --max-connection-per-server (-x) at 16
+		local ariaArgs=(-x16 -s16 -k1M -c --file-allocation=none --summary-interval=5 -o "$Medicat7zFile")
+		if [[ "$insecure" == "true" ]]; then
+			colEcho $yellowB "Note: this mirror has known TLS certificate issues; certificate checking is disabled for this download only."
+			ariaArgs+=(--check-certificate=false)
+		fi
+		if aria2c "${ariaArgs[@]}" -- "$url"; then
+			ok=0
+		fi
+	elif command -v wget >/dev/null 2>&1; then
+		colEcho $yellowB "aria2c not found; falling back to single-stream wget."
+		local wgetArgs=(-c --show-progress -O "$Medicat7zFile")
+		if [[ "$insecure" == "true" ]]; then
+			colEcho $yellowB "Note: this mirror has known TLS certificate issues; certificate checking is disabled for this download only."
+			wgetArgs+=(--no-check-certificate)
+		fi
+		if wget "${wgetArgs[@]}" -- "$url"; then
+			ok=0
+		fi
+	else
+		colEcho $redB "ERROR: Neither aria2c nor wget is available for HTTP download."
+		return 1
 	fi
 
-	if aria2c "${ariaArgs[@]}" -- "$url"; then
-		if [[ -f "$Medicat7zFile" ]]; then
-			location="$Medicat7zFile"
-			colEcho $greenB "Download finished:$whiteB $location"
-			return 0
-		fi
-		colEcho $redB "aria2c reported success but $Medicat7zFile was not found."
-	else
-		colEcho $redB "Download from $mirrorName failed."
+	if [[ "$ok" -eq 0 ]] && [[ -f "$Medicat7zFile" ]]; then
+		location="$Medicat7zFile"
+		colEcho $greenB "Download finished:$whiteB $location"
+		return 0
 	fi
+
+	colEcho $redB "Download from $mirrorName failed."
 	return 1
 }
 
@@ -400,12 +470,12 @@ colEcho $cyanB "Refactored by id3v1669.\n"
 if grep -qs "ubuntu" /etc/os-release; then
 	os="ubuntu"
 	pkgmgr="apt"
-	install_arg="install"
+	install_arg="install -y"
 	update_arg="update"
 elif grep -qs "freebsd" /etc/os-release; then
 	os="freebsd"
 	pkgmgr="pkg"
-	install_arg="install"
+	install_arg="install -y"
 	update_arg="update"
 elif grep -qs "nixos" /etc/os-release; then
 	os="nixos"
@@ -417,30 +487,30 @@ elif grep -qs "nixos" /etc/os-release; then
 elif grep -qs "alpine" /etc/os-release; then
 	os="alpine"
 	pkgmgr="apk"
-	install_arg="add"
+	install_arg="add --no-interactive"
 	update_arg="update"
 elif [[ -e /etc/debian_version ]]; then
 	os="debian"
 	pkgmgr="apt"
-	install_arg="install"
+	install_arg="install -y"
 	update_arg="update"
 elif [[ -e /etc/almalinux-release || -e /etc/rocky-release || -e /etc/centos-release ]]; then
 	colEcho $redB "Fuck Red-Hat for putting source code behind paywalls."
 	os="centos"
 	pkgmgr="yum"
-	install_arg="install"
+	install_arg="install -y"
 	update_arg="update"
 elif [[ -e /etc/fedora-release ]]; then
 	os="fedora"
 	pkgmgr="dnf"
-	install_arg="install"
+	install_arg="install -y"
 	update_arg="upgrade"
 	alias mkexfatfs=mkfs.exfat # Wtf Ventoy?
 elif [[ -e /etc/nobara ]]; then
 	colEcho $redB "gaming moment"
 	os="fedora"
 	pkgmgr="yum"
-	install_arg="install"
+	install_arg="install -y"
 	update_arg="update"
 	alias mkexfatfs=mkfs.exfat
 elif [[ -e /etc/arch-release ]]; then
@@ -453,7 +523,7 @@ elif grep -qs "void" /etc/os-release; then
 	os="void"
 	colEcho $greenB "Enter the void"
 	pkgmgr="xbps-install"
-	install_arg="-S" # Technically don't need one
+	install_arg="-Sy" # -y = assume yes
 	update_arg="-S"
 else
 	os="unknown"
