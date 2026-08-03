@@ -1,42 +1,8 @@
 #!/usr/bin/env bash
 
-# Script Version 0015
-# Keep ScriptVersion in sync with the comment above.
-ScriptVersion="0015"
-#
-# Changelog
-# ---------
-# 0015
-#   - Fix colour init: stop shadowing /usr/bin/clear with sgr0 var (could break
-#     welcome banner); safer colEcho via printf.
-#   - Fix Debian/Ubuntu package install: use exfatprogs (exfat-utils is gone
-# 0014
-#   - Install dependencies one package at a time so one missing/obsolete
-#     package cannot cancel the rest of the apt/dnf transaction.
-#   - Pass -y / --noconfirm / --no-interactive on package installs (apt, yum,
-#     dnf, pkg, apk, xbps; pacman already used --noconfirm).
-#     on Bookworm+), which previously aborted the whole apt transaction so
-#     aria2/7z never installed.
-#   - Abort if package install fails; re-check required commands afterward.
-#   - Direct download falls back to wget when aria2c is missing.
-#   - Increase aria2c download concurrency to -x16 -s16 (was -x32 -s32).
-# 0013
-#   - Allow running as root/sudo after an explicit warning confirmation
-#     (useful for root-only test VMs). Privileged commands use $sudo so
-#     they work when already root (empty sudo) or as a normal user.
-# 0012
-#   - Offer download method choice: direct HTTP (aria2c multi-connection),
-#     BitTorrent, or local path when the MediCat archive is missing.
-#   - Primary direct mirror: files.medicatusb.com (aria2c -x16 -s16 -k1M -c).
-#   - Fallback mirror: files.dog (known broken SSL; aria2c without cert check).
-# 0011
-#   - Fix YesNo infinite loop: empty/EOF input no longer spins forever on
-#     "Invalid input". read failures exit cleanly; non-TTY stdin falls back
-#     to /dev/tty (curl|bash, pipelines).
-#   - YesNo returns exit status (0=yes, 1=no) instead of echoing true/false;
-#     call sites no longer use command substitution $(YesNo ...).
-#   - Trim CR/whitespace; accept Y/Yes and N/No (case-insensitive prefix).
+ScriptVersion="0016"
 
+# See CHANGELOG.md for changes.
 #
 #--------------------------------Variables------------------------------------#
 
@@ -143,31 +109,50 @@ function colEcho() {
 	fi
 }
 
-# Function to wait for a user keypress.
+# Open interactive input: always prefer /dev/tty so pipes / curl|bash / leftover
+# stdin never make keypress prompts return immediately empty.
+# Sets global _promptFd (0 = stdin, or an open fd number). Call promptClose after.
+_promptFd=0
+function promptOpen() {
+	_promptFd=0
+	if [[ -r /dev/tty ]]; then
+		exec 3</dev/tty
+		_promptFd=3
+	fi
+}
+function promptClose() {
+	if [[ "${_promptFd:-0}" -ne 0 ]]; then
+		exec 3<&-
+		_promptFd=0
+	fi
+}
+
+# Function to wait for a user keypress (real terminal, not redirected stdin).
 function UserWait() {
-    read -n 1 -s -r -p "Press any key to continue"
-    echo -e "\r                         \r"
+	local promptText="${1:-Press any key to continue}"
+	promptOpen
+	# Prompt on stderr so it still shows if stdout is piped; read one key from TTY.
+	printf '%s' "$promptText" >&2
+	if ! read -n 1 -s -r <&"$_promptFd"; then
+		promptClose
+		colEcho $redB "ERROR: Failed to read keypress (EOF). Exiting..." >&2
+		exit 1
+	fi
+	printf '\r                         \r' >&2
+	promptClose
 }
 
 # Function to ask a Yes/No question.
 # Returns 0 for Yes, 1 for No. Exit 1 on unrecoverable input failure.
 # Prefer: if YesNo "prompt? (Y/N) "; then ...
-# Avoid: if $(YesNo ...); then  # subshell + captures stdout; can hide prompts/EOF loops
 function YesNo() {
 	local setCheck=""
-	local inputFd=0
-
-	# Prompt on the real terminal when stdin is redirected (curl|bash, pipelines, etc.).
-	# Without this, `read` can hit EOF immediately and spin on "Invalid input" forever.
-	if [[ ! -t 0 ]] && [[ -r /dev/tty ]]; then
-		inputFd=3
-		exec 3</dev/tty
-	fi
+	promptOpen
 
 	while true; do
-		if ! read -r -p "$1" setCheck <&"$inputFd"; then
+		if ! read -r -p "$1" setCheck <&"$_promptFd"; then
+			promptClose
 			colEcho $redB "ERROR: Failed to read input (EOF). Exiting..." >&2
-			[[ "$inputFd" -ne 0 ]] && exec 3<&-
 			exit 1
 		fi
 
@@ -178,11 +163,11 @@ function YesNo() {
 
 		case "$setCheck" in
 			[Yy]|[Yy][Ee][Ss])
-				[[ "$inputFd" -ne 0 ]] && exec 3<&-
+				promptClose
 				return 0
 				;;
 			[Nn]|[Nn][Oo])
-				[[ "$inputFd" -ne 0 ]] && exec 3<&-
+				promptClose
 				return 1
 				;;
 			*)
@@ -297,24 +282,19 @@ function downloadVentoy() {
 	mv ventoy-${venver: -6} ventoy
 }
 
-# Read a line from the terminal (uses /dev/tty when stdin is redirected).
+# Read a line from the real terminal (prefer /dev/tty; never skip on empty stdin).
 function ReadPrompt() {
 	local __prompt="$1"
 	local __resultVar="$2"
 	local __line=""
-	local inputFd=0
 
-	if [[ ! -t 0 ]] && [[ -r /dev/tty ]]; then
-		inputFd=3
-		exec 3</dev/tty
-	fi
-
-	if ! read -r -p "$__prompt" __line <&"$inputFd"; then
-		[[ "$inputFd" -ne 0 ]] && exec 3<&-
+	promptOpen
+	if ! read -r -p "$__prompt" __line <&"$_promptFd"; then
+		promptClose
 		colEcho $redB "ERROR: Failed to read input (EOF). Exiting..." >&2
 		exit 1
 	fi
-	[[ "$inputFd" -ne 0 ]] && exec 3<&-
+	promptClose
 
 	__line="${__line//$'\r'/}"
 	printf -v "$__resultVar" '%s' "$__line"
@@ -626,20 +606,42 @@ else
 fi
 
 # Advise user to connect and select the required USB device.
-colEcho $yellowB "\nPlease Plug your USB in now if it is not already connected..."
-colEcho $yellowB "\nPress any key once it has been detected by your system..."
-UserWait
+colEcho $yellowB "\nPlease plug your USB in now if it is not already connected..."
+colEcho $yellowB "Press any key once it has been detected by your system..."
+UserWait "Press any key when ready..."
 
-colEcho $yellowB "Please Find the ID of your USB below:"
+letter=""
+while true; do
+	colEcho $yellowB "\nPlease find the ID of your USB drive below:"
+	lsblk --nodeps --output "NAME,SIZE,VENDOR,MODEL,SERIAL" | grep -v loop || true
 
-lsblk --nodeps --output "NAME,SIZE,VENDOR,MODEL,SERIAL" | grep -v loop
-
-colEcho $yellowB "Enter the device for the USB drive NOT INCLUDING /dev/ OR the Number After."
-colEcho $yellowB "for example enter sda or sdb"
-read letter
+	colEcho $yellowB "Enter the device name NOT including /dev/ or the partition number."
+	colEcho $yellowB "For example: sda  or  sdb  or  nvme0n1"
+	ReadPrompt "Device: " letter
+	letter="${letter//$'\r'/}"
+	letter="${letter#/dev/}"
+	letter="${letter#"${letter%%[![:space:]]*}"}"
+	letter="${letter%"${letter##*[![:space:]]}"}"
+	# Strip trailing partition numbers for nvme (nvme0n1p1 -> nvme0n1) is user error; only strip bare trailing digit patterns for sdxN
+	if [[ -z "$letter" ]]; then
+		colEcho $redB "No device entered. Try again."
+		continue
+	fi
+	if [[ ! -b "/dev/$letter" ]]; then
+		colEcho $redB "Block device not found:$whiteB /dev/$letter"
+		colEcho $yellowB "Check the name from the list and try again."
+		continue
+	fi
+	break
+done
 
 drive=/dev/$letter
-drive2="$drive""1"
+# First partition: nvme0n1 -> nvme0n1p1, sda -> sda1
+if [[ "$letter" =~ [0-9]$ ]]; then
+	drive2="${drive}p1"
+else
+	drive2="${drive}1"
+fi
 
 if YesNo "You want to install Ventoy and Medicat to $drive / $drive2? (Y/N) "; then
 	colEcho $cyanB "Installation confirmed and will commence in 5 seconds..."
