@@ -1240,21 +1240,41 @@ void Gui::ShowUpdatePrompt(const InstallerUpdateInfo& info) {
         lastUpdatePromptReleaseTag_ = releaseTag;
     }
 
+    const std::wstring localVersion = InstallerVersionLabel();
 #ifndef INSTALLER_RELEASE_TAG
 #define INSTALLER_RELEASE_TAG "unknown"
 #endif
-
-    const std::wstring localVersion = InstallerVersionLabel();
     const std::wstring localTag = [&]() {
         wchar_t buffer[64]{};
         swprintf_s(buffer, L"%hs", INSTALLER_RELEASE_TAG);
         return std::wstring(buffer);
     }();
-    const std::wstring remoteVersion =
-        info.version.empty() ? info.releaseTag : (info.version.rfind(L'v', 0) == 0 ? info.version : L"v" + info.version);
+    const std::wstring remoteVersion = [&]() {
+        if (!info.version.empty()) {
+            return info.version.rfind(L'v', 0) == 0 ? info.version : (L"v" + info.version);
+        }
+        if (!info.releaseTag.empty()) {
+            return info.releaseTag.rfind(L'v', 0) == 0 ? info.releaseTag : (L"v" + info.releaseTag);
+        }
+        return std::wstring(L"unknown");
+    }();
+    const std::wstring remoteTag = info.releaseTag.empty() ? remoteVersion : info.releaseTag;
+
+    // When version and tag are the same scheme (1.0.N), only show the version once.
+    const std::wstring localPrimary = localVersion;
+    const std::wstring localSecondary =
+        !localTag.empty() && localTag != InstallerVersionWide() ? localTag : localVersion;
+    const std::wstring remotePrimary = remoteVersion;
+    const std::wstring remoteSecondary =
+        !remoteTag.empty() && remoteTag != info.version &&
+                (info.version.empty() || remoteTag != (info.version.rfind(L'v', 0) == 0
+                                                           ? info.version.substr(1)
+                                                           : info.version))
+            ? remoteTag
+            : remoteVersion;
 
     const std::wstring message =
-        i18n::Tr(L"update.available_message", localVersion, localTag, remoteVersion, info.releaseTag);
+        i18n::Tr(L"update.available_message", localPrimary, localSecondary, remotePrimary, remoteSecondary);
     const std::wstring title = i18n::Tr(L"update.available_title");
     if (ShowConfirmDialog(message, title, MessageDialogKind::Info)) {
         if (info.downloadUrl.empty()) {

@@ -152,6 +152,70 @@ int ParseReleaseTagNumber(const std::wstring& tag) {
     return any ? value : 0;
 }
 
+struct SemVer {
+    int major = 0;
+    int minor = 0;
+    int patch = 0;
+    bool ok = false;
+};
+
+SemVer ParseSemVer(const std::wstring& tagIn) {
+    SemVer v{};
+    std::wstring tag = tagIn;
+    if (!tag.empty() && (tag[0] == L'v' || tag[0] == L'V')) {
+        tag.erase(tag.begin());
+    }
+    const size_t dash = tag.find(L'-');
+    if (dash != std::wstring::npos) {
+        tag = tag.substr(0, dash);
+    }
+    const size_t plus = tag.find(L'+');
+    if (plus != std::wstring::npos) {
+        tag = tag.substr(0, plus);
+    }
+
+    int parts[3] = {0, 0, 0};
+    int part = 0;
+    size_t i = 0;
+    bool anyDigit = false;
+    while (i < tag.size() && part < 3) {
+        if (!iswdigit(tag[i])) {
+            if (tag[i] == L'.' && anyDigit) {
+                ++part;
+                anyDigit = false;
+                ++i;
+                continue;
+            }
+            break;
+        }
+        anyDigit = true;
+        parts[part] = parts[part] * 10 + (tag[i] - L'0');
+        ++i;
+    }
+    // Require major.minor.patch (two dots / three numeric components).
+    if (part < 2 || !anyDigit) {
+        return v;
+    }
+    v.major = parts[0];
+    v.minor = parts[1];
+    v.patch = parts[2];
+    v.ok = true;
+    return v;
+}
+
+int CompareSemVer(const SemVer& a, const SemVer& b) {
+    if (a.major != b.major) {
+        return a.major < b.major ? -1 : 1;
+    }
+    if (a.minor != b.minor) {
+        return a.minor < b.minor ? -1 : 1;
+    }
+    if (a.patch != b.patch) {
+        return a.patch < b.patch ? -1 : 1;
+    }
+    return 0;
+}
+
 std::wstring FindAssetDownloadUrl(const std::wstring& block, const std::wstring& assetName) {
     size_t from = 0;
     while (from < block.size()) {
@@ -226,8 +290,12 @@ void ForEachReleaseBlock(const std::wstring& json, const std::function<bool(cons
 }
 
 bool FindBestInstallerRelease(const std::wstring& json, ParsedRelease& best) {
+    ParsedRelease firstStableSemver{};
+    ParsedRelease firstAnySemver{};
     ParsedRelease firstStable{};
     ParsedRelease firstPrerelease{};
+    bool haveStableSemver = false;
+    bool haveAnySemver = false;
     bool haveStable = false;
     bool havePrerelease = false;
 
@@ -235,6 +303,17 @@ bool FindBestInstallerRelease(const std::wstring& json, ParsedRelease& best) {
         ParsedRelease release{};
         if (!ParseReleaseBlock(block, release)) {
             return false;
+        }
+        const bool semver = ParseSemVer(release.tag).ok;
+        if (semver) {
+            if (!haveAnySemver) {
+                firstAnySemver = release;
+                haveAnySemver = true;
+            }
+            if (!release.prerelease && !haveStableSemver) {
+                firstStableSemver = release;
+                haveStableSemver = true;
+            }
         }
         if (!release.prerelease) {
             if (!haveStable) {
@@ -245,10 +324,17 @@ bool FindBestInstallerRelease(const std::wstring& json, ParsedRelease& best) {
             firstPrerelease = release;
             havePrerelease = true;
         }
-        // Keep scanning until we have a stable candidate (API is newest-first).
-        return haveStable;
+        return haveStableSemver;
     });
 
+    if (haveStableSemver) {
+        best = firstStableSemver;
+        return true;
+    }
+    if (haveAnySemver) {
+        best = firstAnySemver;
+        return true;
+    }
     if (haveStable) {
         best = firstStable;
         return true;
@@ -266,34 +352,44 @@ bool IsRemoteUpdateNewer(const InstallerUpdateInfo& info) {
     }
 
     const std::wstring localTag = Utf8ToWideLocal(INSTALLER_RELEASE_TAG);
-    if (!info.releaseTag.empty() && !localTag.empty() &&
-        _wcsicmp(info.releaseTag.c_str(), localTag.c_str()) != 0) {
-        const int localTagNumber = ParseReleaseTagNumber(localTag);
-        const int remoteTagNumber = ParseReleaseTagNumber(info.releaseTag);
-        if (remoteTagNumber > localTagNumber) {
-            return true;
-        }
-        // Same numeric prefix (e.g. 3521 vs 3521-BETA): treat different tags as updates when remote builds are newer
-        // isn't known — use lexicographic tag compare only if both non-empty for equal numbers.
-        if (remoteTagNumber == localTagNumber && remoteTagNumber > 0) {
-            // Prefer full (stable) release_tag over local BETA when tags differ only by suffix:
-            // e.g. remote 3521 vs local 3521-BETA -> update; remote 3521-BETA vs local 3521 -> no.
-            const bool localBeta = localTag.find(L"BETA") != std::wstring::npos ||
-                                   localTag.find(L"beta") != std::wstring::npos ||
-                                   localTag.find(L'-') != std::wstring::npos;
-            const bool remoteBeta = info.releaseTag.find(L"BETA") != std::wstring::npos ||
-                                    info.releaseTag.find(L"beta") != std::wstring::npos ||
-                                    info.releaseTag.find(L'-') != std::wstring::npos;
-            if (localBeta && !remoteBeta) {
-                return true;
-            }
-            if (!localBeta && remoteBeta) {
-                return false;
-            }
-            return info.releaseTag > localTag;
-        }
+    if (info.releaseTag.empty() || localTag.empty()) {
+        return false;
+    }
+    if (_wcsicmp(info.releaseTag.c_str(), localTag.c_str()) == 0) {
+        return false;
     }
 
+    const SemVer localSem = ParseSemVer(localTag);
+    const SemVer remoteSem = ParseSemVer(info.releaseTag);
+
+    // New scheme: tags are 1.0.N. Do not "update" to legacy numeric tags (3520 / 3521-BETA).
+    if (localSem.ok && !remoteSem.ok) {
+        return false;
+    }
+    if (!localSem.ok && remoteSem.ok) {
+        return true;
+    }
+    if (localSem.ok && remoteSem.ok) {
+        return CompareSemVer(remoteSem, localSem) > 0;
+    }
+
+    // Both legacy-style tags (old batch scheme) — keep prior behavior for transition.
+    const int localTagNumber = ParseReleaseTagNumber(localTag);
+    const int remoteTagNumber = ParseReleaseTagNumber(info.releaseTag);
+    if (remoteTagNumber > localTagNumber) {
+        return true;
+    }
+    if (remoteTagNumber == localTagNumber && remoteTagNumber > 0) {
+        const bool localBeta = localTag.find(L'-') != std::wstring::npos;
+        const bool remoteBeta = info.releaseTag.find(L'-') != std::wstring::npos;
+        if (localBeta && !remoteBeta) {
+            return true;
+        }
+        if (!localBeta && remoteBeta) {
+            return false;
+        }
+        return _wcsicmp(info.releaseTag.c_str(), localTag.c_str()) > 0;
+    }
     return false;
 }
 
@@ -481,6 +577,16 @@ UpdateCheckResult CheckForInstallerUpdate() {
 
     result.info.releaseTag = release.tag;
     result.info.version = !release.name.empty() ? release.name : release.tag;
+    // Prefer clean semver for display when the tag is 1.0.N
+    {
+        const SemVer tagVer = ParseSemVer(release.tag);
+        if (tagVer.ok) {
+            result.info.version =
+                std::to_wstring(tagVer.major) + L"." + std::to_wstring(tagVer.minor) + L"." +
+                std::to_wstring(tagVer.patch);
+            result.info.remoteBuild = tagVer.patch;
+        }
+    }
     result.info.releaseUrl = release.htmlUrl;
     if (result.info.releaseUrl.empty()) {
         result.info.releaseUrl = L"https://github.com/mon5termatt/medicat_installer/releases/tag/" + release.tag;

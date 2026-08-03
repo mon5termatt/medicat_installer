@@ -168,7 +168,11 @@ add_custom_command(
 )
 
 set(INSTALLER_RELEASE_TAG "unknown")
-if(EXISTS "${REPO_ROOT}/release_tag.txt")
+# Release GitHub tag matches installer version (1.0.N). Prefer build_number.txt.
+if(EXISTS "${BUILD_NUMBER_FILE}")
+    file(READ "${BUILD_NUMBER_FILE}" INSTALLER_RELEASE_TAG)
+    string(STRIP "${INSTALLER_RELEASE_TAG}" INSTALLER_RELEASE_TAG)
+elseif(EXISTS "${REPO_ROOT}/release_tag.txt")
     file(READ "${REPO_ROOT}/release_tag.txt" INSTALLER_RELEASE_TAG)
     string(STRIP "${INSTALLER_RELEASE_TAG}" INSTALLER_RELEASE_TAG)
 endif()
@@ -182,6 +186,7 @@ target_compile_definitions(MedicatInstaller PRIVATE
     MEDICAT_SESSIONS_URL="${MEDICAT_SESSIONS_URL}"
     MEDICAT_UPLOADS_URL="${MEDICAT_UPLOADS_URL}"
     INSTALLER_RELEASE_TAG="${INSTALLER_RELEASE_TAG}"
+    MEDICAT_RELEASE_TAG="${INSTALLER_RELEASE_TAG}"
 )
 
 target_link_libraries(MedicatInstaller PRIVATE

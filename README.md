@@ -1,44 +1,85 @@
 # MediCat USB Installer
 
-> **HIGHLY EXPERIMENTAL** — native C++ preview. Expect bugs; test on a spare drive first.
+Windows GUI (and CLI) installer for preparing a MediCat USB: Ventoy install/upgrade, optional NTFS format, MediCat archive extraction, and MD5 verification.
 
-Windows GUI installer for preparing a MediCat USB: Ventoy install/upgrade, optional NTFS format, MediCat archive extraction, and MD5 verification.
+Native Win32 build. Ships **GUI + command-line** in one exe — no batch or PowerShell wrapper.
 
-**Latest prerelease:** [GitHub Releases](https://github.com/mon5termatt/medicat_installer/releases) (tag `3520+`, `cpp` branch)
+**Releases:** [GitHub Releases](https://github.com/mon5termatt/medicat_installer/releases) — C++ builds on semantic tags (`1.0.N`); download `MedicatInstaller.exe` / `MedicatInstaller-x86.exe`.
 
 ## Status
 
 | Branch | Installer | Notes |
 |--------|-----------|-------|
-| `cpp` | **C++ / Win32** (active) | Single `MedicatInstaller.exe`, bundled tools, experimental |
-| `pwsh` | PowerShell GUI | Previous alpha; still on GitHub for reference |
-| `main` | Legacy batch/scripts | Older community maintenance |
+| `main` | **C++ / Win32** (active) | Single `MedicatInstaller.exe`, bundled tools, beta |
+| `linux` | Linux helper scripts | Separate branch |
 
-## Quick start (release build)
+## Downloads
 
-1. Download `MedicatInstaller.exe` from [Releases](https://github.com/mon5termatt/medicat_installer/releases).
-2. Place `MediCat.USB.v21.12.7z` in the **same folder** as the installer (or use the built-in download mirrors).
-3. Run `MedicatInstaller.exe` **as Administrator**.
-4. Select your USB drive (≥ 30 GiB; `C:` is hidden). The status bar reports whether Ventoy was detected.
-5. Choose options, confirm the wipe warning, and install — or use **Check USB Files** to MD5-check an existing stick.
+| File | Platform |
+|------|----------|
+| `MedicatInstaller.exe` | Windows x64 |
+| `MedicatInstaller-x86.exe` | Windows 32-bit (x86) |
 
 ## What it does
 
-- **Ventoy** — download, extract, fresh install (`/I`) or in-place upgrade (`/U`) based on drive state and checkboxes
-- **Ventoy UI** — if Ventoy is missing: **Install Ventoy** is forced on; if present: optional **Update Ventoy**
-- **Format** — optional NTFS format; forced when Ventoy is not on the drive
-- **Extract** — `MediCat.USB.v21.12.7z` via bundled `7za.exe` with live file log + status bar
+**Install flow (GUI or CLI)**
+
+- **Ventoy** — download, extract, fresh install or in-place upgrade
+- **Format** — optional NTFS format before extraction (forced when Ventoy is not on the drive)
+- **Extract** — `MediCat.USB.v21.12.7z` via bundled 7-Zip with live progress
 - **Verify** — post-install or standalone MD5 check against embedded `MedicatFiles.md5`
-- **Re-extract** — on verify failure, a window lists failed files and can selectively re-extract via `7za`, then re-verify
-- **i18n** — English, Spanish, French, Polish, Turkish + in-app language selector
+- **Re-extract** — selective re-extract of failed files after verify (GUI prompt; CLI with `/yes` or `/reextract`)
+
+**GUI**
+
+- Drive picker (USB, VHD/VHDX; optional fixed disks ≥ 30 GiB)
+- Dark theme, status bar, optional file-log window during extract/verify
+- Inline archive mirror downloads with resume and progress
+- i18n: English, Spanish, French, Polish, Turkish, Cat
+
+**Command line**
+
+- Dedicated console window for `/install` and `/verify` (not your parent CMD session)
+- Live extract/verify progress in the console (`%` + current file)
+- **Cancel** with Ctrl+C or by closing the console window
+- Scripting flags: `/drive:`, `/format`, `/ventoy`, `/yes`, `/quiet`, `/allow-fixed`, `/archive:`, and more — run `/help` for the full list
+- Exit codes for automation (`0` success, `1` error, `4` cancelled, `5` verify failed, …)
+
+## Quick start (GUI)
+
+1. Download the exe for your architecture from [Releases](https://github.com/mon5termatt/medicat_installer/releases).
+2. Place `MediCat.USB.v21.12.7z` in the **same folder** as the installer (or use the built-in download mirrors).
+3. Run **as Administrator**.
+4. Select a USB drive (≥ 30 GiB; `C:` is hidden). The status bar reports whether Ventoy was detected.
+5. Click **Install** or use **Check USB Files** on an existing stick.
+
+## Quick start (CLI)
+
+```bat
+MedicatInstaller.exe /help
+MedicatInstaller.exe /version
+MedicatInstaller.exe /list-drives
+MedicatInstaller.exe /install /drive:E /yes
+MedicatInstaller.exe /verify /drive:E /yes
+```
+
+Logs are written to `medicat_installer.log` beside the exe.
 
 ## Requirements
 
-- Windows 10/11 **x64** or **32-bit (x86)** — build the matching installer (see below)
+- Windows 10/11
 - Administrator elevation (UAC)
-- Internet for Ventoy download (first run; offline Ventoy zip cache supported)
-- USB drive with **≥ 30 GiB** total capacity
+- Internet for Ventoy download (first run) and optional archive mirrors
+- USB or VHD target with **≥ 30 GiB** capacity
 - `MediCat.USB.v21.12.7z` beside the installer or downloaded via UI (~24 GB+ uncompressed)
+
+## Notes
+
+- **Beta** — report issues with `medicat_installer.log` attached, or share the **Diag code** from the error dialog if logs were uploaded.
+- Stable batch-installer history remains on tag `3520` and earlier (`legacy` branch).
+- CLI help/version strings are English-only for now; `/lang:` affects logged and dialog text where shown.
+- Update tooling: see [`UPDATER.md`](UPDATER.md).
+- Support telemetry: anonymous session reports and optional failure log upload — see [Logs](#logs-beside-the-exe).
 
 ## Build from source
 
@@ -71,22 +112,23 @@ cmake --build build-x86 --config Release
 
 On VS 2026 use `-G "Visual Studio 18 2026"` instead.
 
-**Upload to GitHub prerelease** (after a successful build):
+**Upload to GitHub** (after a successful build; version = tag = `1.0.N`):
 
 ```bat
 rebuild.bat release
-rebuild.bat release 3521-BETA
+rebuild.bat as 1.0.42 release 1.0.42
 tools\upload_release.bat
 ```
 
-Uses `release_tag.txt` (default prerelease tag), or the latest prerelease if that file is missing. Requires [`gh`](https://cli.github.com/) authenticated for the repo.
+Creates the `1.0.N` release if needed, uploads both exes, then re-promotes the legacy bridge tag `3521` as GitHub Latest for old batch clients. Requires [`gh`](https://cli.github.com/) authenticated for the repo.
 
-See [`FEATURES.md`](FEATURES.md) for the feature checklist and [`TODO.md`](TODO.md) for planned work (e.g. support log upload).  
-Developer architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+See [`FEATURES.md`](FEATURES.md) for the feature checklist and [`TODO.md`](TODO.md) for planned work.  
+Developer architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).  
+Updater: [`UPDATER.md`](UPDATER.md).
 
 ## Logs (beside the exe)
 
-Plain-text diagnostics only — these are the files users (and future support upload) should share:
+Plain-text diagnostics only:
 
 | File | When |
 |------|------|
@@ -96,7 +138,18 @@ Plain-text diagnostics only — these are the files users (and future support up
 | `check.log` | During MD5 verify — one line per file (`OK` / `FAIL` / `SKIP`) |
 | `failed_files.txt` | When verification finds failures |
 
-If something breaks, attach `medicat_installer.log` to your issue. A future release will upload **`.log` / `.txt` files only** to a support server with a Discord keyword — see [`TODO.md`](TODO.md).
+### Log server (beta)
+
+During the beta, the installer can send diagnostics to the MediCat telemetry/support service:
+
+| What | When |
+|------|------|
+| **Anonymous session stats** | End of install/verify (success or fail) — small JSON, no log files |
+| **Failure logs** | On install/verify **failure** — allowlisted **`.log` / `.txt`** beside the exe only (not the MediCat archive or USB contents) |
+
+On failure upload, the dialog shows a **Diag code** you can paste in Discord support so maintainers can find your bundle. The UI discloses this with a short beta notice; failure log upload can be disabled via settings (`failure_log_auto_upload_enabled`).
+
+You can still attach `medicat_installer.log` manually when filing a GitHub issue. Details: [`docs/SUPPORT_UPLOAD.md`](docs/SUPPORT_UPLOAD.md), [`docs/SUPPORT_SERVER.md`](docs/SUPPORT_SERVER.md).
 
 ## Repo layout
 
@@ -115,7 +168,7 @@ Runtime folders (`Ventoy2Disk/`, `build/`, offline cache) are created locally an
 
 ## Contributing
 
-PRs welcome on the **`cpp`** branch (active C++ installer). Open issues or discuss large changes first if unsure.
+PRs welcome on the **`main`** branch (active C++ installer). Open issues or discuss large changes first if unsure.
 
 ### What to include in a PR
 

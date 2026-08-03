@@ -28,10 +28,17 @@ extern const int kInstallerBuildNumber = {build};
     return version
 
 
+def write_release_tag(repo_root: Path, version: str) -> None:
+    """Keep release_tag.txt in lockstep with installer version (GitHub tag = version)."""
+    tag_path = repo_root / "release_tag.txt"
+    tag_path.write_text(f"{version}\n", encoding="utf-8", newline="\n")
+
+
 def write_counter(counter_path: Path, major: int, minor: int, build: int) -> str:
     version = f"{major}.{minor}.{build}"
     counter_path.parent.mkdir(parents=True, exist_ok=True)
     counter_path.write_text(f"{version}\n", encoding="utf-8", newline="\n")
+    write_release_tag(counter_path.parent, version)
     return version
 
 
@@ -80,7 +87,7 @@ def main() -> int:
     parser.add_argument(
         "--set",
         default="",
-        help="Force a version in build_version.cpp without incrementing build_number.txt (e.g. 1.0.19 or 19)",
+        help="Force version 1.0.N (or patch N) into build_number.txt, release_tag.txt, and build_version.cpp",
     )
     args = parser.parse_args()
 
@@ -98,7 +105,9 @@ def main() -> int:
             print(f"Invalid MEDICAT_PIN_BUILD: {pin_from_env}", file=sys.stderr)
             return 1
         major, minor, build = pinned
-        version = write_build_version(args.output, major, minor, build)
+        # Keep build_number.txt / release_tag.txt / cpp in lockstep (tag == version).
+        version = write_counter(args.counter, major, minor, build)
+        write_build_version(args.output, major, minor, build)
         print(f"Build number pinned (env): {version}")
         return 0
 
@@ -108,7 +117,8 @@ def main() -> int:
             print(f"Invalid --set value: {args.set}", file=sys.stderr)
             return 1
         major, minor, build = pinned
-        version = write_build_version(args.output, major, minor, build)
+        version = write_counter(args.counter, major, minor, build)
+        write_build_version(args.output, major, minor, build)
         print(f"Build number pinned: {version}")
         return 0
 
@@ -117,6 +127,7 @@ def main() -> int:
         if parsed is not None:
             major, minor, build = parsed
             version = write_build_version(args.output, major, minor, build)
+            write_release_tag(args.counter.parent, version)
             print(f"Build number bump skipped ({args.skip_if_env}); using {version}")
         return 0
 
