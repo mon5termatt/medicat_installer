@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 # Script Version 0015
+# Keep ScriptVersion in sync with the comment above.
+ScriptVersion="0015"
 #
 # Changelog
 # ---------
@@ -471,6 +473,7 @@ function chooseMedicatSource() {
 
 command clear 2>/dev/null || true
 colEcho "$yellowB" "WELCOME TO THE MEDICAT INSTALLER.\n"
+colEcho "$cyanB" "Script version:$whiteB $ScriptVersion"
 
 CheckNotElevated
 
