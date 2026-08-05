@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ScriptVersion="0022"
+ScriptVersion="0023"
 
 # See CHANGELOG.md for changes.
 #
@@ -217,11 +217,12 @@ function CheckNotElevated {
 
 # Function to handle dependecies list
 function dependenciesHandler() {
-	$sudo $pkgmgr $update_arg
 	local toInstall=()
 	local command pkg
 	local failedPkgs=()
 
+	# Check what is missing before refreshing package indexes (#139).
+	# apt update / pacman -Syy / etc. are slow and unnecessary when everything is present.
 	for command in "${!depCommands[@]}"; do
 		if ! command -v "$command" >/dev/null 2>&1; then
 			declare -n ref="${depCommands[$command]}"
@@ -240,27 +241,33 @@ function dependenciesHandler() {
 		fi
 	done
 
-	if (( ${#toInstall[@]} > 0 )); then
-		if [ "$os" == "unknown" ]; then
-			colEcho $redB "ERROR: Distro is unknown and some dependencies were not found."
-			colEcho $redB "Please install the following packages manually:$whiteB ${toInstall[*]}"
-			exit 1
-		fi
-		colEcho $cyanB "The following dependencies will be installed (one at a time):$whiteB ${toInstall[*]}"
-		UserWait
-		for pkg in "${toInstall[@]}"; do
-			colEcho $cyanB "Installing$whiteB $pkg$cyanB..."
-			# shellcheck disable=SC2086
-			if ! $sudo $pkgmgr $install_arg $pkg; then
-				colEcho $yellowB "WARNING: Failed to install $pkg — continuing with remaining packages."
-				failedPkgs+=("$pkg")
-			fi
-		done
-		if (( ${#failedPkgs[@]} > 0 )); then
-			colEcho $yellowB "Some packages failed:$whiteB ${failedPkgs[*]}"
-		fi
-	else
+	if (( ${#toInstall[@]} == 0 )); then
 		colEcho $cyanB "All dependencies are already installed.\n"
+		return 0
+	fi
+
+	if [ "$os" == "unknown" ]; then
+		colEcho $redB "ERROR: Distro is unknown and some dependencies were not found."
+		colEcho $redB "Please install the following packages manually:$whiteB ${toInstall[*]}"
+		exit 1
+	fi
+
+	colEcho $cyanB "Refreshing package indexes ($pkgmgr $update_arg)..."
+	# shellcheck disable=SC2086
+	$sudo $pkgmgr $update_arg
+
+	colEcho $cyanB "The following dependencies will be installed (one at a time):$whiteB ${toInstall[*]}"
+	UserWait
+	for pkg in "${toInstall[@]}"; do
+		colEcho $cyanB "Installing$whiteB $pkg$cyanB..."
+		# shellcheck disable=SC2086
+		if ! $sudo $pkgmgr $install_arg $pkg; then
+			colEcho $yellowB "WARNING: Failed to install $pkg - continuing with remaining packages."
+			failedPkgs+=("$pkg")
+		fi
+	done
+	if (( ${#failedPkgs[@]} > 0 )); then
+		colEcho $yellowB "Some packages failed:$whiteB ${failedPkgs[*]}"
 	fi
 
 	# Only hard-fail for commands that are still missing after best-effort install.

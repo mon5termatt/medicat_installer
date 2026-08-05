@@ -2,6 +2,10 @@
 
 All notable changes to `Medicat_Installer.sh` (linux branch).
 
+## 0023
+
+- Skip package-index refresh (`apt update` / `pacman -Syy` / etc.) when every required command is already installed (#139).
+
 ## 0022
 
 - Fix NTFS mount for distros without in-kernel ntfs3: try ntfs3, ntfs, ntfs-3g, then auto; verify `mountpoint` before extract so a failed mount cannot dump MediCat onto the local disk (#81).
