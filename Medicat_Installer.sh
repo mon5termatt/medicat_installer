@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ScriptVersion="0020"
+ScriptVersion="0021"
 
 # See CHANGELOG.md for changes.
 #
@@ -13,12 +13,27 @@ Medicat7zFile="MediCat.USB.$MedicatVersion.7z"
 Medicat7zFull="MediCat USB ${MedicatVersion}/MediCat.USB.${MedicatVersion}.7z"
 # Full archive is ~21.4 GiB; reject clearly truncated downloads before hashing.
 Medicat7zMinBytes=$((20 * 1024 * 1024 * 1024))
+# Google Drive / Mega multi-volume zip (same MD5s as the Windows C++ installer).
+# 7z extracts the set when pointed at the first volume (.001).
+MedicatSplitBase="MediCat.USB.${MedicatVersion}.zip"
+MedicatSplitFirst="${MedicatSplitBase}.001"
+MedicatSplitSizes=(4290772992 4290772992 4290772992 4290772992 4290772992 2917026620)
+MedicatSplitMd5s=(
+	277793dcf0e31736f0790162a89d07c9
+	a4700261f32d4df5092c5dd5ea6aaa2d
+	6b523273c5c7ed1ddc5920dec95b8509
+	35fac6ff4902d62e6e5fd2dab1050a3f
+	7f416a7d9ff0051ae75bbf44a411b8e4
+	32d84a280af91ae408f55a7722ee6818
+)
 # Direct download mirrors (order = try order). files.dog needs insecure SSL.
 MedicatUrlMedicatusb="https://files.medicatusb.com/files/${MedicatVersion}/${Medicat7zFile}"
 MedicatUrlFilesDog="https://files.dog/OD%20Rips/MediCat/${MedicatVersion}/${Medicat7zFile}"
 MedicatTorrentUrl="https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_${MedicatVersion}.torrent"
 needMedicatDownload=false
 location=""
+# solid7z | splitzip
+archiveKind=""
 DownloadMethod=""
 
 # Free-space gates (bytes). Low disk is a common cause of truncated .7z / failed apt / failed extract.
@@ -353,8 +368,75 @@ function ReadPrompt() {
 	printf -v "$__resultVar" '%s' "$__line"
 }
 
+# Normalize a path that may be any of .zip.001-.006 (or a directory containing them) to the .001 volume.
+# Prints the .001 path on success; returns 1 if not a usable split set.
+function resolveSplitFirstVolume() {
+	local input="$1"
+	local dir=""
+	local first=""
+	local i part
+
+	if [[ -d "$input" ]]; then
+		dir="${input%/}"
+	elif [[ -f "$input" ]]; then
+		dir=$(dirname -- "$input")
+	else
+		return 1
+	fi
+
+	first="${dir}/${MedicatSplitFirst}"
+	if [[ ! -f "$first" ]]; then
+		return 1
+	fi
+
+	for i in 1 2 3 4 5 6; do
+		part=$(printf '%s/%s.%03d' "$dir" "$MedicatSplitBase" "$i")
+		if [[ ! -f "$part" ]]; then
+			return 1
+		fi
+	done
+	printf '%s\n' "$first"
+	return 0
+}
+
+# Verify size + MD5 of all six Drive/Mega volumes. Expects location = ...zip.001
+function verifySplitArchive() {
+	local dir
+	local i part expectMd5 expectMin gotSize gotMd5
+	dir=$(dirname -- "$location")
+
+	colEcho $cyanB "Checking Google Drive / Mega split volumes (MD5)..."
+	for i in 0 1 2 3 4 5; do
+		part=$(printf '%s/%s.%03d' "$dir" "$MedicatSplitBase" "$((i + 1))")
+		expectMd5="${MedicatSplitMd5s[$i]}"
+		# Allow 5% below expected size (same idea as the C++ installer).
+		expectMin=$(( MedicatSplitSizes[i] * 95 / 100 ))
+		if [[ ! -f "$part" ]]; then
+			colEcho $redB "ERROR: Missing split volume:$whiteB $part"
+			exit 1
+		fi
+		gotSize=$(stat -c%s "$part" 2>/dev/null || stat -f%z "$part" 2>/dev/null || echo 0)
+		if [[ "$gotSize" -lt "$expectMin" ]]; then
+			colEcho $redB "ERROR: $part looks incomplete or truncated."
+			colEcho $cyanB "Size is$whiteB $gotSize$cyanB bytes; expected about$whiteB ${MedicatSplitSizes[$i]}$cyanB."
+			exit 1
+		fi
+		colEcho $cyanB "Hashing$whiteB $(basename -- "$part")$cyanB..."
+		gotMd5=$(md5sum "$part" | awk '{print tolower($1)}')
+		if [[ "$gotMd5" != "$expectMd5" ]]; then
+			colEcho $redB "ERROR: MD5 mismatch for$whiteB $part"
+			colEcho $cyanB "Got:$whiteB      $gotMd5"
+			colEcho $cyanB "Expected:$whiteB $expectMd5"
+			exit 1
+		fi
+		colEcho $greenB "OK:$whiteB $(basename -- "$part")"
+	done
+	colEcho $greenB "All six split volumes match. Safe to proceed..."
+	colEcho $cyanB "7z will extract from$whiteB $location$cyanB (follows .002-.006 automatically)."
+}
+
 # Download the MediCat archive over HTTP (aria2c multi-connection preferred; wget fallback).
-# $1=url  $2=mirror name  $3=insecure (true|false) — skip TLS verify when true
+# $1=url  $2=mirror name  $3=insecure (true|false) - skip TLS verify when true
 function downloadMedicatHttp() {
 	local url="$1"
 	local mirrorName="$2"
@@ -391,6 +473,7 @@ function downloadMedicatHttp() {
 
 	if [[ "$ok" -eq 0 ]] && [[ -f "$Medicat7zFile" ]]; then
 		location="$Medicat7zFile"
+		archiveKind="solid7z"
 		colEcho $greenB "Download finished:$whiteB $location"
 		return 0
 	fi
@@ -416,8 +499,10 @@ function downloadMedicatTorrent() {
 
 	if [[ -f "$Medicat7zFull" ]]; then
 		location="$Medicat7zFull"
+		archiveKind="solid7z"
 	elif [[ -f "$Medicat7zFile" ]]; then
 		location="$Medicat7zFile"
+		archiveKind="solid7z"
 	else
 		colEcho $redB "ERROR: Torrent finished but $Medicat7zFile was not found."
 		return 1
@@ -545,7 +630,7 @@ function chooseMedicatSource() {
 				return 0
 				;;
 			3)
-				ReadPrompt "Path to $Medicat7zFile: " pathInput
+				ReadPrompt "Path to $Medicat7zFile or ${MedicatSplitFirst}: " pathInput
 				pathInput="${pathInput//$'\r'/}"
 				pathInput="${pathInput#"${pathInput%%[![:space:]]*}"}"
 				pathInput="${pathInput%"${pathInput##*[![:space:]]}"}"
@@ -555,11 +640,20 @@ function chooseMedicatSource() {
 					colEcho $redB "No path entered."
 					continue
 				fi
+				if splitFirst=$(resolveSplitFirstVolume "$pathInput"); then
+					location="$splitFirst"
+					archiveKind="splitzip"
+					DownloadMethod="local"
+					needMedicatDownload=false
+					colEcho $cyanB "Using local split archive:$whiteB $location"
+					return 0
+				fi
 				if [[ ! -f "$pathInput" ]]; then
 					colEcho $redB "File not found:$whiteB $pathInput"
 					continue
 				fi
 				location="$pathInput"
+				archiveKind="solid7z"
 				DownloadMethod="local"
 				needMedicatDownload=false
 				colEcho $cyanB "Using local file:$whiteB $location"
@@ -656,23 +750,22 @@ fi
 colEcho $cyanB "Operating System Identified as:$whiteB $os"
 
 # Ensure dependencies are installed: wget, 7z, mkntfs, and aria2c if MediCat will be downloaded
-colEcho $cyanB "\nLocating the Medicat 7z file..."
+colEcho $cyanB "\nLocating the Medicat archive..."
 
 if [[ -f "$Medicat7zFile" ]]; then
 	location="$Medicat7zFile"
+	archiveKind="solid7z"
 	colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFile\n"
 elif [[ -f "$Medicat7zFull" ]]; then
 	location="$Medicat7zFull"
+	archiveKind="solid7z"
 	colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFull\n"
-elif compgen -G "MediCat.USB.${MedicatVersion}.zip.00[1-6]" >/dev/null \
-	|| compgen -G "MediCat.USB.${MedicatVersion}.zip" >/dev/null; then
-	colEcho $redB "Found Google Drive / Mega split zip parts (or a .zip), but this installer needs the solid .7z:"
-	colEcho $yellowB "  $Medicat7zFile"
-	colEcho $yellowB "Download the .7z from the HTTP mirrors / torrent, or use the Windows C++ installer which accepts .zip.001-.006."
-	needMedicatDownload=true
-	chooseMedicatSource
+elif splitFirst=$(resolveSplitFirstVolume "."); then
+	location="$splitFirst"
+	archiveKind="splitzip"
+	colEcho $cyanB "Medicat split volumes found:$whiteB $MedicatSplitFirst .. .006\n"
 else
-	colEcho $yellowB "Medicat archive not found in the current directory."
+	colEcho $yellowB "Medicat archive not found in the current directory (.7z or .zip.001-.006)."
 	chooseMedicatSource
 fi
 
@@ -724,30 +817,48 @@ if [[ -z "$location" ]] || [[ ! -f "$location" ]]; then
 	exit 1
 fi
 
-# Check size then SHA256 of the Medicat archive.
-colEcho $cyanB "Checking size and SHA256 hash of$whiteB $location$cyanB..."
-
-fileSize=$(stat -c%s "$location" 2>/dev/null || stat -f%z "$location" 2>/dev/null || echo 0)
-if [[ "$fileSize" -lt "$Medicat7zMinBytes" ]]; then
-	colEcho $redB "ERROR: $location looks incomplete or truncated."
-	colEcho $cyanB "Size is$whiteB $fileSize$cyanB bytes; expected at least$whiteB $Medicat7zMinBytes$cyanB (~20 GiB)."
-	colEcho $yellowB "Delete the partial file and download again (prefer aria2c / a stable mirror)."
-	exit 1
+# Infer kind if local path was set without going through locate.
+if [[ -z "$archiveKind" ]]; then
+	if [[ "$location" == *.zip.001 ]] || basename -- "$location" | grep -qE '\.zip\.001$'; then
+		archiveKind="splitzip"
+	else
+		archiveKind="solid7z"
+	fi
 fi
 
-checksha256=$(sha256sum "$location" | awk '{print $1}')
-
-if [[ "$checksha256" != "$Medicat256Hash" ]]; then
-	colEcho $redB "$location SHA256 hash does not match."
-	colEcho $redB "File may be corrupted, incomplete, or the wrong format (need the .7z, not Google Drive .zip parts)."
-	colEcho $cyanB "Got:$whiteB      $checksha256"
-	colEcho $cyanB "Expected:$whiteB $Medicat256Hash"
-	colEcho $cyanB "Exiting..."
-	exit 1
+if [[ "$archiveKind" == "splitzip" ]]; then
+	if ! splitFirst=$(resolveSplitFirstVolume "$location"); then
+		colEcho $redB "ERROR: Incomplete Google Drive / Mega split set (need all of ${MedicatSplitBase}.001-.006)."
+		exit 1
+	fi
+	location="$splitFirst"
+	verifySplitArchive
 else
-	colEcho $greenB "$location SHA256 hash matches."
-	colEcho $cyanB "Hash is$whiteB $checksha256"
-	colEcho $cyanB "Safe to proceed..."
+	# Check size then SHA256 of the solid Medicat .7z
+	colEcho $cyanB "Checking size and SHA256 hash of$whiteB $location$cyanB..."
+
+	fileSize=$(stat -c%s "$location" 2>/dev/null || stat -f%z "$location" 2>/dev/null || echo 0)
+	if [[ "$fileSize" -lt "$Medicat7zMinBytes" ]]; then
+		colEcho $redB "ERROR: $location looks incomplete or truncated."
+		colEcho $cyanB "Size is$whiteB $fileSize$cyanB bytes; expected at least$whiteB $Medicat7zMinBytes$cyanB (~20 GiB)."
+		colEcho $yellowB "Delete the partial file and download again (prefer aria2c / a stable mirror)."
+		exit 1
+	fi
+
+	checksha256=$(sha256sum "$location" | awk '{print $1}')
+
+	if [[ "$checksha256" != "$Medicat256Hash" ]]; then
+		colEcho $redB "$location SHA256 hash does not match."
+		colEcho $redB "File may be corrupted, incomplete, or the wrong format (need the .7z, or all six .zip.001-.006 parts)."
+		colEcho $cyanB "Got:$whiteB      $checksha256"
+		colEcho $cyanB "Expected:$whiteB $Medicat256Hash"
+		colEcho $cyanB "Exiting..."
+		exit 1
+	else
+		colEcho $greenB "$location SHA256 hash matches."
+		colEcho $cyanB "Hash is$whiteB $checksha256"
+		colEcho $cyanB "Safe to proceed..."
+	fi
 fi
 
 # Advise user to connect and select the required USB device.
@@ -864,7 +975,12 @@ colEcho $yellowB "NOTE: 32GB USBs are fine but JUST BARELY — little room left 
 requireFreeSpace "./MedicatUSB" "$MedicatUsbMinFreeBytes" "MediCat extract onto USB" "fatal"
 
 colEcho $cyanB "Extracting Medicat to NTFS volume..."
+# For split Drive/Mega volumes, $location is the .001 file; 7z opens the rest automatically.
 7z x -o./MedicatUSB "$location"
+if [ "$?" != "0" ]; then
+	colEcho $redB "ERROR: 7z extract failed for$whiteB $location"
+	exit 1
+fi
 
 colEcho $cyanB "MedicatUSB has been created."
 

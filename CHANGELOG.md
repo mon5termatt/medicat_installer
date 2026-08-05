@@ -2,6 +2,10 @@
 
 All notable changes to `Medicat_Installer.sh` (linux branch).
 
+## 0021
+
+- Accept Google Drive / Mega multi-volume archives (`MediCat.USB.v21.12.zip.001`-.006): verify each part MD5, then extract with `7z` from `.001` (addresses #87).
+
 ## 0020
 
 - Fix Ventoy download/rename when GitHub tag parsing failed (`mv ventoy-` / missing `Ventoy2Disk.sh`) by stripping the tag to digits+dots and validating the extracted folder (addresses #99 / #142-style `venver` bugs).
