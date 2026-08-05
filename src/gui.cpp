@@ -3043,7 +3043,7 @@ void Gui::RefreshArchivePanelLabel() {
     const MediCatArchiveInfo info = InspectMediCatArchive(EffectiveArchivePath());
     const wchar_t* labelKey =
         info.state == MediCatArchiveState::Incomplete ? L"ui.archive_incomplete" : L"ui.archive_missing";
-    SetWindowTextW(archiveMissingLabel_, i18n::Tr(labelKey, kMediCatArchiveUiName).c_str());
+    SetWindowTextW(archiveMissingLabel_, i18n::Tr(labelKey).c_str());
 }
 
 void Gui::BrowseForArchive() {
@@ -3551,7 +3551,7 @@ void Gui::OnCreate(HWND hwnd) {
         kHeaderTitleX, kHeaderTitleY, kHeaderTitleWidth, 28, hwnd, nullptr, instance_, nullptr);
 
     archiveMissingLabel_ = CreateWindowW(
-        L"STATIC", i18n::Tr(L"ui.archive_missing", kMediCatArchiveUiName).c_str(),
+        L"STATIC", i18n::Tr(L"ui.archive_missing").c_str(),
         WS_CHILD | SS_LEFT | SS_LEFTNOWORDWRAP,
         kMargin, kContentTop, kContentWidth, kArchiveLabelHeight, hwnd, nullptr, instance_, nullptr);
 

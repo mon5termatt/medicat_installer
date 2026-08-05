@@ -38,8 +38,6 @@ constexpr MediCatSplitPart kMediCatSplitParts[] = {
 };
 constexpr size_t kMediCatSplitPartCount = sizeof(kMediCatSplitParts) / sizeof(kMediCatSplitParts[0]);
 constexpr wchar_t kMediCatSplitFirstFileName[] = L"MediCat.USB.v21.12.zip.001";
-// UI label when either solid .7z or Drive split volumes are acceptable.
-constexpr wchar_t kMediCatArchiveUiName[] = L"MediCat.USB.v21.12.7z / .zip.001-.006";
 
 constexpr wchar_t kDownloadMirror1Url[] =
     L"https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z";
