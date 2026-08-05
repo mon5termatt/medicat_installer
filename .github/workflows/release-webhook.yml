@@ -1,11 +1,11 @@
 # Notify an external webhook (Discord-compatible) when a GitHub Release is published.
 #
 # Required repo secret:
-#   RELEASE_WEBHOOK_URL  — Discord incoming webhook URL (or any endpoint that
+#   RELEASE_WEBHOOK_URL  - Discord incoming webhook URL (or any endpoint that
 #                          accepts a Discord-style JSON POST with embeds).
 #
 # Optional secret:
-#   RELEASE_WEBHOOK_CONTENT — plain text content prefix (e.g. "@here"); empty = embeds only.
+#   RELEASE_WEBHOOK_CONTENT - plain text content prefix (e.g. "@here"); empty = embeds only.
 
 name: Release webhook
 
