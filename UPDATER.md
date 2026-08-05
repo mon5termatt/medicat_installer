@@ -11,7 +11,10 @@ The C++ installer discovers updates via the **GitHub Releases API**.
 | Embedded `kInstallerVersion` | `1.0.41` |
 | Embedded `kInstallerBuildNumber` | `41` (patch) |
 
-`tools/bump_build_number.py` keeps `build_number.txt` and `release_tag.txt` synchronized on each bump.
+`tools/bump_build_number.py --next-after-github` (used by `rebuild.bat`) sets
+`build_number.txt` to **one patch above** the latest GitHub release that ships
+`MedicatInstaller.exe` (e.g. latest `1.0.43` → next build `1.0.44`). That keeps
+dev builds aligned with published tags instead of racing ahead of Releases.
 
 Upload with:
 
@@ -22,6 +25,10 @@ rebuild.bat release
 (omit TAG to use the version from `build_number.txt`)
 
 `tools/upload_release.bat` creates the GitHub release if the tag is missing (as **Latest**), uploads both Windows exes, and attaches **`Medicat_Installer.sh`** from the tip of the **`linux`** branch.
+
+### Release webhook
+
+[`.github/workflows/release-webhook.yml`](.github/workflows/release-webhook.yml) fires on `release: published` and POSTs a Discord-compatible embed to the repo secret **`RELEASE_WEBHOOK_URL`**. Optional **`RELEASE_WEBHOOK_CONTENT`** adds a message body (e.g. a role ping).
 
 ## Source
 

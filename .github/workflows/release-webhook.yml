@@ -1,0 +1,108 @@
+# Notify an external webhook (Discord-compatible) when a GitHub Release is published.
+#
+# Required repo secret:
+#   RELEASE_WEBHOOK_URL  — Discord incoming webhook URL (or any endpoint that
+#                          accepts a Discord-style JSON POST with embeds).
+#
+# Optional secret:
+#   RELEASE_WEBHOOK_CONTENT — plain text content prefix (e.g. "@here"); empty = embeds only.
+
+name: Release webhook
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    name: Post release webhook
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build and send payload
+        env:
+          WEBHOOK_URL: ${{ secrets.RELEASE_WEBHOOK_URL }}
+          WEBHOOK_CONTENT: ${{ secrets.RELEASE_WEBHOOK_CONTENT }}
+          RELEASE_JSON: ${{ toJson(github.event.release) }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WEBHOOK_URL:-}" ]; then
+            echo "RELEASE_WEBHOOK_URL secret is not set; skipping notify."
+            exit 0
+          fi
+
+          python3 <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          release = json.loads(os.environ["RELEASE_JSON"])
+          repo = os.environ.get("REPO", "")
+          webhook = os.environ["WEBHOOK_URL"].strip()
+          content = (os.environ.get("WEBHOOK_CONTENT") or "").strip()
+
+          tag = release.get("tag_name") or ""
+          name = release.get("name") or tag
+          html_url = release.get("html_url") or ""
+          body = (release.get("body") or "").strip()
+          prerelease = bool(release.get("prerelease"))
+          assets = release.get("assets") or []
+          asset_lines = []
+          for asset in assets:
+              aname = asset.get("name") or "asset"
+              aurl = asset.get("browser_download_url") or ""
+              size = int(asset.get("size") or 0)
+              mb = size / (1024 * 1024) if size else 0.0
+              if aurl:
+                  asset_lines.append(f"• [{aname}]({aurl}) ({mb:.1f} MiB)")
+              else:
+                  asset_lines.append(f"• {aname}")
+
+          description_parts = []
+          if body:
+              clipped = body if len(body) <= 1200 else body[:1197] + "..."
+              description_parts.append(clipped)
+          if asset_lines:
+              description_parts.append("**Assets**\n" + "\n".join(asset_lines[:15]))
+          description = "\n\n".join(description_parts)[:3900]
+
+          embed = {
+              "title": f"{'Pre-release' if prerelease else 'Release'} {name}",
+              "url": html_url,
+              "color": 0xE6B03C if prerelease else 0x38BDA8,
+              "fields": [
+                  {"name": "Tag", "value": tag or "(none)", "inline": True},
+                  {"name": "Repository", "value": repo or "(unknown)", "inline": True},
+              ],
+          }
+          if description:
+              embed["description"] = description
+          author = (release.get("author") or {}).get("login")
+          if author:
+              embed["footer"] = {"text": f"Published by {author}"}
+
+          payload = {"embeds": [embed]}
+          if content:
+              payload["content"] = content
+
+          data = json.dumps(payload).encode("utf-8")
+          req = urllib.request.Request(
+              webhook,
+              data=data,
+              method="POST",
+              headers={
+                  "Content-Type": "application/json",
+                  "User-Agent": "medicat-installer-release-webhook",
+              },
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  print(f"Webhook OK (HTTP {resp.status})")
+          except urllib.error.HTTPError as exc:
+              detail = exc.read().decode("utf-8", errors="replace")
+              raise SystemExit(f"Webhook failed HTTP {exc.code}: {detail}") from exc
+          PY

@@ -34,6 +34,7 @@ if /i "%~1"=="/release" (
 echo Unknown option: %~1
 echo Usage: rebuild.bat [as BUILD] [release [TAG]]
 echo   BUILD is a full version 1.0.N or a patch number N
+echo   Default bump = one above the latest GitHub release ^(avoids skipped tags^)
 echo   TAG defaults to the version in build_number.txt when omitted
 exit /b 1
 
@@ -53,8 +54,8 @@ if not "%PIN_BUILD%"=="0" (
     python "tools\bump_build_number.py" "build_number.txt" "generated\build_version.cpp" --major 1 --minor 0 --set "%PIN_BUILD%"
     if errorlevel 1 goto fail
 ) else (
-    echo Bumping build number...
-    python "tools\bump_build_number.py" "build_number.txt" "generated\build_version.cpp" --major 1 --minor 0
+    echo Syncing build number from latest GitHub release...
+    python "tools\bump_build_number.py" "build_number.txt" "generated\build_version.cpp" --major 1 --minor 0 --next-after-github
     if errorlevel 1 goto fail
 )
 set MEDICAT_BUILD_NUMBER_BUMPED=1

@@ -94,7 +94,7 @@ Requires Visual Studio 2022 or newer (or Build Tools), CMake 3.16+, Python 3, `b
 rebuild.bat
 ```
 
-One configure + one build produces:
+Sets the build number to **one above the latest GitHub release** (so tags are not skipped), then one configure + one build produces:
 
 - `build/Release/MedicatInstaller.exe` (x64)
 - `build/Release/MedicatInstaller-x86.exe` (Win32)
@@ -121,7 +121,7 @@ rebuild.bat as 1.0.42 release 1.0.42
 tools\upload_release.bat
 ```
 
-Creates the `1.0.N` release if needed and uploads both exes as GitHub Latest. Requires [`gh`](https://cli.github.com/) authenticated for the repo.
+Creates the `1.0.N` release if needed and uploads both exes as GitHub Latest. Requires [`gh`](https://cli.github.com/) authenticated for the repo. Published releases also fire [`.github/workflows/release-webhook.yml`](.github/workflows/release-webhook.yml) when the `RELEASE_WEBHOOK_URL` secret is set.
 
 See [`FEATURES.md`](FEATURES.md) for the feature checklist and [`TODO.md`](TODO.md) for planned work.  
 Developer architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).  
