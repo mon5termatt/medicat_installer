@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ScriptVersion="0019"
+ScriptVersion="0020"
 
 # See CHANGELOG.md for changes.
 #
@@ -10,7 +10,9 @@ ScriptVersion="0019"
 MedicatVersion="v21.12"
 Medicat256Hash='a306331453897d2b20644ca9334bb0015b126b8647cecec8d9b2d300a0027ea4'
 Medicat7zFile="MediCat.USB.$MedicatVersion.7z"
-Medicat7zFull=''MediCat\ USB\ $MedicatVersion/MediCat.USB.$MedicatVersion.7z''
+Medicat7zFull="MediCat USB ${MedicatVersion}/MediCat.USB.${MedicatVersion}.7z"
+# Full archive is ~21.4 GiB; reject clearly truncated downloads before hashing.
+Medicat7zMinBytes=$((20 * 1024 * 1024 * 1024))
 # Direct download mirrors (order = try order). files.dog needs insecure SSL.
 MedicatUrlMedicatusb="https://files.medicatusb.com/files/${MedicatVersion}/${Medicat7zFile}"
 MedicatUrlFilesDog="https://files.dog/OD%20Rips/MediCat/${MedicatVersion}/${Medicat7zFile}"
@@ -263,19 +265,51 @@ function dependenciesHandler() {
 # Function to download ventoy
 function downloadVentoy() {
 	local os="$1"
-  	local ventoyPackage=$2
-  	# Identify latest Ventoy release.
-  	venver=$(wget -q -O - https://api.github.com/repos/ventoy/Ventoy/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
+	local ventoyPackage=$2
+	local apiJson=""
+	local tarUrl=""
+	local extractedDir=""
+	local wgetArgs=()
 
-	# Download latest verion of Ventoy.
-	colEcho $cyanB "\nDownloading Ventoy Version:$whiteB ${venver: -6}"
-	wget -q --show-progress https://github.com/ventoy/Ventoy/releases/download/v${venver: -6}/ventoy-${venver: -6}-linux.tar.gz -O ventoy.tar.gz
+	colEcho $cyanB "\nLooking up latest Ventoy release..."
+	apiJson=$(wget -q -O - https://api.github.com/repos/ventoy/Ventoy/releases/latest 2>/dev/null) || apiJson=""
+	venver=$(printf '%s' "$apiJson" | grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"[^"]+"' | head -n1 | cut -d'"' -f4)
+	# Keep digits and dots only (strip leading v / junk). Avoid brittle ${venver: -6}.
+	venver="${venver//[^0-9.]/}"
+
+	if [[ -z "$venver" ]]; then
+		colEcho $redB "ERROR: Could not determine the latest Ventoy version from GitHub."
+		colEcho $yellowB "Check network access to api.github.com and try again."
+		exit 1
+	fi
+
+	tarUrl="https://github.com/ventoy/Ventoy/releases/download/v${venver}/ventoy-${venver}-linux.tar.gz"
+	colEcho $cyanB "\nDownloading Ventoy Version:$whiteB $venver"
+	colEcho $cyanB "URL:$whiteB $tarUrl"
+
+	wgetArgs=(-q -O ventoy.tar.gz)
+	# --show-progress is missing on some wget builds (BusyBox / older distros).
+	if wget --help 2>&1 | grep -q -- '--show-progress'; then
+		wgetArgs+=(--show-progress)
+	fi
+	if ! wget "${wgetArgs[@]}" -- "$tarUrl"; then
+		colEcho $redB "ERROR: Failed to download Ventoy."
+		exit 1
+	fi
+	if [[ ! -s ventoy.tar.gz ]]; then
+		colEcho $redB "ERROR: ventoy.tar.gz is missing or empty after download."
+		exit 1
+	fi
 
 	colEcho $cyanB "\nExtracting Ventoy..."
-	tar -xf ventoy.tar.gz
+	if ! tar -xf ventoy.tar.gz; then
+		colEcho $redB "ERROR: Failed to extract ventoy.tar.gz"
+		rm -f ventoy.tar.gz
+		exit 1
+	fi
 
 	colEcho $cyanB "Removing the extracted Ventoy tar.gz file..."
-	rm -rf ventoy.tar.gz
+	rm -f ventoy.tar.gz
 
 	# Remove the ./ventoy folder if it exists before renaming ventoy folder.
 	if [ -d ./ventoy ]; then
@@ -283,8 +317,22 @@ function downloadVentoy() {
 		rm -rf ./ventoy/
 	fi
 
+	extractedDir="ventoy-${venver}"
+	if [[ ! -d "$extractedDir" ]]; then
+		extractedDir=$(find . -maxdepth 1 -type d -name 'ventoy-*' ! -name 'ventoy-*.tar.gz' 2>/dev/null | head -n1)
+		extractedDir="${extractedDir#./}"
+	fi
+	if [[ -z "$extractedDir" ]] || [[ ! -d "$extractedDir" ]]; then
+		colEcho $redB "ERROR: Extracted Ventoy folder not found (expected ventoy-${venver})."
+		exit 1
+	fi
+	if [[ ! -f "$extractedDir/Ventoy2Disk.sh" ]]; then
+		colEcho $redB "ERROR: Ventoy2Disk.sh is missing inside $extractedDir"
+		exit 1
+	fi
+
 	colEcho $cyanB "Renaming ventoy folder to remove the version number..."
-	mv ventoy-${venver: -6} ventoy
+	mv "$extractedDir" ventoy
 }
 
 # Read a line from the real terminal (prefer /dev/tty; never skip on empty stdin).
@@ -616,6 +664,13 @@ if [[ -f "$Medicat7zFile" ]]; then
 elif [[ -f "$Medicat7zFull" ]]; then
 	location="$Medicat7zFull"
 	colEcho $cyanB "Medicat file found:$whiteB $Medicat7zFull\n"
+elif compgen -G "MediCat.USB.${MedicatVersion}.zip.00[1-6]" >/dev/null \
+	|| compgen -G "MediCat.USB.${MedicatVersion}.zip" >/dev/null; then
+	colEcho $redB "Found Google Drive / Mega split zip parts (or a .zip), but this installer needs the solid .7z:"
+	colEcho $yellowB "  $Medicat7zFile"
+	colEcho $yellowB "Download the .7z from the HTTP mirrors / torrent, or use the Windows C++ installer which accepts .zip.001-.006."
+	needMedicatDownload=true
+	chooseMedicatSource
 else
 	colEcho $yellowB "Medicat archive not found in the current directory."
 	chooseMedicatSource
@@ -669,19 +724,28 @@ if [[ -z "$location" ]] || [[ ! -f "$location" ]]; then
 	exit 1
 fi
 
-# Check the SHA256 hash of the Medicat zip file.
-colEcho $cyanB "Checking SHA256 hash of$whiteB $Medicat7zFile$cyanB..."
+# Check size then SHA256 of the Medicat archive.
+colEcho $cyanB "Checking size and SHA256 hash of$whiteB $location$cyanB..."
+
+fileSize=$(stat -c%s "$location" 2>/dev/null || stat -f%z "$location" 2>/dev/null || echo 0)
+if [[ "$fileSize" -lt "$Medicat7zMinBytes" ]]; then
+	colEcho $redB "ERROR: $location looks incomplete or truncated."
+	colEcho $cyanB "Size is$whiteB $fileSize$cyanB bytes; expected at least$whiteB $Medicat7zMinBytes$cyanB (~20 GiB)."
+	colEcho $yellowB "Delete the partial file and download again (prefer aria2c / a stable mirror)."
+	exit 1
+fi
 
 checksha256=$(sha256sum "$location" | awk '{print $1}')
 
 if [[ "$checksha256" != "$Medicat256Hash" ]]; then
-	colEcho $redB "$Medicat7zFile SHA256 hash does not match."
-	colEcho $redB "File may be corrupted or compromised."
-	colEcho $cyanB "Hash is$whiteB $checksha256"
+	colEcho $redB "$location SHA256 hash does not match."
+	colEcho $redB "File may be corrupted, incomplete, or the wrong format (need the .7z, not Google Drive .zip parts)."
+	colEcho $cyanB "Got:$whiteB      $checksha256"
+	colEcho $cyanB "Expected:$whiteB $Medicat256Hash"
 	colEcho $cyanB "Exiting..."
 	exit 1
 else
-	colEcho $greenB "$Medicat7zFile SHA256 hash matches."
+	colEcho $greenB "$location SHA256 hash matches."
 	colEcho $cyanB "Hash is$whiteB $checksha256"
 	colEcho $cyanB "Safe to proceed..."
 fi

@@ -2,6 +2,14 @@
 
 All notable changes to `Medicat_Installer.sh` (linux branch).
 
+## 0020
+
+- Fix Ventoy download/rename when GitHub tag parsing failed (`mv ventoy-` / missing `Ventoy2Disk.sh`) by stripping the tag to digits+dots and validating the extracted folder (addresses #99 / #142-style `venver` bugs).
+- Make wget `--show-progress` optional so older wget builds still download Ventoy.
+- Reject truncated MediCat archives before hashing; clearer SHA256 mismatch hints for wrong format / incomplete downloads.
+- Detect Google Drive `.zip.001-.006` in the working directory and point users at the solid `.7z`.
+- Fix `Medicat7zFull` path quoting for the nested `MediCat USB v21.12/` layout.
+
 ## 0019
 
 - Warn when free space is low: working directory (~1 GiB), MediCat download (~22 GiB), and USB extract (~26 GiB). Shows `df` and asks before continuing; download/extract gates use a stronger confirm.
