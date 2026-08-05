@@ -751,8 +751,12 @@ SessionSystemSnapshot BuildSessionSystemSnapshot() {
 }  // namespace
 
 std::wstring BuildMediCatArchiveSizeDebugLine(const std::wstring& path) {
-    if (path.empty() || !FileExists(path)) {
+    if (path.empty()) {
         return {};
+    }
+    if (!FileExists(path)) {
+        // Still note missing extract path (e.g. .zip.001 while other volumes exist).
+        return L"MediCat archive: " + path + L" — missing";
     }
     const uint64_t size = GetFileSizeBytes(path);
     return L"MediCat archive: " + path + L" — " + FormatBytes(size) + L" (" + std::to_wstring(size) +

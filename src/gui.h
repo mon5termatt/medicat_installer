@@ -144,6 +144,8 @@ public:
     void UpdateArchivePanel();
     void SetInitialLanguage(const std::wstring& languageCode);
     std::wstring SelectedDrive() const;
+    // User-browsed archive path (empty = use beside-exe / offline resolution).
+    std::wstring SelectedArchivePath() const;
     bool FormatChecked() const;
     bool RunVentoyChecked() const;
     bool VentoyOnSelectedDrive() const;
@@ -205,6 +207,8 @@ private:
     void LayoutReExtractDialog();
     void RefreshArchivePanelLabel();
     bool IsArchiveAvailable() const;
+    std::wstring EffectiveArchivePath() const;
+    void BrowseForArchive();
     void EnsureVentoyVersionsLoaded();
     void PopulateVentoyVersionCombo();
     void SetVentoyVersions(std::vector<std::wstring> versions);
@@ -251,6 +255,7 @@ private:
     HWND downloadMagnetBtn_ = nullptr;
     HWND downloadGoogleDriveBtn_ = nullptr;
     HWND downloadMegaBtn_ = nullptr;
+    HWND browseArchiveBtn_ = nullptr;
     HWND fileLogWindow_ = nullptr;
     HWND fileLogList_ = nullptr;
     HWND creditsWindow_ = nullptr;
@@ -318,6 +323,7 @@ private:
     bool ventoyVersionsLoading_ = false;
     bool ventoyVersionsLoaded_ = false;
     bool archiveMissing_ = false;
+    std::wstring archiveOverridePath_;
     bool ventoyOnDrive_ = false;
     std::wstring lastVentoyControlDrive_;
     std::atomic<bool> downloadingArchive_{false};

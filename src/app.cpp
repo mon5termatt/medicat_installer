@@ -112,7 +112,13 @@ void App::LogCommandLine(int argc, wchar_t** argv) {
 
 std::wstring App::ResolveArchivePath(const std::wstring& overridePath) const {
     if (!overridePath.empty()) {
-        return overridePath;
+        return NormalizeMediCatArchivePath(overridePath);
+    }
+    if (!headless_) {
+        const std::wstring browsed = gui_.SelectedArchivePath();
+        if (!browsed.empty()) {
+            return NormalizeMediCatArchivePath(browsed);
+        }
     }
     return ResolveMediCatArchivePath(root_);
 }
@@ -665,13 +671,15 @@ void App::StartUpdateCheck() {
             return;
         }
         if (!result.info.updateAvailable) {
-            log_->Debug(L"[Update] Installer is up to date");
+            log_->Debug(L"[Update] Installer is up to date (local " + InstallerVersionWide() + L", remote " +
+                        result.info.releaseTag + L", remoteBuild " + std::to_wstring(result.info.remoteBuild) + L")");
             finish();
             return;
         }
 
         log_->Info(L"[Update] Newer installer available — v" + result.info.version + L" (" + result.info.releaseTag +
-                   L")");
+                   L", remoteBuild " + std::to_wstring(result.info.remoteBuild) + L", localBuild " +
+                   std::to_wstring(kInstallerBuildNumber) + L")");
         auto* payload = new UpdateResultPayload{result.info};
         PostToGui(hwnd, WM_MEDICAT_UPDATE_RESULT, reinterpret_cast<LPARAM>(payload));
         finish();
@@ -1285,7 +1293,7 @@ void App::OnInstall() {
         return;
     }
 
-    const std::wstring archive = ResolveMediCatArchivePath(root_);
+    const std::wstring archive = ResolveArchivePath(L"");
     LogMediCatArchiveDebug(archive);
 
     gui_.SetBusy(true, BusyProgressMode::Download);

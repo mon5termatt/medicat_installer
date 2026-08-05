@@ -47,8 +47,8 @@
       "dialog_yes": "Yes",
       "dialog_no": "No",
       "language_label": "Language:",
-      "archive_missing": "{0} not found. Download the archive:",
-      "archive_incomplete": "{0} appears incomplete. Download the full archive:",
+      "archive_missing": "{0} not found. Download or browse for the archive:",
+      "archive_incomplete": "{0} appears incomplete. Download or browse for the full archive:",
       "alt_download_label": "Other download methods:",
       "alt_download_open": "Open",
       "download_mirror_1": "Via mirror 1",
@@ -57,7 +57,8 @@
       "download_magnet": "Magnet",
       "download_google_drive": "Google Drive",
       "download_mega": "Mega",
-      "download_all": "All Downloads"
+      "download_all": "All Downloads",
+      "browse_archive": "Browse for archive…"
     },
     "status": {
       "status_ready": "Ready to install MediCat",
@@ -101,7 +102,8 @@
       "drive_arrived": "Drive detected: {0}",
       "drives_arrived": "{0} new drives detected",
       "selected_drive_removed": "Selected drive {0} was removed — choose another drive",
-      "scanning_drives": "Scanning drives..."
+      "scanning_drives": "Scanning drives...",
+      "archive_selected": "Using archive: {0}"
     },
     "messages": {
       "no_internet": "No internet connection detected. Please check your connection and try again.",
@@ -146,7 +148,8 @@
       "drive_lost_after_ventoy": "The USB drive could not be found after Ventoy installation. It may have failed to remount — please check Disk Management and try again.",
       "drive_removed_during_operation": "The selected drive {0} was removed during the operation. Connect the drive and try again.",
       "drive_io_error_during_operation": "A read/write error occurred on drive {0} during the operation. Check the USB connection and try again.",
-      "archive_download_failed": "Archive download failed: {0}"
+      "archive_download_failed": "Archive download failed: {0}",
+      "archive_browse_invalid": "That file does not look like a complete MediCat archive (.7z or Google Drive .zip.001-.006)."
     },
     "ventoy_warning": {
       "title": "Ventoy Installation Warning",
@@ -198,8 +201,9 @@
       "archive_corrupt": "Archive Verification Failed",
       "selection_cancelled": "Selection Cancelled",
       "no_drive_for_check": "No Drive Selected",
-      "file_dialog_title": "Select MediCat Archive File (MediCat.USB.v{0}.7z)",
-      "help_gate": "Repeated failures — get help"
+      "file_dialog_title": "Select MediCat Archive (MediCat.USB.v{0}.7z or .zip.001-.006)",
+      "help_gate": "Repeated failures — get help",
+      "archive_browse_invalid": "Invalid Archive"
     },
     "log": {
       "installer_started": "MediCat Installer v{0} Started",
@@ -312,8 +316,8 @@
       "dialog_yes": "Sí",
       "dialog_no": "No",
       "language_label": "Idioma:",
-      "archive_missing": "No se encontró {0}. Descargue el archivo:",
-      "archive_incomplete": "{0} parece incompleto. Descargue el archivo completo:",
+      "archive_missing": "No se encontró {0}. Descargue o busque el archivo:",
+      "archive_incomplete": "{0} parece incompleto. Descargue o busque el archivo completo:",
       "alt_download_label": "Otros métodos de descarga:",
       "alt_download_open": "Abrir",
       "download_mirror_1": "Mediante espejo 1",
@@ -322,7 +326,8 @@
       "download_magnet": "Magnet",
       "download_google_drive": "Google Drive",
       "download_mega": "Mega",
-      "download_all": "Todas las descargas"
+      "download_all": "Todas las descargas",
+      "browse_archive": "Buscar archivo…"
     },
     "status": {
       "status_ready": "Listo para instalar MediCat",
@@ -367,7 +372,8 @@
       "drive_arrived": "Unidad detectada: {0}",
       "drives_arrived": "{0} unidades nuevas detectadas",
       "selected_drive_removed": "Se quitó la unidad seleccionada {0} — elija otra",
-      "scanning_drives": "Buscando unidades..."
+      "scanning_drives": "Buscando unidades...",
+      "archive_selected": "Usando archivo: {0}"
     },
     "messages": {
       "no_internet": "No se detectó conexión a internet. Por favor verifique su conexión e intente nuevamente.",
@@ -409,7 +415,8 @@
       "drive_removed_during_operation": "Se quitó la unidad seleccionada {0} durante la operación. Conecte la unidad e intente nuevamente.",
       "drive_io_error_during_operation": "Ocurrió un error de lectura/escritura en la unidad {0} durante la operación. Verifique la conexión USB e intente nuevamente.",
       "archive_download_failed": "Error al descargar el archivo: {0}",
-      "drive_under_minimum": "La unidad {0} es demasiado pequeña. MediCat requiere al menos 30 GB de capacidad total."
+      "drive_under_minimum": "La unidad {0} es demasiado pequeña. MediCat requiere al menos 30 GB de capacidad total.",
+      "archive_browse_invalid": "Ese archivo no parece un archivo MediCat completo (.7z o Google Drive .zip.001-.006)."
     },
     "ventoy_warning": {
       "title": "Advertencia de Instalación Ventoy",
@@ -461,8 +468,9 @@
       "archive_corrupt": "Error de Verificación del Archivo",
       "selection_cancelled": "Selección Cancelada",
       "no_drive_for_check": "No se Seleccionó Unidad",
-      "file_dialog_title": "Seleccionar Archivo MediCat (MediCat.USB.v{0}.7z)",
-      "help_gate": "Fallos repetidos — obtener ayuda"
+      "file_dialog_title": "Seleccionar archivo MediCat (MediCat.USB.v{0}.7z o .zip.001-.006)",
+      "help_gate": "Fallos repetidos — obtener ayuda",
+      "archive_browse_invalid": "Archivo no válido"
     },
     "log": {
       "installer_started": "Instalador MediCat v{0} Iniciado",
@@ -576,8 +584,8 @@
       "dialog_yes": "Oui",
       "dialog_no": "Non",
       "language_label": "Langue :",
-      "archive_missing": "{0} introuvable. Téléchargez l'archive :",
-      "archive_incomplete": "{0} semble incomplet. Téléchargez l'archive complète :",
+      "archive_missing": "{0} introuvable. Téléchargez ou parcourez pour trouver l’archive :",
+      "archive_incomplete": "{0} semble incomplet. Téléchargez ou parcourez pour l’archive complète :",
       "alt_download_label": "Autres méthodes de téléchargement :",
       "alt_download_open": "Ouvrir",
       "download_mirror_1": "Via miroir 1",
@@ -586,7 +594,8 @@
       "download_magnet": "Magnet",
       "download_google_drive": "Google Drive",
       "download_mega": "Mega",
-      "download_all": "Toutes les téléchargements"
+      "download_all": "Toutes les téléchargements",
+      "browse_archive": "Parcourir l’archive…"
     },
     "status": {
       "status_ready": "Prêt à installer MediCat",
@@ -631,7 +640,8 @@
       "drive_arrived": "Lecteur détecté : {0}",
       "drives_arrived": "{0} nouveaux lecteurs détectés",
       "selected_drive_removed": "Le lecteur sélectionné {0} a été retiré — choisissez-en un autre",
-      "scanning_drives": "Recherche des lecteurs..."
+      "scanning_drives": "Recherche des lecteurs...",
+      "archive_selected": "Archive utilisée : {0}"
     },
     "messages": {
       "no_internet": "Aucune connexion Internet détectée. Veuillez vérifier votre connexion et réessayer.",
@@ -673,7 +683,8 @@
       "drive_removed_during_operation": "Le lecteur sélectionné {0} a été retiré pendant l'opération. Reconnectez-le et réessayez.",
       "drive_io_error_during_operation": "Une erreur de lecture/écriture s'est produite sur le lecteur {0} pendant l'opération. Vérifiez la connexion USB et réessayez.",
       "archive_download_failed": "Échec du téléchargement de l'archive : {0}",
-      "drive_under_minimum": "Le lecteur {0} est trop petit. MediCat nécessite au moins 30 Go de capacité totale."
+      "drive_under_minimum": "Le lecteur {0} est trop petit. MediCat nécessite au moins 30 Go de capacité totale.",
+      "archive_browse_invalid": "Ce fichier ne semble pas être une archive MediCat complète (.7z ou Google Drive .zip.001-.006)."
     },
     "ventoy_warning": {
       "title": "Avertissement d'Installation Ventoy",
@@ -725,8 +736,9 @@
       "archive_corrupt": "Échec de Vérification de l'Archive",
       "selection_cancelled": "Sélection Annulée",
       "no_drive_for_check": "Aucun Lecteur Sélectionné",
-      "file_dialog_title": "Sélectionner le Fichier d'Archive MediCat (MediCat.USB.v{0}.7z)",
-      "help_gate": "Échecs répétés — obtenir de l'aide"
+      "file_dialog_title": "Sélectionner l’archive MediCat (MediCat.USB.v{0}.7z ou .zip.001-.006)",
+      "help_gate": "Échecs répétés — obtenir de l'aide",
+      "archive_browse_invalid": "Archive invalide"
     },
     "log": {
       "installer_started": "Installateur MediCat v{0} Démarré",
@@ -840,8 +852,8 @@
       "dialog_yes": "Tak",
       "dialog_no": "Nie",
       "language_label": "Język:",
-      "archive_missing": "Nie znaleziono {0}. Pobierz archiwum:",
-      "archive_incomplete": "{0} wygląda na niekompletne. Pobierz pełne archiwum:",
+      "archive_missing": "Nie znaleziono {0}. Pobierz lub wskaż archiwum:",
+      "archive_incomplete": "{0} wygląda na niekompletne. Pobierz lub wskaż pełne archiwum:",
       "alt_download_label": "Inne metody pobierania:",
       "alt_download_open": "Otwórz",
       "download_mirror_1": "Przez mirror 1",
@@ -850,7 +862,8 @@
       "download_magnet": "Magnet",
       "download_google_drive": "Google Drive",
       "download_mega": "Mega",
-      "download_all": "Wszystkie pobrania"
+      "download_all": "Wszystkie pobrania",
+      "browse_archive": "Przeglądaj archiwum…"
     },
     "status": {
       "status_ready": "Gotowy do instalacji MediCat",
@@ -895,7 +908,8 @@
       "drive_arrived": "Wykryto dysk: {0}",
       "drives_arrived": "Wykryto {0} nowych dysków",
       "selected_drive_removed": "Wybrany dysk {0} został usunięty — wybierz inny",
-      "scanning_drives": "Wyszukiwanie dysków..."
+      "scanning_drives": "Wyszukiwanie dysków...",
+      "archive_selected": "Używane archiwum: {0}"
     },
     "messages": {
       "no_internet": "Nie wykryto połączenia z Internetem. Sprawdź połączenie i spróbuj ponownie.",
@@ -937,7 +951,8 @@
       "drive_removed_during_operation": "Wybrany dysk {0} został usunięty podczas operacji. Podłącz dysk i spróbuj ponownie.",
       "drive_io_error_during_operation": "Wystąpił błąd odczytu/zapisu na dysku {0} podczas operacji. Sprawdź połączenie USB i spróbuj ponownie.",
       "archive_download_failed": "Pobieranie archiwum nie powiodło się: {0}",
-      "drive_under_minimum": "Dysk {0} jest za mały. MediCat wymaga co najmniej 30 GB całkowitej pojemności."
+      "drive_under_minimum": "Dysk {0} jest za mały. MediCat wymaga co najmniej 30 GB całkowitej pojemności.",
+      "archive_browse_invalid": "Ten plik nie wygląda na kompletne archiwum MediCat (.7z lub Google Drive .zip.001-.006)."
     },
     "ventoy_warning": {
       "title": "Ostrzeżenie dotyczące instalacji Ventoy",
@@ -989,8 +1004,9 @@
       "archive_corrupt": "Błąd weryfikacji archiwum",
       "selection_cancelled": "Wybór anulowany",
       "no_drive_for_check": "Nie wybrano dysku",
-      "file_dialog_title": "Wybierz plik archiwum MediCat (MediCat.USB.v{0}.7z)",
-      "help_gate": "Powtarzające się błędy — uzyskaj pomoc"
+      "file_dialog_title": "Wybierz archiwum MediCat (MediCat.USB.v{0}.7z lub .zip.001-.006)",
+      "help_gate": "Powtarzające się błędy — uzyskaj pomoc",
+      "archive_browse_invalid": "Nieprawidłowe archiwum"
     },
     "log": {
       "installer_started": "Uruchomiono instalator MediCat v{0}",
@@ -1095,8 +1111,8 @@
       "dialog_yes": "Evet",
       "dialog_no": "Hayır",
       "language_label": "Dil:",
-      "archive_missing": "{0} bulunamadı. Arşivi indirin:",
-      "archive_incomplete": "{0} eksik görünüyor. Tam arşivi indirin:",
+      "archive_missing": "{0} bulunamadı. Arşivi indirin veya dosya seçin:",
+      "archive_incomplete": "{0} eksik görünüyor. Tam arşivi indirin veya dosya seçin:",
       "alt_download_label": "Diğer indirme yöntemleri:",
       "alt_download_open": "Aç",
       "download_mirror_1": "Mirror 1 ile",
@@ -1113,7 +1129,8 @@
       "credits_open_ventoy": "Ventoy projesi",
       "credits_close_button": "Kapat",
       "feedback_button": "Hata bildirimi ve öneri",
-      "beta_telemetry_notice": "Beta: anonim kullanım istatistikleri ve hata günlükleri hata ayıklamaya yardımcı olmak için otomatik gönderilebilir."
+      "beta_telemetry_notice": "Beta: anonim kullanım istatistikleri ve hata günlükleri hata ayıklamaya yardımcı olmak için otomatik gönderilebilir.",
+      "browse_archive": "Arşiv dosyası seç…"
     },
     "status": {
       "status_ready": "MediCat kurulumu için hazır",
@@ -1158,7 +1175,8 @@
       "drives_arrived": "{0} yeni sürücü algılandı",
       "selected_drive_removed": "Seçili sürücü {0} kaldırıldı — başka bir sürücü seçin",
       "scanning_drives": "Sürücüler taranıyor...",
-      "installing_module": "lib/... dizininden çıkarma kütüphaneleri yükleniyor"
+      "installing_module": "lib/... dizininden çıkarma kütüphaneleri yükleniyor",
+      "archive_selected": "Kullanılan arşiv: {0}"
     },
     "messages": {
       "no_internet": "İnternet bağlantısı algılanmadı. Lütfen bağlantınızı kontrol edip tekrar deneyin.",
@@ -1203,7 +1221,8 @@
       "drive_lost_after_ventoy": "Ventoy kurulumundan sonra USB sürücü bulunamadı. Yeniden bağlanamamış olabilir — lütfen Disk Yönetimi'ni kontrol edip tekrar deneyin.",
       "drive_removed_during_operation": "Seçili sürücü {0} işlem sırasında kaldırıldı. Sürücüyü bağlayıp tekrar deneyin.",
       "drive_io_error_during_operation": "İşlem sırasında {0} sürücüsünde okuma/yazma hatası oluştu. USB bağlantısını kontrol edip tekrar deneyin.",
-      "archive_download_failed": "Arşiv indirilemedi: {0}"
+      "archive_download_failed": "Arşiv indirilemedi: {0}",
+      "archive_browse_invalid": "Bu dosya eksiksiz bir MediCat arşivi gibi görünmüyor (.7z veya Google Drive .zip.001-.006)."
     },
     "ventoy_warning": {
       "title": "Ventoy Kurulum Uyarısı",
@@ -1255,8 +1274,9 @@
       "archive_corrupt": "Arşiv Doğrulaması Başarısız",
       "selection_cancelled": "Seçim İptal Edildi",
       "no_drive_for_check": "Sürücü Seçilmedi",
-      "file_dialog_title": "MediCat Arşiv Dosyasını Seçin (MediCat.USB.v{0}.7z)",
-      "help_gate": "Tekrarlayan hatalar — yardım alın"
+      "file_dialog_title": "MediCat arşivini seçin (MediCat.USB.v{0}.7z veya .zip.001-.006)",
+      "help_gate": "Tekrarlayan hatalar — yardım alın",
+      "archive_browse_invalid": "Geçersiz arşiv"
     },
     "log": {
       "installer_started": "MediCat Kurulumcu v{0} Başlatıldı",

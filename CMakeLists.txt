@@ -191,6 +191,7 @@ target_compile_definitions(MedicatInstaller PRIVATE
 
 target_link_libraries(MedicatInstaller PRIVATE
     comctl32
+    comdlg32
     shell32
     shlwapi
     user32

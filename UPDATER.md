@@ -44,7 +44,7 @@ Selection (newest first, must include platform asset):
 
 ## Version compare
 
-Remote is newer when its **semantic version** is greater (`1.0.42` > `1.0.41`).  
+Remote is newer when **patch/build** is greater (`remoteBuild` 43 > local `kInstallerBuildNumber` 42), or when the remote **semantic version** is greater (`1.0.43` > `1.0.42`). Local version comes from `kInstallerVersion` / `kInstallerBuildNumber` (same as the UI), not the CMake `INSTALLER_RELEASE_TAG` define.  
 Legacy tags like `3520` / `3521-BETA` are never treated as updates over a `1.0.N` build.
 
 ## Apply flow

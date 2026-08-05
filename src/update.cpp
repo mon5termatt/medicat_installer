@@ -347,19 +347,31 @@ bool FindBestInstallerRelease(const std::wstring& json, ParsedRelease& best) {
 }
 
 bool IsRemoteUpdateNewer(const InstallerUpdateInfo& info) {
+    // Prefer patch/build compare — always matches the displayed kInstallerVersion.
     if (info.remoteBuild > 0 && info.remoteBuild > kInstallerBuildNumber) {
         return true;
     }
 
-    const std::wstring localTag = Utf8ToWideLocal(INSTALLER_RELEASE_TAG);
-    if (info.releaseTag.empty() || localTag.empty()) {
+    const std::wstring localVersion = Utf8ToWideLocal(kInstallerVersion);
+    const std::wstring localTag = [&]() {
+        const std::wstring fromDefine = Utf8ToWideLocal(INSTALLER_RELEASE_TAG);
+        if (!fromDefine.empty() && _wcsicmp(fromDefine.c_str(), L"unknown") != 0) {
+            return fromDefine;
+        }
+        return localVersion;
+    }();
+
+    if (info.releaseTag.empty()) {
         return false;
     }
-    if (_wcsicmp(info.releaseTag.c_str(), localTag.c_str()) == 0) {
+    if (!localTag.empty() && _wcsicmp(info.releaseTag.c_str(), localTag.c_str()) == 0) {
+        return false;
+    }
+    if (!localVersion.empty() && _wcsicmp(info.releaseTag.c_str(), localVersion.c_str()) == 0) {
         return false;
     }
 
-    const SemVer localSem = ParseSemVer(localTag);
+    const SemVer localSem = ParseSemVer(!localVersion.empty() ? localVersion : localTag);
     const SemVer remoteSem = ParseSemVer(info.releaseTag);
 
     // New scheme: tags are 1.0.N. Do not "update" to legacy numeric tags (3520 / 3521-BETA).
@@ -592,7 +604,6 @@ UpdateCheckResult CheckForInstallerUpdate() {
         result.info.releaseUrl = L"https://github.com/mon5termatt/medicat_installer/releases/tag/" + release.tag;
     }
     result.info.downloadUrl = release.downloadUrl;
-    result.info.remoteBuild = 0;
     result.info.updateAvailable = IsRemoteUpdateNewer(result.info);
     result.success = true;
     return result;

@@ -13,6 +13,7 @@
 #include "ventoy.h"
 
 #include <commctrl.h>
+#include <commdlg.h>
 #include <dbt.h>
 #include <uxtheme.h>
 #include <windowsx.h>
@@ -21,6 +22,10 @@
 #include <memory>
 #include <sstream>
 #include <thread>
+
+#ifndef MEDICAT_USB_VERSION
+#define MEDICAT_USB_VERSION "21.12"
+#endif
 
 namespace medicat {
 
@@ -74,7 +79,8 @@ constexpr int kBottomChrome = 28;
 constexpr int kArchiveLabelHeight = 36;
 constexpr int kDownloadBtnHeight = 28;
 constexpr int kDownloadBtnGap = 8;
-constexpr int kArchivePanelHeight = kArchiveLabelHeight + kDownloadBtnHeight + kDownloadBtnGap + kDownloadBtnHeight + 10;
+constexpr int kArchivePanelHeight =
+    kArchiveLabelHeight + 3 * kDownloadBtnHeight + 2 * kDownloadBtnGap + 10;
 
 struct MainContentLayout {
     int contentTop = 0;
@@ -201,6 +207,7 @@ constexpr int kDownloadGoogleDriveBtnId = 1022;
 constexpr int kDownloadMegaBtnId = 1023;
 constexpr int kDownloadTorrentBtnId = 1029;
 constexpr int kDownloadMagnetBtnId = 1030;
+constexpr int kBrowseArchiveBtnId = 1031;
 constexpr int kManualInstallBtnId = 1024;
 constexpr int kCreditsBtnId = 1025;
 constexpr int kFeedbackBtnId = 1026;
@@ -1241,14 +1248,7 @@ void Gui::ShowUpdatePrompt(const InstallerUpdateInfo& info) {
     }
 
     const std::wstring localVersion = InstallerVersionLabel();
-#ifndef INSTALLER_RELEASE_TAG
-#define INSTALLER_RELEASE_TAG "unknown"
-#endif
-    const std::wstring localTag = [&]() {
-        wchar_t buffer[64]{};
-        swprintf_s(buffer, L"%hs", INSTALLER_RELEASE_TAG);
-        return std::wstring(buffer);
-    }();
+    const std::wstring localTag = InstallerVersionWide();
     const std::wstring remoteVersion = [&]() {
         if (!info.version.empty()) {
             return info.version.rfind(L'v', 0) == 0 ? info.version : (L"v" + info.version);
@@ -1351,7 +1351,7 @@ void Gui::LogDriveListSelection(const std::vector<DriveInfo>& drives, const int 
 
 void Gui::SetDownloadControlsEnabled(const bool enabled) {
     for (HWND control : {downloadMirror1Btn_, downloadMirror2Btn_, downloadTorrentBtn_, downloadMagnetBtn_,
-                         downloadGoogleDriveBtn_, downloadMegaBtn_}) {
+                         downloadGoogleDriveBtn_, downloadMegaBtn_, browseArchiveBtn_}) {
         if (control && IsWindow(control)) {
             EnableWindow(control, enabled);
         }
@@ -3021,8 +3021,17 @@ void Gui::UpdateAdvancedControls() {
     LayoutMainContent();
 }
 
+std::wstring Gui::SelectedArchivePath() const { return archiveOverridePath_; }
+
+std::wstring Gui::EffectiveArchivePath() const {
+    if (!archiveOverridePath_.empty()) {
+        return NormalizeMediCatArchivePath(archiveOverridePath_);
+    }
+    return ResolveMediCatArchivePath(GetExeDirectory());
+}
+
 bool Gui::IsArchiveAvailable() const {
-    const MediCatArchiveInfo info = InspectMediCatArchive(ResolveMediCatArchivePath(GetExeDirectory()));
+    const MediCatArchiveInfo info = InspectMediCatArchive(EffectiveArchivePath());
     return info.state == MediCatArchiveState::SizeOk || info.state == MediCatArchiveState::Verified;
 }
 
@@ -3031,14 +3040,56 @@ void Gui::RefreshArchivePanelLabel() {
         return;
     }
 
-    const MediCatArchiveInfo info = InspectMediCatArchive(ResolveMediCatArchivePath(GetExeDirectory()));
+    const MediCatArchiveInfo info = InspectMediCatArchive(EffectiveArchivePath());
     const wchar_t* labelKey =
         info.state == MediCatArchiveState::Incomplete ? L"ui.archive_incomplete" : L"ui.archive_missing";
-    SetWindowTextW(archiveMissingLabel_, i18n::Tr(labelKey, kMediCatArchiveFileName).c_str());
+    SetWindowTextW(archiveMissingLabel_, i18n::Tr(labelKey, kMediCatArchiveUiName).c_str());
+}
+
+void Gui::BrowseForArchive() {
+    wchar_t fileBuf[MAX_PATH]{};
+    OPENFILENAMEW ofn{};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd_;
+    ofn.lpstrFile = fileBuf;
+    ofn.nMaxFile = MAX_PATH;
+    // Double-null-terminated filter pairs.
+    ofn.lpstrFilter =
+        L"MediCat archive (*.7z;*.zip.001-006)\0*.7z;*.zip.001;*.zip.002;*.zip.003;*.zip.004;*.zip.005;*.zip.006\0"
+        L"7-Zip archive (*.7z)\0*.7z\0"
+        L"Split zip volumes (*.zip.001-006)\0*.zip.001;*.zip.002;*.zip.003;*.zip.004;*.zip.005;*.zip.006\0"
+        L"All files (*.*)\0*.*\0";
+    ofn.nFilterIndex = 1;
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_EXPLORER;
+    const std::wstring title = i18n::Tr(L"titles.file_dialog_title", Utf8ToWide(MEDICAT_USB_VERSION));
+    ofn.lpstrTitle = title.c_str();
+    const std::wstring initialDir = GetExeDirectory();
+    ofn.lpstrInitialDir = initialDir.c_str();
+
+    if (!GetOpenFileNameW(&ofn)) {
+        return;
+    }
+
+    const std::wstring selected = NormalizeMediCatArchivePath(fileBuf);
+    archiveOverridePath_ = selected;
+
+    const MediCatArchiveInfo info = InspectMediCatArchive(selected);
+    UpdateArchivePanel();
+
+    if (info.state == MediCatArchiveState::SizeOk || info.state == MediCatArchiveState::Verified) {
+        SetStatusBar(i18n::Tr(L"status.archive_selected", ShortDisplayPath(selected)));
+        if (onLog_) {
+            onLog_(i18n::Tr(L"status.archive_selected", selected));
+        }
+        return;
+    }
+
+    ShowMessageDialog(i18n::Tr(L"messages.archive_browse_invalid"), i18n::Tr(L"titles.archive_browse_invalid"),
+                      MessageDialogKind::Warning);
 }
 
 void Gui::UpdateArchivePanel() {
-    const MediCatArchiveInfo info = InspectMediCatArchive(ResolveMediCatArchivePath(GetExeDirectory()));
+    const MediCatArchiveInfo info = InspectMediCatArchive(EffectiveArchivePath());
     const bool missing = info.state == MediCatArchiveState::Missing || info.state == MediCatArchiveState::Incomplete;
     if (missing == archiveMissing_) {
         if (missing) {
@@ -3051,7 +3102,7 @@ void Gui::UpdateArchivePanel() {
     RefreshArchivePanelLabel();
     const int show = missing ? SW_SHOW : SW_HIDE;
     for (HWND control : {archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_, downloadTorrentBtn_,
-                         downloadMagnetBtn_, downloadGoogleDriveBtn_, downloadMegaBtn_}) {
+                         downloadMagnetBtn_, downloadGoogleDriveBtn_, downloadMegaBtn_, browseArchiveBtn_}) {
         if (control && IsWindow(control)) {
             ShowWindow(control, show);
         }
@@ -3091,6 +3142,7 @@ void Gui::LayoutMainContent() {
 
         const int row1Y = kContentTop + kArchiveLabelHeight;
         const int row2Y = row1Y + kDownloadBtnHeight + kDownloadBtnGap;
+        const int row3Y = row2Y + kDownloadBtnHeight + kDownloadBtnGap;
 
         if (downloadMirror1Btn_ && IsWindow(downloadMirror1Btn_)) {
             SetWindowPos(downloadMirror1Btn_, nullptr, contentLeft, row1Y, kDownloadMirrorBtnWidth, kDownloadBtnHeight,
@@ -3114,6 +3166,10 @@ void Gui::LayoutMainContent() {
         }
         if (downloadMegaBtn_ && IsWindow(downloadMegaBtn_)) {
             SetWindowPos(downloadMegaBtn_, nullptr, row2Col4X, row2Y, kDownloadRowBtnWidth, kDownloadBtnHeight,
+                         SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        if (browseArchiveBtn_ && IsWindow(browseArchiveBtn_)) {
+            SetWindowPos(browseArchiveBtn_, nullptr, contentLeft, row3Y, kContentWidth, kDownloadBtnHeight,
                          SWP_NOZORDER | SWP_NOACTIVATE);
         }
     }
@@ -3495,7 +3551,7 @@ void Gui::OnCreate(HWND hwnd) {
         kHeaderTitleX, kHeaderTitleY, kHeaderTitleWidth, 28, hwnd, nullptr, instance_, nullptr);
 
     archiveMissingLabel_ = CreateWindowW(
-        L"STATIC", i18n::Tr(L"ui.archive_missing", kMediCatArchiveFileName).c_str(),
+        L"STATIC", i18n::Tr(L"ui.archive_missing", kMediCatArchiveUiName).c_str(),
         WS_CHILD | SS_LEFT | SS_LEFTNOWORDWRAP,
         kMargin, kContentTop, kContentWidth, kArchiveLabelHeight, hwnd, nullptr, instance_, nullptr);
 
@@ -3518,6 +3574,8 @@ void Gui::OnCreate(HWND hwnd) {
                                                 kDownloadRowBtnWidth);
     downloadMegaBtn_ =
         createDownloadBtn(kDownloadMegaBtnId, i18n::Tr(L"ui.download_mega").c_str(), kDownloadRowBtnWidth);
+    browseArchiveBtn_ =
+        createDownloadBtn(kBrowseArchiveBtnId, i18n::Tr(L"ui.browse_archive").c_str(), kContentWidth);
 
     const std::wstring versionText = InstallerVersionLabel();
     const MainContentLayout initialLayout = ComputeMainContentLayout(false, false);
@@ -3654,7 +3712,8 @@ void Gui::OnCreate(HWND hwnd) {
 
     for (HWND child :
          {languageCombo_, titleLabel_, versionLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_,
-          downloadTorrentBtn_, downloadMagnetBtn_, downloadGoogleDriveBtn_, downloadMegaBtn_, driveLabel_, driveCombo_,
+          downloadTorrentBtn_, downloadMagnetBtn_, downloadGoogleDriveBtn_, downloadMegaBtn_, browseArchiveBtn_,
+          driveLabel_, driveCombo_,
           showAllDrivesCheck_, formatCheck_, ventoyActionCheck_, advancedCheck_, pinVentoyCheck_,
           ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_, verifyFilesBtn_,
           openLogBtn_, manualInstallBtn_, creditsBtn_, discordFooterBtn_, feedbackBtn_, progressBar_, statusBar_,
@@ -3684,6 +3743,7 @@ void Gui::OnCreate(HWND hwnd) {
     SubclassGlowButton(downloadMagnetBtn_, false);
     SubclassGlowButton(downloadGoogleDriveBtn_, false);
     SubclassGlowButton(downloadMegaBtn_, false);
+    SubclassGlowButton(browseArchiveBtn_, false);
 
     for (const HWND checkbox : {formatCheck_, ventoyActionCheck_, showAllDrivesCheck_, advancedCheck_, pinVentoyCheck_,
                                 ventoySecureBootCheck_, ventoyGptCheck_}) {
@@ -3793,6 +3853,10 @@ void Gui::OnCommand(WPARAM wp, LPARAM lp) {
     }
     if (id == kDownloadMegaBtnId) {
         OpenBrowserUrl(kDownloadMegaUrl);
+        return;
+    }
+    if (id == kBrowseArchiveBtnId) {
+        BrowseForArchive();
         return;
     }
 }
@@ -3992,6 +4056,9 @@ void Gui::RefreshTranslatedUi() {
     if (downloadMegaBtn_ && IsWindow(downloadMegaBtn_)) {
         SetWindowTextW(downloadMegaBtn_, i18n::Tr(L"ui.download_mega").c_str());
     }
+    if (browseArchiveBtn_ && IsWindow(browseArchiveBtn_)) {
+        SetWindowTextW(browseArchiveBtn_, i18n::Tr(L"ui.browse_archive").c_str());
+    }
     if (fileLogWindow_ && IsWindow(fileLogWindow_)) {
         SetWindowTextW(fileLogWindow_, i18n::Tr(L"ui.file_log_title").c_str());
     }
@@ -4000,7 +4067,8 @@ void Gui::RefreshTranslatedUi() {
     }
 
     for (HWND child : {titleLabel_, archiveMissingLabel_, downloadMirror1Btn_, downloadMirror2Btn_, downloadTorrentBtn_,
-                       downloadMagnetBtn_, downloadGoogleDriveBtn_, downloadMegaBtn_, driveLabel_, driveCombo_,
+                       downloadMagnetBtn_, downloadGoogleDriveBtn_, downloadMegaBtn_, browseArchiveBtn_, driveLabel_,
+                       driveCombo_,
                        showAllDrivesCheck_, formatCheck_, ventoyActionCheck_, advancedCheck_, pinVentoyCheck_,
                        ventoySecureBootCheck_, ventoyGptCheck_, installBtn_, verifyFilesBtn_, openLogBtn_, manualInstallBtn_, creditsBtn_, progressBar_, statusBar_,
                        betaNoticeLabel_, languageCombo_, versionLabel_}) {
