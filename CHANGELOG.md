@@ -2,6 +2,10 @@
 
 All notable changes to `Medicat_Installer.sh` (linux branch).
 
+## 0022
+
+- Fix NTFS mount for distros without in-kernel ntfs3: try ntfs3, ntfs, ntfs-3g, then auto; verify `mountpoint` before extract so a failed mount cannot dump MediCat onto the local disk (#81).
+
 ## 0021
 
 - Accept Google Drive / Mega multi-volume archives (`MediCat.USB.v21.12.zip.001`-.006): verify each part MD5, then extract with `7z` from `.001` (addresses #87).

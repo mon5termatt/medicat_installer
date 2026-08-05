@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ScriptVersion="0021"
+ScriptVersion="0022"
 
 # See CHANGELOG.md for changes.
 #
@@ -433,6 +433,72 @@ function verifySplitArchive() {
 	done
 	colEcho $greenB "All six split volumes match. Safe to proceed..."
 	colEcho $cyanB "7z will extract from$whiteB $location$cyanB (follows .002-.006 automatically)."
+}
+
+# Mount the Medicat NTFS partition. Try ntfs3 (in-kernel), then ntfs (often ntfs-3g),
+# then ntfs-3g directly. Fail hard if the mountpoint is not a real mount of $device
+# so 7z never extracts into a plain local ./MedicatUSB directory (#81).
+function mountMedicatNtfs() {
+	local device="$1"
+	local mnt="$2"
+	local opts="rw,uid=$(id -u),gid=$(id -g),fmask=0111,dmask=0000"
+	local attempt=""
+	local mountedSource=""
+
+	if [[ ! -b "$device" ]]; then
+		colEcho $redB "ERROR: Not a block device:$whiteB $device"
+		exit 1
+	fi
+	mkdir -p "$mnt"
+
+	# Clear a stale mount from a previous run.
+	if mountpoint -q "$mnt" 2>/dev/null; then
+		colEcho $yellowB "Unmounting existing mount at$whiteB $mnt$yellowB..."
+		$sudo umount "$mnt" 2>/dev/null || true
+	fi
+
+	for attempt in "ntfs3" "ntfs" "ntfs-3g" "auto"; do
+		colEcho $cyanB "Trying mount type:$whiteB $attempt"
+		case "$attempt" in
+			ntfs3)
+				$sudo mount -t ntfs3 -o "$opts" "$device" "$mnt" 2>/dev/null || continue
+				;;
+			ntfs)
+				$sudo mount -t ntfs -o "$opts" "$device" "$mnt" 2>/dev/null || continue
+				;;
+			ntfs-3g)
+				if ! command -v ntfs-3g >/dev/null 2>&1; then
+					continue
+				fi
+				$sudo ntfs-3g -o "$opts" "$device" "$mnt" 2>/dev/null || continue
+				;;
+			auto)
+				$sudo mount -o "$opts" "$device" "$mnt" 2>/dev/null || continue
+				;;
+		esac
+
+		if ! mountpoint -q "$mnt" 2>/dev/null; then
+			# mount may have "succeeded" without binding; try next type
+			$sudo umount "$mnt" 2>/dev/null || true
+			continue
+		fi
+
+		mountedSource=$(findmnt -n -o SOURCE --target "$mnt" 2>/dev/null || true)
+		# Accept exact device or a resolved path (e.g. /dev/sdb1).
+		if [[ "$mountedSource" != "$device" ]] && [[ "$mountedSource" != "$(readlink -f "$device" 2>/dev/null || true)" ]]; then
+			colEcho $yellowB "Mount at$whiteB $mnt$yellowB is$whiteB $mountedSource$yellowB, expected$whiteB $device$yellowB; trying next type..."
+			$sudo umount "$mnt" 2>/dev/null || true
+			continue
+		fi
+
+		colEcho $greenB "Mounted$whiteB $device$greenB at$whiteB $mnt$greenB (type$whiteB $attempt$greenB)."
+		return 0
+	done
+
+	colEcho $redB "ERROR: Failed to mount$whiteB $device$redB at$whiteB $mnt"
+	colEcho $yellowB "Tried ntfs3, ntfs, ntfs-3g, and auto. Install ntfs-3g if needed, then re-run."
+	colEcho $redB "Refusing to extract into an unmounted local folder (that would fill your system disk)."
+	exit 1
 }
 
 # Download the MediCat archive over HTTP (aria2c multi-connection preferred; wget fallback).
@@ -958,7 +1024,10 @@ colEcho $cyanB "Unmounting drive$whiteB $drive"
 $sudo umount $drive
 
 colEcho $cyanB "Creating Medicat NTFS file system on drive$whiteB $drive2"
-$sudo mkntfs --fast --label Medicat $drive2
+if ! $sudo mkntfs --fast --label Medicat $drive2; then
+	colEcho $redB "ERROR: mkntfs failed on$whiteB $drive2"
+	exit 1
+fi
 
 # Create a mountpoint folder for the Medicat NTFS volume
 requireFreeSpace "." "$MedicatWorkMinFreeBytes" "MedicatUSB mountpoint" "fatal"
@@ -968,11 +1037,17 @@ if ! [[ -d MedicatUSB/ ]] ; then
 fi
 
 colEcho $cyanB "Mounting Medicat NTFS volume..."
-$sudo mount $drive2 ./MedicatUSB -o user,auto,fmask=0111,dmask=0000
+mountMedicatNtfs "$drive2" "./MedicatUSB"
 
 # Target USB must have room for the extracted MediCat tree.
-colEcho $yellowB "NOTE: 32GB USBs are fine but JUST BARELY — little room left after extract."
+colEcho $yellowB "NOTE: 32GB USBs are fine but JUST BARELY - little room left after extract."
 requireFreeSpace "./MedicatUSB" "$MedicatUsbMinFreeBytes" "MediCat extract onto USB" "fatal"
+
+# Belt-and-suspenders: never extract unless ./MedicatUSB is still a mount of $drive2.
+if ! mountpoint -q ./MedicatUSB 2>/dev/null; then
+	colEcho $redB "ERROR: ./MedicatUSB is not a mounted filesystem. Aborting extract."
+	exit 1
+fi
 
 colEcho $cyanB "Extracting Medicat to NTFS volume..."
 # For split Drive/Mega volumes, $location is the .001 file; 7z opens the rest automatically.
