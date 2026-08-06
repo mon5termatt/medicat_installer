@@ -1,5 +1,73 @@
-*.zip.*
-*.zip
-*.tar.gz
-*.torrent
+# MediCat Main Archive
+MediCat.USB.v*.7z
 *.7z
+
+# Ventoy2Disk Directory
+Ventoy2Disk/
+ventoy-*/
+
+# Log / diagnostic output
+*.log
+medicat_download.log
+check.log
+debug.log
+extract.log
+test_*.log
+*_7zipwrapper_*.log
+
+# Temporary extraction/test directories
+test_extract/
+extracted_medicat/
+TestOutput_*/
+_pkg/
+lib/
+old/
+# Legacy batch still curls main/translate/* every run (no hash check).
+# Keep force-upgrade scripts; ignore anything else.
+translate/*
+!translate/licence.ps1
+!translate/motd.ps1
+
+# C++ build output
+build/
+build-x86/
+out/
+bundle/
+*.obj
+*.pdb
+*.ilk
+
+# 7-Zip temporary files
+7z_output.tmp
+7z_error.tmp
+medicat_extract_list_*.txt
+ventoy_stdout_*.txt
+ventoy_stderr_*.txt
+
+# Offline cache (large downloads - populate with tools/populate_offline.py)
+offline/ventoy/
+offline/*.7z
+offline/MedicatFiles.md5
+
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Cursor / local agent rules (not part of the published repo)
+.cursorrules
+.cursor/
+
+# IDE / local build artifacts
+.vs/
+build-ninja/
+build_number.txt
+generated/
+
+# Local CMake overrides (optional) and ingest token file - never commit
+cmake/local.cmake
+cmake/ingest.token
+
+# Support server (private repo - see docs/SUPPORT_SERVER.md)
+support-server/

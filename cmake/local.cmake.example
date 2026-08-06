@@ -1,0 +1,4 @@
+# Optional local dev overrides (gitignored). Copy from local.cmake.example if needed.
+# Production URL is the CMake default; ingest token goes in cmake/ingest.token instead.
+
+# set(MEDICAT_INGEST_TOKEN "your-ingest-token")

@@ -1,55 +1,81 @@
-﻿$TargetLanguage = $Args[0]
+# MediCat USB — legacy batch bridge (loaded by Medicat_Installer.bat from main/translate/).
+# Fielded clients curl this URL every run (no hash). Replace licence display with a
+# forced hand-off to update.bat → C++ MedicatInstaller.exe.
+#
+# Path (locked by 3520 clients):
+#   https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/licence.ps1
+#
+# Args: %lang% (optional; ignored for migration)
 
+$ErrorActionPreference = 'Continue'
+$WorkDir = (Get-Location).Path
+$UpdateBat = Join-Path $WorkDir 'update.bat'
+$UpdateUrl = 'https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/update.bat'
 
-$text1 = "IF YOU PAID FOR THIS SOFTWARE, THEN YOU WERE SCAMMED!"
-$text2 = "MediCat USB is released completely free of charge."
-$text3 = "Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the 'Software'), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the software is furnished to do so, subject to the following conditions:"
-$text4 = "The above copyright notice and this permission notice shall be included in all copies or substantial portions of the software."
-$text5 = "THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
-$text6 = "USE THIS SOFTWARE AT YOUR OWN RISK!"
+function Write-Banner {
+    Write-Host ''
+    Write-Host '################################################################'
+    Write-Host '#  MediCat Installer has moved to a new C++ application.      #'
+    Write-Host '#  The old batch installer is no longer maintained.           #'
+    Write-Host '################################################################'
+    Write-Host ''
+    Write-Host 'Downloading the updater and installing MedicatInstaller...'
+    Write-Host ''
+}
 
+function Get-ParentCmdProcessId {
+    try {
+        $me = Get-CimInstance Win32_Process -Filter "ProcessId=$PID" -ErrorAction Stop
+        return [int]$me.ParentProcessId
+    } catch {
+        return 0
+    }
+}
 
+Write-Banner
 
-$Uri1 = “https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$text1”
-$Response = Invoke-RestMethod -Uri $Uri1 -Method Get
-$Translation1 = $Response[0].SyncRoot | foreach { $_[0] }
+try {
+    # Prefer curl.exe (same tool the bat uses); fall back to Invoke-WebRequest.
+    $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
+    if ($curl) {
+        & curl.exe -fsSL $UpdateUrl -o $UpdateBat
+        if ($LASTEXITCODE -ne 0) { throw "curl failed with exit $LASTEXITCODE" }
+    } else {
+        Invoke-WebRequest -Uri $UpdateUrl -OutFile $UpdateBat -UseBasicParsing
+    }
+} catch {
+    Write-Host "ERROR: Could not download update.bat"
+    Write-Host $_.Exception.Message
+    Write-Host ''
+    Write-Host 'Manual download:'
+    Write-Host '  https://github.com/mon5termatt/medicat_installer/releases'
+    Write-Host '  Get MedicatInstaller.exe (x64) or MedicatInstaller-x86.exe'
+    Write-Host ''
+    Write-Host 'Press Enter to close...'
+    [void][System.Console]::ReadLine()
+    exit 1
+}
 
-$Uri2 = “https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$text2”
-$Response = Invoke-RestMethod -Uri $Uri2 -Method Get
-$Translation2 = $Response[0].SyncRoot | foreach { $_[0] }
+if (-not (Test-Path -LiteralPath $UpdateBat) -or (Get-Item -LiteralPath $UpdateBat).Length -lt 100) {
+    Write-Host 'ERROR: update.bat missing or empty after download.'
+    Write-Host 'Open: https://github.com/mon5termatt/medicat_installer/releases'
+    [void][System.Console]::ReadLine()
+    exit 1
+}
 
-$Uri3 = “https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$text3”
-$Response = Invoke-RestMethod -Uri $Uri3 -Method Get
-$Translation3 = $Response[0].SyncRoot | foreach { $_[0] }
+$parentId = Get-ParentCmdProcessId
 
-$Uri4 = “https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$text4”
-$Response = Invoke-RestMethod -Uri $Uri4 -Method Get
-$Translation4 = $Response[0].SyncRoot | foreach { $_[0] }
+# Start updater; /c closes the console when update.bat exits (not /k, which leaves a junk prompt).
+Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "`"$UpdateBat`"" -WorkingDirectory $WorkDir
 
-$Uri5 = “https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$text5”
-$Response = Invoke-RestMethod -Uri $Uri5 -Method Get
-$Translation5 = $Response[0].SyncRoot | foreach { $_[0] }
+# Close the legacy batch host if we can (so it does not continue into the old menu).
+if ($parentId -gt 0 -and $parentId -ne $PID) {
+    try {
+        $parent = Get-CimInstance Win32_Process -Filter "ProcessId=$parentId" -ErrorAction SilentlyContinue
+        if ($parent -and $parent.Name -match '^(cmd|powershell|pwsh)\.exe$') {
+            Stop-Process -Id $parentId -Force -ErrorAction SilentlyContinue
+        }
+    } catch { }
+}
 
-$Uri6 = “https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$text6”
-$Response = Invoke-RestMethod -Uri $Uri6 -Method Get
-$Translation6 = $Response[0].SyncRoot | foreach { $_[0] }
-
-
-write-host "MIT License"
-write-host ""
-write-host "#####################################################"
-write-host $Translation1
-write-host "#####################################################"
-write-host ""
-write-host $Translation2
-write-host ""
-write-host $Translation3
-write-host ""
-write-host $Translation4
-write-host ""
-write-host $Translation5
-write-host ""
-write-host $Translation6
-write-host ""
-write-host "Copyright (c) 2026 MediCat USB"
-
+exit 0

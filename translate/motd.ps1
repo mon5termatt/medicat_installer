@@ -1,26 +1,18 @@
+# Legacy batch prints MOTD after the main menu is drawn. If the user somehow
+# skipped licence.ps1 migration, nudge every menu redraw toward the C++ updater.
+#
+# Path: https://raw.githubusercontent.com/mon5termatt/medicat_installer/main/translate/motd.ps1
+
 $TargetLanguage = $Args[0]
-$today = Get-Date
+$text1 = 'This batch installer is obsolete. Close it and run MedicatInstaller.exe from GitHub Releases, or re-run so licence.ps1 can auto-update you.'
 
-# Check Holiday
-# https://nationaltoday.com/category/world/
+try {
+    if ($TargetLanguage -and $TargetLanguage -ne 'en') {
+        $Uri1 = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$text1"
+        $Response = Invoke-RestMethod -Uri $Uri1 -Method Get
+        $Translation1 = $Response[0].SyncRoot | ForEach-Object { $_[0] }
+        if ($Translation1) { $text1 = $Translation1 }
+    }
+} catch { }
 
-if ($today.Month -eq 4 -and $today.Day -eq 1) {
-# Holiday Text (And/Or Action)
-$text1 = "Happy April Fools Day"    
-Start-Process "https://url.medicatusb.com/af26"
-} else {
-# Normal Text (Updated every once in a while.)
-$text1 = "If you or a loved one has been diagnosed with a broken computer, you may be asked to help now..."
-} # Close Loop
-
-### Saved messages
-# This one is gold, save it. 
-# If you or a loved one has been diagnosed with a broken computer, you may be asked to help now...
-
-# Do Translation
-$Uri1 = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($TargetLanguage)&dt=t&q=$text1"
-$Response = Invoke-RestMethod -Uri $Uri1 -Method Get
-$Translation1 = $Response[0].SyncRoot | foreach { $_[0] }
-
-write-host $Translation1
-
+Write-Host $text1

@@ -1,0 +1,3 @@
+# Copy to cmake/ingest.token (gitignored) — one line, no quotes.
+# Or set MEDICAT_INGEST_TOKEN when running cmake.
+# your-ingest-token-here
