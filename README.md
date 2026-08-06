@@ -12,6 +12,8 @@ Native Win32 build. Ships **GUI + command-line** in one exe — no batch or Powe
 |--------|-----------|-------|
 | `main` | **C++ / Win32** (active) | Single `MedicatInstaller.exe`, bundled tools, beta |
 | `linux` | Linux helper scripts | Separate branch |
+| `legacy` / `legacy-archive` | Batch / older scripts | Frozen tip for historical batch installers |
+| `archive/main-cpp-rewrite` | C++ rewrite-era tip | Backup of the short pre-restore `main` history |
 
 ## Downloads
 
@@ -77,7 +79,7 @@ Logs are written to `medicat_installer.log` beside the exe.
 ## Notes
 
 - **Beta** — report issues with `medicat_installer.log` attached, or share the **Diag code** from the error dialog if logs were uploaded.
-- Stable batch-installer history remains on tag `3520` and earlier (`legacy` branch).
+- Stable batch-installer history remains on tag `3520` and on branches `legacy` / `legacy-archive`.
 - CLI help/version strings are English-only for now; `/lang:` affects logged and dialog text where shown.
 - Update tooling: see [`UPDATER.md`](UPDATER.md).
 - Support telemetry: anonymous session reports and optional failure log upload — see [Logs](#logs-beside-the-exe).
