@@ -1174,6 +1174,12 @@ void App::OnVerify() {
         return;
     }
 
+    if (!gui_.MedicatOnSelectedDrive()) {
+        // Verify is greyed when presence fails; ignore stray clicks during/after detection.
+        installing_ = false;
+        return;
+    }
+
     if (!MeetsMinimumDriveCapacity(drive)) {
         gui_.ShowMessageDialog(i18n::Tr(L"messages.drive_under_minimum", drive),
                                i18n::Tr(L"titles.drive_under_minimum"), MessageDialogKind::Warning);

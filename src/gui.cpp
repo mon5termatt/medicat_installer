@@ -1307,6 +1307,31 @@ void Gui::LogVentoyDetection(const std::wstring& drive, const VentoyDetectionRes
     lastVentoyLogFound_ = detection.installed;
 }
 
+void Gui::LogMedicatPresence(const std::wstring& drive, const MedicatPresenceResult& presence) {
+    if (!onLog_ || drive.empty()) {
+        return;
+    }
+
+    const bool changed = !hasLastMedicatLog_ || drive != lastMedicatLogDrive_ ||
+                         presence.likelyInstalled != lastMedicatLogFound_ ||
+                         presence.scorePercent != lastMedicatLogScore_;
+    if (!changed) {
+        return;
+    }
+
+    onLog_(i18n::Tr(L"log.medicat_presence_score", std::to_wstring(presence.scorePercent),
+                    std::to_wstring(presence.markersFound), std::to_wstring(presence.markersTotal)));
+    if (!presence.likelyInstalled) {
+        onLog_(i18n::Tr(L"log.medicat_presence_too_low", std::to_wstring(presence.scorePercent),
+                        std::to_wstring(kMedicatPresenceProceedThresholdPercent)));
+    }
+
+    hasLastMedicatLog_ = true;
+    lastMedicatLogDrive_ = drive;
+    lastMedicatLogFound_ = presence.likelyInstalled;
+    lastMedicatLogScore_ = presence.scorePercent;
+}
+
 void Gui::LogDriveListSelection(const std::vector<DriveInfo>& drives, const int selectedIdx,
                                 const std::wstring& previous, const int restoreIdx) {
     if (!onLog_) {
@@ -1360,7 +1385,6 @@ void Gui::SetDownloadControlsEnabled(const bool enabled) {
 
 void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
     EnableWindow(installBtn_, !busy && !archiveMissing_);
-    EnableWindow(verifyFilesBtn_, !busy);
     EnableWindow(driveCombo_, !busy);
     EnableWindow(languageCombo_, !busy);
     EnableWindow(showAllDrivesCheck_, !busy);
@@ -1373,6 +1397,7 @@ void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
         busyProgressMode_ = progressMode;
         EnableWindow(pinVentoyCheck_, FALSE);
         EnableWindow(ventoyVersionCombo_, FALSE);
+        UpdateVerifyFilesButton();
         if (progressMode == BusyProgressMode::FileLog || progressMode == BusyProgressMode::Verify) {
             SetTimer(hwnd_, kUiRefreshTimerId, kUiRefreshIntervalMs, nullptr);
         }
@@ -1382,6 +1407,7 @@ void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
             FlushInstallUi();
         }
         busyProgressMode_ = BusyProgressMode::None;
+        UpdateVerifyFilesButton();
         if (pendingDriveRefresh_) {
             pendingDriveRefresh_ = false;
             RefreshDrives(true);
@@ -2887,6 +2913,10 @@ bool Gui::VentoyOnSelectedDrive() const {
     return ventoyOnDrive_;
 }
 
+bool Gui::MedicatOnSelectedDrive() const {
+    return medicatOnDrive_;
+}
+
 bool Gui::AdvancedChecked() const {
     return SendMessageW(advancedCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
 }
@@ -3650,6 +3680,7 @@ void Gui::OnCreate(HWND hwnd) {
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
         kMargin + kInstallBtnWidth + kActionBtnGap, initialLayout.installY, kVerifyBtnWidth, kInstallBtnHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kVerifyFilesBtnId)), instance_, nullptr);
+    UpdateVerifyFilesButton();
 
     progressBar_ = CreateWindowW(
         PROGRESS_CLASSW, nullptr,
@@ -4288,7 +4319,10 @@ void Gui::RefreshDriveVentoyStatus(const bool updateStatusBar) {
     const std::wstring drive = SelectedDrive();
     if (drive.empty()) {
         hasLastVentoyLog_ = false;
+        hasLastMedicatLog_ = false;
         ventoyOnDrive_ = false;
+        medicatOnDrive_ = false;
+        UpdateVerifyFilesButton();
 
         if (drive != lastVentoyControlDrive_) {
             lastVentoyControlDrive_ = drive;
@@ -4301,12 +4335,17 @@ void Gui::RefreshDriveVentoyStatus(const bool updateStatusBar) {
         return;
     }
 
+    // Disable verify until the async presence check finishes for this drive.
+    medicatOnDrive_ = false;
+    UpdateVerifyFilesButton();
+
     const uint64_t generation = ++ventoyStatusGeneration_;
     const HWND hwnd = hwnd_;
     std::thread([hwnd, drive, updateStatusBar, generation]() {
         auto* payload = new VentoyStatusPayload{};
         payload->drive = drive;
         payload->detection = DetectVentoyOnDrive(drive);
+        payload->medicatPresence = CheckMedicatPresenceOnDrive(drive);
         payload->updateStatusBar = updateStatusBar;
         payload->generation = generation;
         PostMessageW(hwnd, WM_MEDICAT_VENTOY_STATUS, 0, reinterpret_cast<LPARAM>(payload));
@@ -4327,7 +4366,10 @@ void Gui::ApplyVentoyStatus(VentoyStatusPayload* payload) {
     }
 
     LogVentoyDetection(payload->drive, payload->detection);
+    LogMedicatPresence(payload->drive, payload->medicatPresence);
     ventoyOnDrive_ = payload->detection.installed;
+    medicatOnDrive_ = payload->medicatPresence.likelyInstalled;
+    UpdateVerifyFilesButton();
 
     if (payload->drive != lastVentoyControlDrive_) {
         lastVentoyControlDrive_ = payload->drive;
@@ -4335,12 +4377,22 @@ void Gui::ApplyVentoyStatus(VentoyStatusPayload* payload) {
     }
 
     if (payload->updateStatusBar) {
-        if (ventoyOnDrive_) {
+        if (!medicatOnDrive_) {
+            SetStatusBar(i18n::Tr(L"status.medicat_not_on_drive", payload->drive));
+        } else if (ventoyOnDrive_) {
             SetStatusBar(i18n::Tr(L"status.ventoy_found", payload->drive));
         } else {
             SetStatusBar(i18n::Tr(L"status.ventoy_not_on_drive", payload->drive));
         }
     }
+}
+
+void Gui::UpdateVerifyFilesButton() {
+    if (!verifyFilesBtn_ || !IsWindow(verifyFilesBtn_)) {
+        return;
+    }
+    const bool busy = busyProgressMode_ != BusyProgressMode::None;
+    EnableWindow(verifyFilesBtn_, !busy && medicatOnDrive_);
 }
 
 void Gui::RefreshDriveVentoyControls() {

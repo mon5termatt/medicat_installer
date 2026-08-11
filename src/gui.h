@@ -3,6 +3,7 @@
 #include "drives.h"
 #include "update.h"
 #include "ventoy.h"
+#include "verify.h"
 
 #include <windows.h>
 
@@ -93,6 +94,7 @@ struct DriveListPayload {
 struct VentoyStatusPayload {
     std::wstring drive;
     VentoyDetectionResult detection;
+    MedicatPresenceResult medicatPresence;
     bool updateStatusBar = true;
     uint64_t generation = 0;
 };
@@ -149,6 +151,7 @@ public:
     bool FormatChecked() const;
     bool RunVentoyChecked() const;
     bool VentoyOnSelectedDrive() const;
+    bool MedicatOnSelectedDrive() const;
     bool AdvancedChecked() const;
     bool PinVentoyVersionChecked() const;
     bool VentoySecureBootChecked() const;
@@ -173,6 +176,7 @@ private:
     void RefreshDriveVentoyStatus(bool updateStatusBar = true);
     void ApplyVentoyStatus(VentoyStatusPayload* payload);
     void RefreshDriveVentoyControls();
+    void UpdateVerifyFilesButton();
     bool HandleDeviceChange(WPARAM wp, LPARAM lp);
     void ScheduleDriveChangeRefresh();
     void OnDebouncedDriveChange();
@@ -181,6 +185,7 @@ private:
                                        const std::wstring& selectedBefore);
     void EnforceForcedDriveCheckboxes();
     void LogVentoyDetection(const std::wstring& drive, const VentoyDetectionResult& detection);
+    void LogMedicatPresence(const std::wstring& drive, const MedicatPresenceResult& presence);
     void LogDriveListSelection(const std::vector<DriveInfo>& drives, int selectedIdx, const std::wstring& previous,
                                int restoreIdx);
     void FlushInstallUi();
@@ -325,7 +330,12 @@ private:
     bool archiveMissing_ = false;
     std::wstring archiveOverridePath_;
     bool ventoyOnDrive_ = false;
+    bool medicatOnDrive_ = false;
     std::wstring lastVentoyControlDrive_;
+    bool hasLastMedicatLog_ = false;
+    std::wstring lastMedicatLogDrive_;
+    bool lastMedicatLogFound_ = false;
+    unsigned lastMedicatLogScore_ = 0;
     std::atomic<bool> downloadingArchive_{false};
     bool pendingDriveRefresh_ = false;
     bool driveRefreshCoalesceFromDevice_ = false;
