@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Increment shared build counter and regenerate build_version.cpp.
+"""Write build_number.txt and generated/build_version.cpp.
 
-Default bump (`--next-after-github`) sets the version to one patch above the
-latest GitHub release that ships MedicatInstaller.exe, so local rebuilds do not
-skip ahead of published tags.
+rebuild.bat uses `--next-after-github` (latest published installer tag + 1).
+`--keep` reuses the local counter (CMake PRE_BUILD after a bump).
+`--set` / MEDICAT_PIN_BUILD pin a version (CI tags and updater tests).
 """
 
 from __future__ import annotations
@@ -188,7 +188,7 @@ def next_version_after_github(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Bump installer build number")
+    parser = argparse.ArgumentParser(description="Write installer build number")
     parser.add_argument("counter", type=Path, help="Path to version counter file (e.g. 1.0.19)")
     parser.add_argument("output", type=Path, help="Path to generated build_version.cpp")
     parser.add_argument("--major", default="1")
@@ -197,6 +197,11 @@ def main() -> int:
         "--repo",
         default=os.environ.get("MEDICAT_GITHUB_REPO", _DEFAULT_REPO),
         help=f"GitHub repo for latest-release sync (default: {_DEFAULT_REPO})",
+    )
+    parser.add_argument(
+        "--keep",
+        action="store_true",
+        help="Reuse build_number.txt (no increment, no GitHub). This is the default.",
     )
     parser.add_argument(
         "--next-after-github",
@@ -257,15 +262,14 @@ def main() -> int:
             print(f"Build number bump skipped ({args.skip_if_env}); using {version}")
         return 0
 
-    if in_github_actions():
-        print(
-            "Refusing to bump the build number on GitHub Actions. "
-            "Pin the tag with --set or MEDICAT_PIN_BUILD.",
-            file=sys.stderr,
-        )
-        return 1
-
     if args.next_after_github:
+        if in_github_actions():
+            print(
+                "Refusing to bump the build number on GitHub Actions. "
+                "Pin the tag with --set or MEDICAT_PIN_BUILD.",
+                file=sys.stderr,
+            )
+            return 1
         next_ver = next_version_after_github(
             args.repo, default_major, default_minor, args.counter
         )
@@ -274,31 +278,42 @@ def main() -> int:
                 "Could not read latest GitHub release; falling back to local +1",
                 file=sys.stderr,
             )
-        else:
-            major, minor, build = next_ver
-            local = read_counter(args.counter, default_major, default_minor)
+            parsed = read_counter(args.counter, default_major, default_minor)
+            if parsed is None:
+                major, minor, build = default_major, default_minor, 0
+            else:
+                major, minor, build = parsed
+            build += 1
             version = write_counter(args.counter, major, minor, build)
             write_build_version(args.output, major, minor, build)
-            if local is not None:
-                local_s = f"{local[0]}.{local[1]}.{local[2]}"
-                if local != (major, minor, build):
-                    print(f"Build number synced from GitHub: {local_s} -> {version}")
-                else:
-                    print(f"Build number: {version} (matches next after GitHub latest)")
-            else:
-                print(f"Build number: {version} (from GitHub latest + 1)")
+            print(f"Build number: {version}")
             return 0
+        major, minor, build = next_ver
+        local = read_counter(args.counter, default_major, default_minor)
+        version = write_counter(args.counter, major, minor, build)
+        write_build_version(args.output, major, minor, build)
+        if local is not None:
+            local_s = f"{local[0]}.{local[1]}.{local[2]}"
+            if local != (major, minor, build):
+                print(f"Build number synced from GitHub: {local_s} -> {version}")
+            else:
+                print(f"Build number: {version} (matches next after GitHub latest)")
+        else:
+            print(f"Build number: {version} (from GitHub latest + 1)")
+        return 0
 
     parsed = read_counter(args.counter, default_major, default_minor)
     if parsed is None:
-        major, minor, build = default_major, default_minor, 0
-    else:
-        major, minor, build = parsed
+        major, minor, build = 0, 0, 0
+        version = write_counter(args.counter, major, minor, build)
+        write_build_version(args.output, major, minor, build)
+        print(f"No local build_number.txt; using {version} (rebuild.bat as 1.0.N to pin)")
+        return 0
 
-    build += 1
+    major, minor, build = parsed
     version = write_counter(args.counter, major, minor, build)
     write_build_version(args.output, major, minor, build)
-    print(f"Build number: {version}")
+    print(f"Build number: {version} (local, unchanged)")
     return 0
 
 

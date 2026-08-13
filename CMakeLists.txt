@@ -133,6 +133,7 @@ set(_SYNC_BUILD_NUMBER_CMD
     --major ${PROJECT_VERSION_MAJOR}
     --minor ${PROJECT_VERSION_MINOR}
     --skip-if-env MEDICAT_BUILD_NUMBER_BUMPED
+    --keep
 )
 if(NOT _PIN_BUILD STREQUAL "")
     list(APPEND _SYNC_BUILD_NUMBER_CMD --set "${_PIN_BUILD}")

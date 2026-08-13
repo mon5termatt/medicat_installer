@@ -11,14 +11,11 @@ The C++ installer discovers updates via the **GitHub Releases API**.
 | Embedded `kInstallerVersion` | `1.0.41` |
 | Embedded `kInstallerBuildNumber` | `41` (patch) |
 
-`tools/bump_build_number.py --next-after-github` (used by `rebuild.bat`) sets
-`build_number.txt` to **one patch above** the latest GitHub release that ships
-`MedicatInstaller.exe` (e.g. latest `1.0.43` → next build `1.0.44`). That keeps
-dev builds aligned with published tags instead of racing ahead of Releases.
+`rebuild.bat` (local) sets `build_number.txt` to **one patch above** the latest GitHub release that ships `MedicatInstaller.exe` (e.g. latest `1.0.43` → next build `1.0.44`). That keeps local test builds aligned with published tags. Use `rebuild.bat as 1.0.N` to pin a version. CI pins the git tag and does not bump.
 
 ### Publish from a tag (CI)
 
-Push a tag that matches the installer version (no `v` prefix). [`.github/workflows/release-build.yml`](.github/workflows/release-build.yml) pins that tag (`rebuild.bat as 1.0.N`) on `windows-2022` and does **not** bump from GitHub. Then it runs `tools/upload_release.bat`.
+Push a tag that matches the installer version (no `v` prefix). [`.github/workflows/release-build.yml`](.github/workflows/release-build.yml) pins that tag, configures unified CMake, builds x64 + Win32 on `windows-2022`, and does **not** bump from GitHub. Then it runs `tools/upload_release.bat`.
 
 ```bat
 git tag 1.0.50
