@@ -222,6 +222,9 @@ def main() -> int:
         print(f"Invalid --major/--minor: {args.major}.{args.minor}", file=sys.stderr)
         return 1
 
+    def in_github_actions() -> bool:
+        return os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
+
     pin_from_env = os.environ.get("MEDICAT_PIN_BUILD", "").strip()
     if pin_from_env:
         pinned = parse_set_value(pin_from_env, default_major, default_minor)
@@ -253,6 +256,14 @@ def main() -> int:
             write_release_tag(args.counter.parent, version)
             print(f"Build number bump skipped ({args.skip_if_env}); using {version}")
         return 0
+
+    if in_github_actions():
+        print(
+            "Refusing to bump the build number on GitHub Actions. "
+            "Pin the tag with --set or MEDICAT_PIN_BUILD.",
+            file=sys.stderr,
+        )
+        return 1
 
     if args.next_after_github:
         next_ver = next_version_after_github(

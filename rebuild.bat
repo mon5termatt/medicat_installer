@@ -48,8 +48,16 @@ echo Regenerating i18n...
 python "tools\i18n_codegen.py"
 if errorlevel 1 goto fail
 
+if defined GITHUB_ACTIONS (
+    if "%PIN_BUILD%"=="0" (
+        echo GitHub Actions builds must pin the tag: rebuild.bat as 1.0.N
+        echo Do not bump from latest GitHub release in CI.
+        goto fail
+    )
+)
+
 if not "%PIN_BUILD%"=="0" (
-    echo Pinning build number to %PIN_BUILD% ^(updater test build^)...
+    echo Pinning build number to %PIN_BUILD%...
     set "MEDICAT_PIN_BUILD=%PIN_BUILD%"
     python "tools\bump_build_number.py" "build_number.txt" "generated\build_version.cpp" --major 1 --minor 0 --set "%PIN_BUILD%"
     if errorlevel 1 goto fail

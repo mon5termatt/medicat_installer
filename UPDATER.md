@@ -18,7 +18,7 @@ dev builds aligned with published tags instead of racing ahead of Releases.
 
 ### Publish from a tag (CI)
 
-Push a tag that matches the installer version (no `v` prefix). [`.github/workflows/release-build.yml`](.github/workflows/release-build.yml) runs `rebuild.bat as 1.0.N` on `windows-2022`, then `tools/upload_release.bat`.
+Push a tag that matches the installer version (no `v` prefix). [`.github/workflows/release-build.yml`](.github/workflows/release-build.yml) pins that tag (`rebuild.bat as 1.0.N`) on `windows-2022` and does **not** bump from GitHub. Then it runs `tools/upload_release.bat`.
 
 ```bat
 git tag 1.0.50

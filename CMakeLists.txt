@@ -120,15 +120,27 @@ if(CMAKE_SIZEOF_VOID_P EQUAL 4)
     set_target_properties(MedicatInstaller PROPERTIES OUTPUT_NAME "MedicatInstaller-x86")
 endif()
 
+set(_PIN_BUILD "")
+if(DEFINED ENV{MEDICAT_PIN_BUILD} AND NOT "$ENV{MEDICAT_PIN_BUILD}" STREQUAL "")
+    set(_PIN_BUILD "$ENV{MEDICAT_PIN_BUILD}")
+elseif(DEFINED MEDICAT_PIN_BUILD AND NOT "${MEDICAT_PIN_BUILD}" STREQUAL "")
+    set(_PIN_BUILD "${MEDICAT_PIN_BUILD}")
+endif()
+set(_SYNC_BUILD_NUMBER_CMD
+    python "${REPO_ROOT}/tools/bump_build_number.py"
+    "${BUILD_NUMBER_FILE}"
+    "${BUILD_VERSION_CPP}"
+    --major ${PROJECT_VERSION_MAJOR}
+    --minor ${PROJECT_VERSION_MINOR}
+    --skip-if-env MEDICAT_BUILD_NUMBER_BUMPED
+)
+if(NOT _PIN_BUILD STREQUAL "")
+    list(APPEND _SYNC_BUILD_NUMBER_CMD --set "${_PIN_BUILD}")
+endif()
 add_custom_command(TARGET MedicatInstaller PRE_BUILD
-    COMMAND python "${REPO_ROOT}/tools/bump_build_number.py"
-        "${BUILD_NUMBER_FILE}"
-        "${BUILD_VERSION_CPP}"
-        --major ${PROJECT_VERSION_MAJOR}
-        --minor ${PROJECT_VERSION_MINOR}
-        --skip-if-env MEDICAT_BUILD_NUMBER_BUMPED
+    COMMAND ${_SYNC_BUILD_NUMBER_CMD}
     WORKING_DIRECTORY "${REPO_ROOT}"
-    COMMENT "Incrementing build number"
+    COMMENT "Syncing embedded build number"
 )
 
 target_include_directories(MedicatInstaller PRIVATE src "${CMAKE_CURRENT_SOURCE_DIR}/res")

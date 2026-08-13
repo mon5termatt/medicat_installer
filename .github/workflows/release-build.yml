@@ -4,6 +4,8 @@
 #   git tag 1.0.50
 #   git push origin 1.0.50
 #
+# Version is pinned to that tag. CI never bumps from GitHub or local +1.
+#
 # The tagged commit must include this workflow file.
 #
 # Optional repo secret:
@@ -69,6 +71,8 @@ jobs:
         shell: cmd
         env:
           MEDICAT_INGEST_TOKEN: ${{ secrets.MEDICAT_INGEST_TOKEN }}
+          MEDICAT_PIN_BUILD: ${{ env.VERSION }}
+          MEDICAT_BUILD_NUMBER_BUMPED: "1"
         run: rebuild.bat as %VERSION%
 
       - name: Upload build artifacts
