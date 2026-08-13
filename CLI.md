@@ -192,7 +192,7 @@ When `MEDICAT_OFFLINE_BUILD` is defined at compile time, `/check-update` is a no
 | Flag | Description |
 |------|-------------|
 | `/list-drives` | Print eligible drives (one per line: letter, label, type, size) and exit `0` |
-| `/dump-config` | Print resolved paths (exe dir, 7za temp, archive, Ventoy dir, manifest) and exit `0` |
+| `/dump-config` | Print resolved paths (exe dir, 7za/aria2c temp, archive, Ventoy dir, manifest) and exit `0` |
 
 Useful for support scripts; no admin required for `/list-drives` (read-only).
 

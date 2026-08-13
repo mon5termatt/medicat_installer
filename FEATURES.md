@@ -70,7 +70,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Drive size / free display | ✅ | `ui.drive_format`; volume label when set |
 | Cancel button | ⬜ | PS had cancel |
 | Internet check before install | ✅ | `TestInternetConnection` when Ventoy step runs |
-| Archive download mirrors | ✅ | Missing-archive panel + offline cache paths |
+| Archive download mirrors | ✅ | Missing-archive panel + offline cache paths; HTTP via `aria2c`; Torrent button uses bundled aria2 BitTorrent |
 | Antivirus / MOTD splash | ⬜ | Batch legacy |
 
 ---
@@ -93,6 +93,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Bundle `7za.exe` in exe | ✅ | `bundle.cpp` |
+| Bundle `aria2c.exe` in exe | ✅ | Gzipped official binary; 16 connections for file downloads |
 | Bundle `7z.exe` in exe | ✅ | For Ventoy zip |
 | SevenZipSharp / `lib/` | ⬜ | **Not needed** — 7za subprocess only |
 | Self-update / version check | ⬜ | Batch: `curver` |

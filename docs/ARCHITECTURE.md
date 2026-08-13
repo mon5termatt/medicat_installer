@@ -17,8 +17,8 @@ medicat_installer/
 │   ├── ventoy.cpp          # Ventoy download, extract, VTOYCLI /I /U
 │   ├── extract.cpp         # 7za subprocess (full + selective @list)
 │   ├── verify.cpp          # Parallel MD5 against MedicatFiles.md5
-│   ├── bundle.cpp          # Embedded 7za, 7z, MD5 resources
-│   ├── download.cpp        # WinHTTP (Ventoy, mirrors)
+│   ├── bundle.cpp          # Embedded 7za, aria2c, MD5 resources
+│   ├── download.cpp        # aria2c file downloads + WinHTTP (API, fallback)
 │   ├── offline.cpp         # Offline Ventoy/archive cache paths
 │   ├── debug.cpp           # System/installer diagnostics → medicat_installer.log
 │   ├── log.cpp             # medicat_installer.log
@@ -40,6 +40,7 @@ medicat_installer/
 │   └── ARCHITECTURE.md     # This file
 ├── build/                  # CMake output (gitignored)
 ├── 7za.exe / bin/7z.exe    # Bundled into exe at build time
+├── aria2c.exe              # Fetched at build, gzipped, bundled
 ├── MedicatFiles.md5        # Verification manifest (bundled)
 ├── CMakeLists.txt
 ├── README.md
@@ -158,7 +159,7 @@ Detection: `{drive}\ventoy` folder **or** physical-disk layout matching Ventoy2D
 1. **CMake** configures MSVC project (x64 / ARM64).
 2. **i18n_codegen.py** → `src/i18n_generated.h`
 3. **fetch_ventoy_versions.py** → embedded version list
-4. **bundle.rc** embeds `7za.exe`, `7z.exe`, `MedicatFiles.md5`
+4. **bundle.rc** embeds `7za.exe`, gzipped `aria2c.exe`, `MedicatFiles.md5`
 5. Output: `build/Release/MedicatInstaller.exe` (single-file distribution; tools extracted to `%TEMP%\MedicatInstaller\{pid}\` at runtime)
 
 ---
@@ -170,6 +171,7 @@ Detection: `{drive}\ventoy` folder **or** physical-disk layout matching Ventoy2D
 | `medicat_installer.log` | `log.cpp`, `debug.cpp` | Every session (includes diagnostic sections) |
 | `extract.log` | `extract.cpp` | Full 7za extract |
 | `reextract.log` | `extract.cpp` | Selective re-extract |
+| `aria.log` | `download.cpp` | aria2c HTTP/torrent download |
 | `check.log` | `verify.cpp` | MD5 pass/fail lines |
 | `failed_files.txt` | `verify.cpp` | Verification failures |
 

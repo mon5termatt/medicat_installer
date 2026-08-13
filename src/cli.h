@@ -63,8 +63,8 @@ std::wstring FormatCliFileProgress(int percent, const std::wstring& file);
 void PrintCliHelp();
 void PrintCliVersion();
 void PrintCliDrives(bool allowFixed);
-void PrintCliConfig(const std::wstring& root, const std::wstring& sevenZa, const std::wstring& md5Manifest,
-                    const std::wstring& archivePath);
+void PrintCliConfig(const std::wstring& root, const std::wstring& sevenZa, const std::wstring& aria2c,
+                    const std::wstring& md5Manifest, const std::wstring& archivePath);
 
 std::wstring NormalizeDriveLetter(const std::wstring& drive);
 bool IsSupportedLanguage(const std::wstring& code);

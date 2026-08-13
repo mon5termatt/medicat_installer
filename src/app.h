@@ -95,6 +95,7 @@ private:
     std::unique_ptr<Logger> log_;
     std::wstring root_;
     std::wstring sevenZa_;
+    std::wstring aria2c_;
     std::wstring md5Manifest_;
     std::wstring currentOperation_;
     std::atomic<bool> installing_{false};

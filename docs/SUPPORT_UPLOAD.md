@@ -192,6 +192,7 @@ Optional Advanced: manual **Send logs** (any time) for power users — still req
 | `medicat_installer.log` | Every session |
 | `extract.log` | After extract |
 | `reextract.log` | After selective re-extract |
+| `aria.log` | After aria2 HTTP or torrent download |
 | `check.log` | After verify |
 | `failed_files.txt` | Verify failures |
 

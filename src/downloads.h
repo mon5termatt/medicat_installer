@@ -57,6 +57,7 @@ constexpr wchar_t kManualInstallDocUrl[] = L"https://medicatusb.com/docs/medicat
 constexpr wchar_t kBetaFeedbackUrl[] = L"https://url.medicatusb.com/betafeedback";
 constexpr wchar_t kDiscordSupportUrl[] = L"https://url.medicatusb.com/discord";
 constexpr wchar_t kSevenZipProjectUrl[] = L"https://www.7-zip.org/";
+constexpr wchar_t kAria2ProjectUrl[] = L"https://aria2.github.io/";
 constexpr wchar_t kVentoyProjectUrl[] = L"https://www.ventoy.net/en/index.html";
 
 inline bool OpenBrowserUrl(const wchar_t* url) {

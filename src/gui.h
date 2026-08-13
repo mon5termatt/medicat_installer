@@ -220,6 +220,8 @@ private:
     void ApplyLanguageSelection(const std::wstring& languageCode);
     void RefreshTranslatedUi();
     void StartMirrorDownload(const std::wstring& url, const std::wstring& mirrorName);
+    void StartTorrentDownload();
+    void StartArchiveDownload(const std::wstring& url, const std::wstring& sourceName, bool torrent);
     void SetDownloadControlsEnabled(bool enabled);
     void ShowUpdatePrompt(const InstallerUpdateInfo& info);
     bool LogoHitTest(HWND hwnd, int clientX, int clientY) const;
@@ -266,6 +268,7 @@ private:
     HWND creditsWindow_ = nullptr;
     HWND creditsIntro_ = nullptr;
     HWND creditsSevenZipBtn_ = nullptr;
+    HWND creditsAria2Btn_ = nullptr;
     HWND creditsVentoyBtn_ = nullptr;
     HWND creditsCloseBtn_ = nullptr;
     HWND reExtractWindow_ = nullptr;

@@ -80,7 +80,7 @@ Batch history is also on tag `3520`.
 
 # Build from source
 
-Visual Studio 2022+, CMake, Python 3, plus `bin/7z/.../7za.exe` and `MedicatFiles.md5`.
+Visual Studio 2022+, CMake, Python 3, plus `bin/7z/.../7za.exe` and `MedicatFiles.md5`. The build fetches official `aria2c` (GPL-2.0) and embeds it for multi-connection downloads.
 
 ```bat
 rebuild.bat

@@ -12,6 +12,7 @@ struct DiagnosticContext {
     std::wstring operation;
     std::wstring selectedDrive;
     std::wstring sevenZaPath;
+    std::wstring aria2cPath;
     std::wstring md5ManifestPath;
     std::wstring archivePath;
     bool formatChecked = false;

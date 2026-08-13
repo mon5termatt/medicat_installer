@@ -314,11 +314,12 @@ void PrintCliDrives(const bool allowFixed) {
     }
 }
 
-void PrintCliConfig(const std::wstring& root, const std::wstring& sevenZa, const std::wstring& md5Manifest,
-                    const std::wstring& archivePath) {
+void PrintCliConfig(const std::wstring& root, const std::wstring& sevenZa, const std::wstring& aria2c,
+                    const std::wstring& md5Manifest, const std::wstring& archivePath) {
     AttachCliConsole();
     WriteCliLine(L"Installer directory: " + root);
     WriteCliLine(L"7za: " + (sevenZa.empty() ? L"(missing)" : sevenZa));
+    WriteCliLine(L"aria2c: " + (aria2c.empty() ? L"(missing)" : aria2c));
     WriteCliLine(L"MD5 manifest: " + (md5Manifest.empty() ? L"(missing)" : md5Manifest));
     WriteCliLine(L"MediCat archive: " + archivePath);
     WriteCliLine(L"Temp dir: " + GetMedicatTempDir());

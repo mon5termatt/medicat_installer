@@ -9,12 +9,17 @@ set(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 # Bundle 7za matching the installer target CPU (x64 or Win32).
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(BUNDLE_7ZA "${REPO_ROOT}/bin/7z/x64/7za.exe")
+    set(ARIA2_ARCH "x64")
 else()
     set(BUNDLE_7ZA "${REPO_ROOT}/bin/7z/x32/7za.exe")
+    set(ARIA2_ARCH "x32")
 endif()
 set(BUNDLE_MD5 "${REPO_ROOT}/MedicatFiles.md5")
 set(BUNDLE_MD5_GZ "${REPO_ROOT}/generated/MedicatFiles.md5.gz")
 set(PREPARE_MD5_SCRIPT "${REPO_ROOT}/tools/prepare_md5_bundle.py")
+set(PREPARE_ARIA2_SCRIPT "${REPO_ROOT}/tools/prepare_aria2_bundle.py")
+set(BUNDLE_ARIA2_EXE "${REPO_ROOT}/bin/aria2/${ARIA2_ARCH}/aria2c.exe")
+set(BUNDLE_ARIA2_GZ "${CMAKE_BINARY_DIR}/aria2c.exe.gz")
 
 if(NOT EXISTS "${BUNDLE_7ZA}")
     message(FATAL_ERROR "7za.exe not found for bundling: ${BUNDLE_7ZA}")
@@ -31,11 +36,24 @@ add_custom_command(
     WORKING_DIRECTORY "${REPO_ROOT}"
 )
 
+add_custom_command(
+    OUTPUT "${BUNDLE_ARIA2_GZ}"
+    COMMAND python "${PREPARE_ARIA2_SCRIPT}"
+            --arch "${ARIA2_ARCH}"
+            --cache-exe "${BUNDLE_ARIA2_EXE}"
+            --output "${BUNDLE_ARIA2_GZ}"
+    DEPENDS "${PREPARE_ARIA2_SCRIPT}"
+    COMMENT "Downloading and compressing aria2c for bundling (${ARIA2_ARCH})"
+    WORKING_DIRECTORY "${REPO_ROOT}"
+)
+
 file(TO_NATIVE_PATH "${BUNDLE_7ZA}" BUNDLE_7ZA_PATH)
 file(TO_NATIVE_PATH "${BUNDLE_MD5_GZ}" BUNDLE_MD5_GZ_PATH)
+file(TO_NATIVE_PATH "${BUNDLE_ARIA2_GZ}" BUNDLE_ARIA2_GZ_PATH)
 # RC treats \7 as an escape — use forward slashes in the resource script.
 string(REPLACE "\\" "/" BUNDLE_7ZA_PATH "${BUNDLE_7ZA_PATH}")
 string(REPLACE "\\" "/" BUNDLE_MD5_GZ_PATH "${BUNDLE_MD5_GZ_PATH}")
+string(REPLACE "\\" "/" BUNDLE_ARIA2_GZ_PATH "${BUNDLE_ARIA2_GZ_PATH}")
 
 set(VENTOY_VERSIONS_GEN "${CMAKE_BINARY_DIR}/ventoy_versions.txt")
 set(VENTOY_VERSIONS_SCRIPT "${REPO_ROOT}/tools/fetch_ventoy_versions.py")
@@ -66,7 +84,7 @@ add_custom_command(
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/res/bundle.rc.in" "${CMAKE_BINARY_DIR}/bundle.rc" @ONLY)
 set_source_files_properties("${CMAKE_BINARY_DIR}/bundle.rc" PROPERTIES
-    OBJECT_DEPENDS "${VENTOY_VERSIONS_GEN};${BUNDLE_MD5_GZ};${BUNDLE_7ZA};${DISCORD_ICO}"
+    OBJECT_DEPENDS "${VENTOY_VERSIONS_GEN};${BUNDLE_MD5_GZ};${BUNDLE_7ZA};${BUNDLE_ARIA2_GZ};${DISCORD_ICO}"
 )
 
 set(BUILD_NUMBER_FILE "${REPO_ROOT}/build_number.txt")
@@ -112,6 +130,7 @@ add_executable(MedicatInstaller WIN32
     "${CMAKE_BINARY_DIR}/bundle.rc"
     "${CMAKE_BINARY_DIR}/ventoy_versions.txt"
     "${BUNDLE_MD5_GZ}"
+    "${BUNDLE_ARIA2_GZ}"
     "${I18N_GEN}"
     "${DISCORD_ICO}"
 )

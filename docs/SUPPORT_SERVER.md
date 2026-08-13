@@ -88,6 +88,7 @@ Basename allowlist (plus any file ending in `.log`, `.txt`, or `.json`):
 | `medicat_installer.log` | Every session |
 | `extract.log` | After full extract |
 | `reextract.log` | After selective re-extract |
+| `aria.log` | After aria2 HTTP or torrent download |
 | `check.log` | After verify |
 | `failed_files.txt` | Verify failures |
 | `support_manifest.json` | Generated at upload time |

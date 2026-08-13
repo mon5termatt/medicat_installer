@@ -155,6 +155,33 @@ bool EnsureMd5Manifest(HINSTANCE instance, const std::wstring& dir, const std::w
     return DecompressGzipWith7za(sevenZa, gzPath, dir, md5Path);
 }
 
+bool EnsureAria2c(HINSTANCE instance, const std::wstring& dir, const std::wstring& sevenZa, std::wstring& aria2cPath) {
+    const std::wstring gzPath = JoinPath(dir, L"aria2c.exe.gz");
+    aria2cPath = JoinPath(dir, L"aria2c.exe");
+
+    if (!EnsureExtracted(instance, IDR_ARIA2C, gzPath)) {
+        aria2cPath.clear();
+        return false;
+    }
+
+    if (FileExists(aria2cPath)) {
+        WIN32_FILE_ATTRIBUTE_DATA gzInfo{};
+        WIN32_FILE_ATTRIBUTE_DATA exeInfo{};
+        if (GetFileAttributesExW(gzPath.c_str(), GetFileExInfoStandard, &gzInfo) &&
+            GetFileAttributesExW(aria2cPath.c_str(), GetFileExInfoStandard, &exeInfo) &&
+            CompareFileTime(&exeInfo.ftLastWriteTime, &gzInfo.ftLastWriteTime) >= 0) {
+            return true;
+        }
+    }
+
+    DeleteFileW(aria2cPath.c_str());
+    if (!DecompressGzipWith7za(sevenZa, gzPath, dir, aria2cPath)) {
+        aria2cPath.clear();
+        return false;
+    }
+    return true;
+}
+
 }  // namespace
 
 BundledTools EnsureBundledTools(const HINSTANCE instance) {
@@ -171,6 +198,8 @@ BundledTools EnsureBundledTools(const HINSTANCE instance) {
         tools.error = L"Failed to extract bundled MedicatFiles.md5";
         return tools;
     }
+
+    EnsureAria2c(instance, tools.dir, tools.sevenZa, tools.aria2c);
 
     tools.ok = true;
     return tools;

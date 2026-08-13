@@ -461,8 +461,8 @@ void PostSessionReportOnce(const SessionReportRequest& request, const SessionRep
 
 std::vector<std::wstring> CollectSupportLogFiles(const std::wstring& installerRoot) {
     static const wchar_t* kRootFiles[] = {L"medicat_installer.log", L"ventoy.log", L"extract.log",
-                                          L"reextract.log",         L"check.log",  L"failed_files.txt",
-                                          nullptr};
+                                          L"reextract.log",         L"check.log",  L"aria.log",
+                                          L"failed_files.txt",      nullptr};
     static const wchar_t* kVentoyCliFiles[] = {L"cli_log.txt", L"cli_done.txt", L"cli_percent.txt", nullptr};
 
     std::vector<std::wstring> files;

@@ -218,6 +218,7 @@ constexpr int kDebugMenuLast = kDebugMenuBase + static_cast<int>(SimulatedFailur
 constexpr int kCreditsIntroId = 1130;
 constexpr int kCreditsSevenZipBtnId = 1131;
 constexpr int kCreditsVentoyBtnId = 1132;
+constexpr int kCreditsAria2BtnId = 1134;
 constexpr int kCreditsCloseBtnId = 1133;
 constexpr int kReExtractMessageId = 1101;
 constexpr int kReExtractListId = 1102;
@@ -240,8 +241,7 @@ constexpr UINT kUpdateCheckIntervalMs = 5 * 60 * 1000;  // 5 minutes
 constexpr UINT kUiRefreshIntervalMs = 250;
 constexpr UINT kArchiveCheckIntervalMs = 3000;
 constexpr UINT kDriveDebounceMs = 500;
-constexpr int kDownloadMirrorBtnWidth = (kContentWidth - kDownloadBtnGap) / 2;
-constexpr int kDownloadRowBtnWidth = (kContentWidth - 3 * kDownloadBtnGap) / 4;
+constexpr int kDownloadGridBtnWidth = (kContentWidth - 2 * kDownloadBtnGap) / 3;
 constexpr wchar_t kFileLogWindowClass[] = L"MedicatFileLogWindow";
 constexpr wchar_t kCreditsWindowClass[] = L"MedicatCreditsWindow";
 constexpr wchar_t kReExtractWindowClass[] = L"MedicatReExtractWindow";
@@ -281,7 +281,7 @@ constexpr int kReExtractDialogSectionGap = 16;
 constexpr int kReExtractDialogBtnHeight = 34;
 constexpr int kReExtractDialogBtnGap = 10;
 constexpr int kCreditsClientWidth = 400;
-constexpr int kCreditsClientHeight = 268;
+constexpr int kCreditsClientHeight = 312;
 constexpr int kCreditsDialogMargin = 24;
 constexpr int kCreditsDialogTopPad = 20;
 constexpr int kCreditsDialogBtnHeight = 34;
@@ -1487,23 +1487,36 @@ void Gui::SetDownloadProgress(const int percent, const std::wstring& barText, co
 }
 
 void Gui::StartMirrorDownload(const std::wstring& url, const std::wstring& mirrorName) {
+    StartArchiveDownload(url, mirrorName, false);
+}
+
+void Gui::StartTorrentDownload() {
+    StartArchiveDownload(kDownloadTorrentUrl, i18n::Tr(L"ui.download_torrent"), true);
+}
+
+void Gui::StartArchiveDownload(const std::wstring& url, const std::wstring& sourceName, const bool torrent) {
     if (downloadingArchive_.exchange(true)) {
         return;
     }
 
     const std::wstring destination = JoinPath(GetExeDirectory(), kMediCatArchiveFileName);
-    const std::wstring tempPath = destination + L".part";
+    const std::wstring tempPath = torrent ? destination : (destination + L".part");
     const uint64_t partialSize = GetFileSizeBytes(tempPath);
-    const bool resuming = partialSize > 0;
+    const bool resuming = partialSize > 0 || (torrent && FileExists(tempPath + L".aria2"));
+
+    const wchar_t* downloadingKey =
+        torrent ? L"status.downloading_archive_torrent" : L"status.downloading_archive_mirror";
+    const wchar_t* resumingKey = torrent ? L"status.resuming_archive_torrent" : L"status.resuming_archive_mirror";
 
     SetBusy(true, BusyProgressMode::Download);
-    SetDownloadProgress(
-        0, FormatProgressBytes(partialSize),
-        i18n::Tr(resuming ? L"status.resuming_archive_mirror" : L"status.downloading_archive_mirror", mirrorName));
+    SetDownloadProgress(0, FormatProgressBytes(partialSize),
+                        torrent ? i18n::Tr(resuming ? resumingKey : downloadingKey)
+                                : i18n::Tr(resuming ? resumingKey : downloadingKey, sourceName));
 
     HWND hwnd = hwnd_;
 
-    std::thread([this, hwnd, url, mirrorName, destination, tempPath, resuming, partialSize]() {
+    std::thread([this, hwnd, url, sourceName, destination, tempPath, resuming, partialSize, torrent, downloadingKey,
+                 resumingKey]() {
         std::wstring netError;
         if (!TestInternetConnection(netError)) {
             downloadingArchive_ = false;
@@ -1519,46 +1532,45 @@ void Gui::StartMirrorDownload(const std::wstring& url, const std::wstring& mirro
         uint64_t lastDownloaded = 0;
         bool showResuming = resuming;
         std::wstring error;
-        const bool ok = HttpDownloadFileWithProgress(
-            url, tempPath,
-            [&](const uint64_t downloaded, const uint64_t total) {
-                const uint64_t now = GetTickCount64();
-                if (lastUiTick != 0 && now - lastUiTick < 200) {
-                    return;
-                }
+        const auto onProgress = [&](const uint64_t downloaded, const uint64_t total) {
+            const uint64_t now = GetTickCount64();
+            if (lastUiTick != 0 && now - lastUiTick < 200) {
+                return;
+            }
 
-                uint64_t speed = 0;
-                if (lastUiTick != 0 && now > lastUiTick && downloaded >= lastDownloaded) {
-                    const uint64_t deltaBytes = downloaded - lastDownloaded;
-                    const uint64_t deltaMs = now - lastUiTick;
-                    speed = (deltaBytes * 1000) / deltaMs;
-                }
-                lastUiTick = now;
-                lastDownloaded = downloaded;
+            uint64_t speed = 0;
+            if (lastUiTick != 0 && now > lastUiTick && downloaded >= lastDownloaded) {
+                const uint64_t deltaBytes = downloaded - lastDownloaded;
+                const uint64_t deltaMs = now - lastUiTick;
+                speed = (deltaBytes * 1000) / deltaMs;
+            }
+            lastUiTick = now;
+            lastDownloaded = downloaded;
 
-                if (showResuming && downloaded > partialSize) {
-                    showResuming = false;
-                }
+            if (showResuming && downloaded > partialSize) {
+                showResuming = false;
+            }
 
-                const int percent = DownloadPercent(downloaded, total);
-                const std::wstring sizeText = FormatDownloadSizeText(downloaded, total);
-                std::wstring statusLine = i18n::Tr(showResuming ? L"status.resuming_archive_mirror"
-                                                                  : L"status.downloading_archive_mirror",
-                                                   mirrorName);
-                const std::wstring speedText = FormatDownloadSpeed(speed);
-                if (!speedText.empty()) {
-                    statusLine += L" · ";
-                    statusLine += speedText;
-                }
+            const int percent = DownloadPercent(downloaded, total);
+            const std::wstring sizeText = FormatDownloadSizeText(downloaded, total);
+            std::wstring statusLine = torrent ? i18n::Tr(showResuming ? resumingKey : downloadingKey)
+                                              : i18n::Tr(showResuming ? resumingKey : downloadingKey, sourceName);
+            const std::wstring speedText = FormatDownloadSpeed(speed);
+            if (!speedText.empty()) {
+                statusLine += L" · ";
+                statusLine += speedText;
+            }
 
-                auto* progress = new ProgressPayload{};
-                progress->downloadUpdate = true;
-                progress->percent = percent;
-                progress->statusText = sizeText;
-                progress->file = statusLine;
-                PostMessageW(hwnd, WM_MEDICAT_PROGRESS, 0, reinterpret_cast<LPARAM>(progress));
-            },
-            error);
+            auto* progress = new ProgressPayload{};
+            progress->downloadUpdate = true;
+            progress->percent = percent;
+            progress->statusText = sizeText;
+            progress->file = statusLine;
+            PostMessageW(hwnd, WM_MEDICAT_PROGRESS, 0, reinterpret_cast<LPARAM>(progress));
+        };
+
+        const bool ok = torrent ? TorrentDownloadFileWithProgress(url, tempPath, onProgress, error)
+                                : HttpDownloadFileWithProgress(url, tempPath, onProgress, error);
 
         if (!ok) {
             downloadingArchive_ = false;
@@ -1570,16 +1582,18 @@ void Gui::StartMirrorDownload(const std::wstring& url, const std::wstring& mirro
             return;
         }
 
-        DeleteFileW(destination.c_str());
-        if (!MoveFileW(tempPath.c_str(), destination.c_str())) {
-            DeleteFileW(tempPath.c_str());
-            downloadingArchive_ = false;
-            auto* payload = new DonePayload{};
-            payload->success = false;
-            payload->message = i18n::Tr(L"messages.archive_download_failed", L"Could not save archive file");
-            payload->title = i18n::Tr(L"titles.download_failed");
-            PostMessageW(hwnd, WM_MEDICAT_DONE, 0, reinterpret_cast<LPARAM>(payload));
-            return;
+        if (tempPath != destination) {
+            DeleteFileW(destination.c_str());
+            if (!MoveFileW(tempPath.c_str(), destination.c_str())) {
+                DeleteFileW(tempPath.c_str());
+                downloadingArchive_ = false;
+                auto* payload = new DonePayload{};
+                payload->success = false;
+                payload->message = i18n::Tr(L"messages.archive_download_failed", L"Could not save archive file");
+                payload->title = i18n::Tr(L"titles.download_failed");
+                PostMessageW(hwnd, WM_MEDICAT_DONE, 0, reinterpret_cast<LPARAM>(payload));
+                return;
+            }
         }
 
         downloadingArchive_ = false;
@@ -1754,6 +1768,9 @@ void Gui::RefreshCreditsWindowText() {
     if (creditsSevenZipBtn_ && IsWindow(creditsSevenZipBtn_)) {
         SetWindowTextW(creditsSevenZipBtn_, i18n::Tr(L"ui.credits_open_7zip").c_str());
     }
+    if (creditsAria2Btn_ && IsWindow(creditsAria2Btn_)) {
+        SetWindowTextW(creditsAria2Btn_, i18n::Tr(L"ui.credits_open_aria2").c_str());
+    }
     if (creditsVentoyBtn_ && IsWindow(creditsVentoyBtn_)) {
         SetWindowTextW(creditsVentoyBtn_, i18n::Tr(L"ui.credits_open_ventoy").c_str());
     }
@@ -1792,6 +1809,7 @@ void Gui::LayoutCreditsWindow() {
     };
 
     placeButton(creditsSevenZipBtn_);
+    placeButton(creditsAria2Btn_);
     placeButton(creditsVentoyBtn_);
     y += kCreditsDialogBtnGap;
     placeButton(creditsCloseBtn_);
@@ -1836,6 +1854,12 @@ void Gui::OpenCreditsWindow() {
         0, 0, 100, kCreditsDialogBtnHeight, creditsWindow_,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCreditsSevenZipBtnId)), instance_, nullptr);
 
+    creditsAria2Btn_ = CreateWindowW(
+        L"BUTTON", i18n::Tr(L"ui.credits_open_aria2").c_str(),
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        0, 0, 100, kCreditsDialogBtnHeight, creditsWindow_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCreditsAria2BtnId)), instance_, nullptr);
+
     creditsVentoyBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.credits_open_ventoy").c_str(),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
@@ -1849,13 +1873,14 @@ void Gui::OpenCreditsWindow() {
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kCreditsCloseBtnId)), instance_, nullptr);
 
     SendMessageW(creditsIntro_, WM_SETFONT, reinterpret_cast<WPARAM>(subtitleFont), TRUE);
-    for (HWND child : {creditsSevenZipBtn_, creditsVentoyBtn_, creditsCloseBtn_}) {
+    for (HWND child : {creditsSevenZipBtn_, creditsAria2Btn_, creditsVentoyBtn_, creditsCloseBtn_}) {
         if (child && IsWindow(child)) {
             SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
         }
     }
 
     SubclassGlowButton(creditsSevenZipBtn_, false);
+    SubclassGlowButton(creditsAria2Btn_, false);
     SubclassGlowButton(creditsVentoyBtn_, false);
     SubclassGlowButton(creditsCloseBtn_, false);
 
@@ -1884,6 +1909,10 @@ LRESULT CALLBACK Gui::CreditsWndProc(const HWND hwnd, const UINT msg, const WPAR
             const int id = LOWORD(wp);
             if (id == kCreditsSevenZipBtnId) {
                 OpenBrowserUrl(kSevenZipProjectUrl);
+                return 0;
+            }
+            if (id == kCreditsAria2BtnId) {
+                OpenBrowserUrl(kAria2ProjectUrl);
                 return 0;
             }
             if (id == kCreditsVentoyBtnId) {
@@ -1924,6 +1953,7 @@ LRESULT CALLBACK Gui::CreditsWndProc(const HWND hwnd, const UINT msg, const WPAR
             self->creditsWindow_ = nullptr;
             self->creditsIntro_ = nullptr;
             self->creditsSevenZipBtn_ = nullptr;
+            self->creditsAria2Btn_ = nullptr;
             self->creditsVentoyBtn_ = nullptr;
             self->creditsCloseBtn_ = nullptr;
             return 0;
@@ -3159,10 +3189,8 @@ void Gui::LayoutMainContent() {
     const int verifyBtnX = contentLeft + kInstallBtnWidth + kActionBtnGap;
     const int progressBarWidth = kContentWidth - kOpenLogBtnWidth - kActionBtnGap;
     const int openLogBtnX = contentLeft + progressBarWidth + kActionBtnGap;
-    const int mirror2X = contentLeft + kDownloadMirrorBtnWidth + kDownloadBtnGap;
-    const int row2Col2X = contentLeft + kDownloadRowBtnWidth + kDownloadBtnGap;
-    const int row2Col3X = row2Col2X + kDownloadRowBtnWidth + kDownloadBtnGap;
-    const int row2Col4X = row2Col3X + kDownloadRowBtnWidth + kDownloadBtnGap;
+    const int col2X = contentLeft + kDownloadGridBtnWidth + kDownloadBtnGap;
+    const int col3X = col2X + kDownloadGridBtnWidth + kDownloadBtnGap;
 
     if (archiveMissing_) {
         if (archiveMissingLabel_ && IsWindow(archiveMissingLabel_)) {
@@ -3175,27 +3203,27 @@ void Gui::LayoutMainContent() {
         const int row3Y = row2Y + kDownloadBtnHeight + kDownloadBtnGap;
 
         if (downloadMirror1Btn_ && IsWindow(downloadMirror1Btn_)) {
-            SetWindowPos(downloadMirror1Btn_, nullptr, contentLeft, row1Y, kDownloadMirrorBtnWidth, kDownloadBtnHeight,
+            SetWindowPos(downloadMirror1Btn_, nullptr, contentLeft, row1Y, kDownloadGridBtnWidth, kDownloadBtnHeight,
                          SWP_NOZORDER | SWP_NOACTIVATE);
         }
         if (downloadMirror2Btn_ && IsWindow(downloadMirror2Btn_)) {
-            SetWindowPos(downloadMirror2Btn_, nullptr, mirror2X, row1Y, kDownloadMirrorBtnWidth, kDownloadBtnHeight,
+            SetWindowPos(downloadMirror2Btn_, nullptr, col2X, row1Y, kDownloadGridBtnWidth, kDownloadBtnHeight,
                          SWP_NOZORDER | SWP_NOACTIVATE);
         }
         if (downloadTorrentBtn_ && IsWindow(downloadTorrentBtn_)) {
-            SetWindowPos(downloadTorrentBtn_, nullptr, contentLeft, row2Y, kDownloadRowBtnWidth, kDownloadBtnHeight,
+            SetWindowPos(downloadTorrentBtn_, nullptr, col3X, row1Y, kDownloadGridBtnWidth, kDownloadBtnHeight,
                          SWP_NOZORDER | SWP_NOACTIVATE);
         }
         if (downloadMagnetBtn_ && IsWindow(downloadMagnetBtn_)) {
-            SetWindowPos(downloadMagnetBtn_, nullptr, row2Col2X, row2Y, kDownloadRowBtnWidth, kDownloadBtnHeight,
+            SetWindowPos(downloadMagnetBtn_, nullptr, contentLeft, row2Y, kDownloadGridBtnWidth, kDownloadBtnHeight,
                          SWP_NOZORDER | SWP_NOACTIVATE);
         }
         if (downloadGoogleDriveBtn_ && IsWindow(downloadGoogleDriveBtn_)) {
-            SetWindowPos(downloadGoogleDriveBtn_, nullptr, row2Col3X, row2Y, kDownloadRowBtnWidth, kDownloadBtnHeight,
+            SetWindowPos(downloadGoogleDriveBtn_, nullptr, col2X, row2Y, kDownloadGridBtnWidth, kDownloadBtnHeight,
                          SWP_NOZORDER | SWP_NOACTIVATE);
         }
         if (downloadMegaBtn_ && IsWindow(downloadMegaBtn_)) {
-            SetWindowPos(downloadMegaBtn_, nullptr, row2Col4X, row2Y, kDownloadRowBtnWidth, kDownloadBtnHeight,
+            SetWindowPos(downloadMegaBtn_, nullptr, col3X, row2Y, kDownloadGridBtnWidth, kDownloadBtnHeight,
                          SWP_NOZORDER | SWP_NOACTIVATE);
         }
         if (browseArchiveBtn_ && IsWindow(browseArchiveBtn_)) {
@@ -3593,17 +3621,17 @@ void Gui::OnCreate(HWND hwnd) {
     };
 
     downloadMirror1Btn_ =
-        createDownloadBtn(kDownloadMirror1BtnId, i18n::Tr(L"ui.download_mirror_1").c_str(), kDownloadMirrorBtnWidth);
+        createDownloadBtn(kDownloadMirror1BtnId, i18n::Tr(L"ui.download_mirror_1").c_str(), kDownloadGridBtnWidth);
     downloadMirror2Btn_ =
-        createDownloadBtn(kDownloadMirror2BtnId, i18n::Tr(L"ui.download_mirror_2").c_str(), kDownloadMirrorBtnWidth);
+        createDownloadBtn(kDownloadMirror2BtnId, i18n::Tr(L"ui.download_mirror_2").c_str(), kDownloadGridBtnWidth);
     downloadTorrentBtn_ =
-        createDownloadBtn(kDownloadTorrentBtnId, i18n::Tr(L"ui.download_torrent").c_str(), kDownloadRowBtnWidth);
+        createDownloadBtn(kDownloadTorrentBtnId, i18n::Tr(L"ui.download_torrent").c_str(), kDownloadGridBtnWidth);
     downloadMagnetBtn_ =
-        createDownloadBtn(kDownloadMagnetBtnId, i18n::Tr(L"ui.download_magnet").c_str(), kDownloadRowBtnWidth);
+        createDownloadBtn(kDownloadMagnetBtnId, i18n::Tr(L"ui.download_magnet").c_str(), kDownloadGridBtnWidth);
     downloadGoogleDriveBtn_ = createDownloadBtn(kDownloadGoogleDriveBtnId, i18n::Tr(L"ui.download_google_drive").c_str(),
-                                                kDownloadRowBtnWidth);
+                                                kDownloadGridBtnWidth);
     downloadMegaBtn_ =
-        createDownloadBtn(kDownloadMegaBtnId, i18n::Tr(L"ui.download_mega").c_str(), kDownloadRowBtnWidth);
+        createDownloadBtn(kDownloadMegaBtnId, i18n::Tr(L"ui.download_mega").c_str(), kDownloadGridBtnWidth);
     browseArchiveBtn_ =
         createDownloadBtn(kBrowseArchiveBtnId, i18n::Tr(L"ui.browse_archive").c_str(), kContentWidth);
 
@@ -3770,7 +3798,7 @@ void Gui::OnCreate(HWND hwnd) {
     SubclassGlowButton(feedbackBtn_, false);
     SubclassGlowButton(downloadMirror1Btn_, true);
     SubclassGlowButton(downloadMirror2Btn_, true);
-    SubclassGlowButton(downloadTorrentBtn_, false);
+    SubclassGlowButton(downloadTorrentBtn_, true);
     SubclassGlowButton(downloadMagnetBtn_, false);
     SubclassGlowButton(downloadGoogleDriveBtn_, false);
     SubclassGlowButton(downloadMegaBtn_, false);
@@ -3863,7 +3891,7 @@ void Gui::OnCommand(WPARAM wp, LPARAM lp) {
         return;
     }
     if (id == kDownloadTorrentBtnId) {
-        OpenBrowserUrl(kDownloadTorrentUrl);
+        StartTorrentDownload();
         return;
     }
     if (id == kDownloadMagnetBtnId) {

@@ -351,14 +351,14 @@ std::string ExtractToolVersionLine(const std::string& captured) {
         if (firstNonEmpty.empty()) {
             firstNonEmpty = line;
         }
-        if (line.rfind("7-Zip", 0) == 0) {
+        if (line.rfind("7-Zip", 0) == 0 || line.rfind("aria2 version", 0) == 0) {
             return line;
         }
     }
     return firstNonEmpty;
 }
 
-std::wstring GetToolVersionLine(const std::wstring& exePath) {
+std::wstring GetToolVersionLine(const std::wstring& exePath, const wchar_t* extraArgs = L"-h") {
     if (exePath.empty() || !FileExists(exePath)) {
         return L"(not found)";
     }
@@ -388,7 +388,8 @@ std::wstring GetToolVersionLine(const std::wstring& exePath) {
     si.hStdError = stderrWrite;
     si.hStdInput = (nullIn != INVALID_HANDLE_VALUE) ? nullIn : nullptr;
 
-    std::wstring cmd = L"\"" + exePath + L"\" -h";
+    std::wstring cmd = L"\"" + exePath + L"\" ";
+    cmd += extraArgs && extraArgs[0] != L'\0' ? extraArgs : L"-h";
     std::vector<wchar_t> cmdBuffer(cmd.begin(), cmd.end());
     cmdBuffer.push_back(L'\0');
 
@@ -575,6 +576,8 @@ void WriteBundledToolsSection(const DiagnosticContext& context,
     write(L"[Bundled tools]");
     field(L"7za.exe: ", DescribeFile(context.sevenZaPath));
     field(L"7za version: ", GetToolVersionLine(context.sevenZaPath));
+    field(L"aria2c.exe: ", DescribeFile(context.aria2cPath));
+    field(L"aria2c version: ", GetToolVersionLine(context.aria2cPath, L"--version"));
     field(L"MedicatFiles.md5: ", DescribeFile(context.md5ManifestPath));
     field(L"MediCat archive: ", DescribeFile(context.archivePath));
     if (writeDebug) {

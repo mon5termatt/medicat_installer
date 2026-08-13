@@ -93,6 +93,11 @@ App::App(HINSTANCE instance, const std::wstring& logPath) : instance_(instance) 
     } else {
         sevenZa_ = tools.sevenZa;
         md5Manifest_ = tools.md5Manifest;
+        aria2c_ = tools.aria2c;
+        SetAria2cPath(tools.aria2c);
+        if (tools.aria2c.empty()) {
+            log_->Info(L"aria2c not available; file downloads will use WinHTTP");
+        }
     }
 }
 
@@ -262,7 +267,7 @@ int App::RunParsed(const CliParseResult& parsed, int argc, wchar_t** argv) {
         return 0;
     }
     if (parsed.options.action == CliAction::DumpConfig) {
-        PrintCliConfig(root_, sevenZa_, md5Manifest_, ResolveArchivePath(parsed.options.archivePath));
+        PrintCliConfig(root_, sevenZa_, aria2c_, md5Manifest_, ResolveArchivePath(parsed.options.archivePath));
         return 0;
     }
 
@@ -378,6 +383,7 @@ DiagnosticContext App::BuildDiagnosticContext() const {
     DiagnosticContext context;
     context.outputDir = root_;
     context.sevenZaPath = sevenZa_;
+    context.aria2cPath = aria2c_;
     context.md5ManifestPath = md5Manifest_;
     context.archivePath = ResolveArchivePath(cliOptions_.has_value() ? cliOptions_->archivePath : L"");
     context.operation = currentOperation_;
