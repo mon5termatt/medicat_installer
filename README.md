@@ -86,7 +86,7 @@ Visual Studio 2022+, CMake, Python 3, plus `bin/7z/.../7za.exe` and `MedicatFile
 rebuild.bat
 ```
 
-Outputs land in `build/Release/`. Ask in Discord if you get stuck.
+Outputs land in `build/Release/`. Tagged releases (`1.0.N`) are built on GitHub Actions; see [`UPDATER.md`](UPDATER.md). Ask in Discord if you get stuck.
 
 # Credits
 

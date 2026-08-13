@@ -1,0 +1,88 @@
+# Build x64 + Win32 installers and attach them to a GitHub Release.
+#
+# Trigger: push a semver tag that matches the installer version (no "v" prefix):
+#   git tag 1.0.50
+#   git push origin 1.0.50
+#
+# The tagged commit must include this workflow file.
+#
+# Optional repo secret:
+#   MEDICAT_INGEST_TOKEN  - baked into the exe for telemetry / support ingest.
+#                           Empty is allowed (support upload will be disabled).
+#
+# Discord notify stays in release-webhook.yml (fires on release: published).
+
+name: Release build
+
+on:
+  push:
+    tags:
+      - "1.0.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Installer version to pin (1.0.N, no v prefix)"
+        required: true
+        type: string
+      publish:
+        description: "Create or update the GitHub Release and upload assets"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Windows installers
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python build deps
+        run: python -m pip install --upgrade pip pillow
+
+      - name: Resolve installer version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="${{ github.event.inputs.version }}"
+          fi
+          if [[ ! "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Need a semver like 1.0.50 with no v prefix (got: ${TAG:-empty})"
+            exit 1
+          fi
+          echo "VERSION=${TAG}" >> "${GITHUB_ENV}"
+          echo "Building installer version ${TAG}"
+
+      - name: Build (x64 + Win32)
+        shell: cmd
+        env:
+          MEDICAT_INGEST_TOKEN: ${{ secrets.MEDICAT_INGEST_TOKEN }}
+        run: rebuild.bat as %VERSION%
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MedicatInstaller-${{ env.VERSION }}
+          path: |
+            build/Release/MedicatInstaller.exe
+            build/Release/MedicatInstaller-x86.exe
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag' || github.event.inputs.publish == 'true'
+        shell: cmd
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tools\upload_release.bat %VERSION%

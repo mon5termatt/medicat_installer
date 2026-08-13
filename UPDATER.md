@@ -16,13 +16,24 @@ The C++ installer discovers updates via the **GitHub Releases API**.
 `MedicatInstaller.exe` (e.g. latest `1.0.43` → next build `1.0.44`). That keeps
 dev builds aligned with published tags instead of racing ahead of Releases.
 
-Upload with:
+### Publish from a tag (CI)
+
+Push a tag that matches the installer version (no `v` prefix). [`.github/workflows/release-build.yml`](.github/workflows/release-build.yml) runs `rebuild.bat as 1.0.N` on `windows-2022`, then `tools/upload_release.bat`.
 
 ```bat
-rebuild.bat release
+git tag 1.0.50
+git push origin 1.0.50
 ```
 
-(omit TAG to use the version from `build_number.txt`)
+Optional repo secret **`MEDICAT_INGEST_TOKEN`** is passed into the build so support ingest works in the published exe. You can also run the workflow by hand (`workflow_dispatch`) and choose whether to publish.
+
+Local upload is still available:
+
+```bat
+rebuild.bat as 1.0.50 release
+```
+
+(omit TAG after `release` to use the version from `build_number.txt`)
 
 `tools/upload_release.bat` creates the GitHub release if the tag is missing (as **Latest**), uploads both Windows exes, and attaches **`Medicat_Installer.sh`** from the tip of the **`linux`** branch.
 
