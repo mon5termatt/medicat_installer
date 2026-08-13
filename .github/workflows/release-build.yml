@@ -12,7 +12,11 @@
 #   MEDICAT_INGEST_TOKEN  - baked into the exe for telemetry / support ingest.
 #                           Empty is allowed (support upload will be disabled).
 #
-# Discord notify stays in release-webhook.yml (fires on release: published).
+# Discord notify: release-webhook.yml is called after upload. A GITHUB_TOKEN
+# release create does not emit release: published, so the webhook job must
+# be invoked from this workflow (workflow_call). Manual publishes still use
+# release: published. Do not also create the release with a PAT, or Discord
+# would get both the event and this job.
 
 name: Release build
 
@@ -93,3 +97,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: tools\upload_release.bat %VERSION%
+
+  notify:
+    name: Discord webhook
+    needs: build
+    if: github.ref_type == 'tag' || github.event.inputs.publish == 'true'
+    uses: ./.github/workflows/release-webhook.yml
+    with:
+      tag: ${{ github.ref_type == 'tag' && github.ref_name || github.event.inputs.version }}
+    secrets: inherit

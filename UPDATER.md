@@ -36,7 +36,9 @@ rebuild.bat as 1.0.50 release
 
 ### Release webhook
 
-[`.github/workflows/release-webhook.yml`](.github/workflows/release-webhook.yml) fires on `release: published` and POSTs a Discord-compatible embed to the repo secret **`RELEASE_WEBHOOK_URL`**. Optional **`RELEASE_WEBHOOK_CONTENT`** adds a message body (e.g. a role ping).
+[`.github/workflows/release-webhook.yml`](.github/workflows/release-webhook.yml) POSTs a Discord-compatible embed to the repo secret **`RELEASE_WEBHOOK_URL`**. Optional **`RELEASE_WEBHOOK_CONTENT`** adds a message body (e.g. a role ping).
+
+GitHub does not start `release: published` workflows when the release is created with `GITHUB_TOKEN` (CI `upload_release.bat`). Tag builds therefore call the webhook workflow after assets upload (`workflow_call`). Human publishes from the UI still use `release: published`. To announce an existing tag, run **Release webhook** with `workflow_dispatch` and the tag name. Do not create CI releases with a PAT if this job stays in `release-build.yml`, or Discord would get two posts.
 
 ## Source
 

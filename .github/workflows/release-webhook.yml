@@ -1,4 +1,10 @@
-# Notify an external webhook (Discord-compatible) when a GitHub Release is published.
+# Notify an external webhook (Discord-compatible) for a GitHub Release.
+#
+# Triggers:
+#   release published     - human-created releases (PAT / UI). GITHUB_TOKEN
+#                           create/upload does not emit this event.
+#   workflow_call         - release-build.yml after assets are uploaded
+#   workflow_dispatch     - announce an existing tag (e.g. missed notify)
 #
 # Required repo secret:
 #   RELEASE_WEBHOOK_URL  - Discord incoming webhook URL (or any endpoint that
@@ -12,6 +18,18 @@ name: Release webhook
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to announce (e.g. 1.0.45)"
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag to announce"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -25,8 +43,10 @@ jobs:
         env:
           WEBHOOK_URL: ${{ secrets.RELEASE_WEBHOOK_URL }}
           WEBHOOK_CONTENT: ${{ secrets.RELEASE_WEBHOOK_CONTENT }}
-          RELEASE_JSON: ${{ toJson(github.event.release) }}
+          RELEASE_JSON: ${{ github.event_name == 'release' && toJson(github.event.release) || '' }}
+          TAG: ${{ inputs.tag || github.event.release.tag_name }}
           REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "${WEBHOOK_URL:-}" ]; then
@@ -40,11 +60,38 @@ jobs:
           import urllib.error
           import urllib.request
 
-          release = json.loads(os.environ["RELEASE_JSON"])
           repo = os.environ.get("REPO", "")
           webhook = os.environ["WEBHOOK_URL"].strip()
           content = (os.environ.get("WEBHOOK_CONTENT") or "").strip()
+          token = (os.environ.get("GH_TOKEN") or "").strip()
 
+
+          def load_release():
+              raw = (os.environ.get("RELEASE_JSON") or "").strip()
+              if raw and raw not in ("null", "{}", "[]"):
+                  rel = json.loads(raw)
+                  if rel.get("tag_name"):
+                      return rel
+              tag = (os.environ.get("TAG") or "").strip()
+              if not tag or not repo:
+                  raise SystemExit("No release payload and no TAG/REPO to fetch.")
+              url = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
+              headers = {
+                  "Accept": "application/vnd.github+json",
+                  "User-Agent": "medicat-installer-release-webhook",
+              }
+              if token:
+                  headers["Authorization"] = f"Bearer {token}"
+              req = urllib.request.Request(url, headers=headers)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as resp:
+                      return json.loads(resp.read().decode("utf-8"))
+              except urllib.error.HTTPError as exc:
+                  detail = exc.read().decode("utf-8", errors="replace")
+                  raise SystemExit(f"Failed to fetch release {tag}: HTTP {exc.code}: {detail}") from exc
+
+
+          release = load_release()
           tag = release.get("tag_name") or ""
           name = release.get("name") or tag
           html_url = release.get("html_url") or ""
