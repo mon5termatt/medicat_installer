@@ -29,7 +29,7 @@ Ubuntu · Arch · Debian · CentOS · FreeBSD · Fedora · Void · NixOS (and si
 * Basic Linux knowledge (disks, mounts, package managers)
 * Network access to install packages and download Ventoy / MediCat
 
-The script installs or uses packages such as `wget`, `p7zip`/`7z`, `ntfs-3g`, `dosfstools`, `exfat-utils`, `parted`, and `aria2` when needed.
+The script installs or uses packages such as `wget`, `p7zip`/`7z`, `ntfs-3g` / `ntfsprogs` (`mkntfs`), `dosfstools`, `exfatprogs`, `parted`, and `aria2` when needed.
 
 ## What it does
 

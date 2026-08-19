@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ScriptVersion="0023"
+ScriptVersion="0024"
 
 # See CHANGELOG.md for changes.
 #
@@ -65,7 +65,11 @@ declare -A mkfs
 mkfs["nixos"]="nixos.dosfstools"
 mkfs["default"]="dosfstools"
 declare -A ntfs
+# mkntfs lives in ntfsprogs on RHEL-family and Arch (split from ntfs-3g in 2026).
+# Debian/Ubuntu/Alpine/Void still ship mkntfs inside ntfs-3g.
 ntfs["centos"]="ntfsprogs"
+ntfs["fedora"]="ntfsprogs"
+ntfs["arch"]="ntfsprogs"
 ntfs["nixos"]="nixos.ntfs3g"
 ntfs["default"]="ntfs-3g"
 declare -A aria
@@ -270,6 +274,18 @@ function dependenciesHandler() {
 		colEcho $yellowB "Some packages failed:$whiteB ${failedPkgs[*]}"
 	fi
 
+	# ntfs-3g may already be installed while mkntfs lives in ntfsprogs (Arch issue. Cause arch is being a bitch).
+	if ! command -v mkntfs >/dev/null 2>&1 && [ "$os" != "nixos" ]; then
+		if [[ " ${toInstall[*]} " != *" ntfsprogs "* ]]; then
+			colEcho $cyanB "Installing$whiteB ntfsprogs$cyanB (provides mkntfs)..."
+			# shellcheck disable=SC2086
+			if ! $sudo $pkgmgr $install_arg ntfsprogs; then
+				colEcho $yellowB "WARNING: Failed to install ntfsprogs - continuing."
+				failedPkgs+=("ntfsprogs")
+			fi
+		fi
+	fi
+
 	# Only hard-fail for commands that are still missing after best-effort install.
 	local stillMissing=""
 	for command in "${!depCommands[@]}"; do
@@ -279,6 +295,9 @@ function dependenciesHandler() {
 	done
 	if [ -n "$stillMissing" ]; then
 		colEcho $redB "ERROR: Required commands still missing after install:$whiteB$stillMissing"
+		if [[ "$stillMissing" == *" mkntfs"* ]]; then
+			colEcho $yellowB "mkntfs comes from ntfsprogs on Arch/Fedora (not from ntfs-3g)."
+		fi
 		colEcho $redB "Install them manually (or install an equivalent package), then re-run this script."
 		exit 1
 	fi
