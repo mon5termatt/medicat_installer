@@ -26,7 +26,7 @@ MedicatSplitMd5s=(
 	7f416a7d9ff0051ae75bbf44a411b8e4
 	32d84a280af91ae408f55a7722ee6818
 )
-# Direct download mirrors (order = try order). files.dog needs insecure SSL.
+# Direct download mirrors (order = try order).
 MedicatUrlMedicatusb="https://files.medicatusb.com/files/${MedicatVersion}/${Medicat7zFile}"
 MedicatUrlFilesDog="https://files.dog/OD%20Rips/MediCat/${MedicatVersion}/${Medicat7zFile}"
 MedicatTorrentUrl="https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_${MedicatVersion}.torrent"
@@ -611,9 +611,8 @@ function downloadMedicatDirect() {
 		return 0
 	fi
 
-	# files.dog often fails with wget TLS errors; aria2c + --check-certificate=false is the workaround.
 	colEcho $yellowB "\nPrimary mirror failed. Trying fallback (files.dog)..."
-	if downloadMedicatHttp "$MedicatUrlFilesDog" "files.dog" "true"; then
+	if downloadMedicatHttp "$MedicatUrlFilesDog" "files.dog" "false"; then
 		return 0
 	fi
 

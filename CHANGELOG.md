@@ -5,6 +5,7 @@ All notable changes to `Medicat_Installer.sh` (linux branch).
 ## 0024
 
 - Install `ntfsprogs` for `mkntfs` on Arch and Fedora. `ntfs-3g` no longer ships the NTFS userspace tools after the 2026 package split, so the script no longer treats a missing `mkntfs` as a missing `ntfs-3g`. Falls back to `ntfsprogs` if `mkntfs` is still absent after the first install.
+- Drop the files.dog TLS bypass. The mirror now serves a valid Cloudflare / Google Trust Services certificate, so aria2c/wget verify SSL normally.
 
 ## 0023
 
