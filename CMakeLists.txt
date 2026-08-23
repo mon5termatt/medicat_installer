@@ -139,6 +139,12 @@ if(CMAKE_SIZEOF_VOID_P EQUAL 4)
     set_target_properties(MedicatInstaller PROPERTIES OUTPUT_NAME "MedicatInstaller-x86")
 endif()
 
+# Static CRT so end users do not need the VC++ Redistributable.
+if(MSVC)
+    set_property(TARGET MedicatInstaller PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 set(_PIN_BUILD "")
 if(DEFINED ENV{MEDICAT_PIN_BUILD} AND NOT "$ENV{MEDICAT_PIN_BUILD}" STREQUAL "")
     set(_PIN_BUILD "$ENV{MEDICAT_PIN_BUILD}")

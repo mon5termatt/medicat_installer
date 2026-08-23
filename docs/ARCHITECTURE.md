@@ -161,6 +161,7 @@ Detection: `{drive}\ventoy` folder **or** physical-disk layout matching Ventoy2D
 3. **fetch_ventoy_versions.py** → embedded version list
 4. **bundle.rc** embeds `7za.exe`, gzipped `aria2c.exe`, `MedicatFiles.md5`
 5. Output: `build/Release/MedicatInstaller.exe` (single-file distribution; tools extracted to `%TEMP%\MedicatInstaller\{pid}\` at runtime)
+6. **Static CRT (`/MT`)** - no Visual C++ Redistributable required on end-user machines
 
 ---
 
