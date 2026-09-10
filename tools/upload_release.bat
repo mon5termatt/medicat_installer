@@ -85,7 +85,9 @@ goto upload_assets
 
 :create_release
 echo Creating GitHub release %TAG%...
-gh release create "%TAG%" --title "%TAG%" --generate-notes --latest --repo "%REPO%"
+REM Prefer annotated tag message, else the tagged commit message (not empty
+REM generate-notes changelog-only stubs).
+gh release create "%TAG%" --title "%TAG%" --notes-from-tag --latest --repo "%REPO%"
 if errorlevel 1 goto create_failed
 goto upload_assets
 

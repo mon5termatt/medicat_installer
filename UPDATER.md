@@ -32,7 +32,7 @@ rebuild.bat as 1.0.50 release
 
 (omit TAG after `release` to use the version from `build_number.txt`)
 
-`tools/upload_release.bat` creates the GitHub release if the tag is missing (as **Latest**), uploads both Windows exes, and attaches **`Medicat_Installer.sh`** from the tip of the **`linux`** branch.
+`tools/upload_release.bat` creates the GitHub release if the tag is missing (as **Latest**), using the annotated tag message or the tagged commit message as release notes (`gh --notes-from-tag`). It uploads both Windows exes and attaches **`Medicat_Installer.sh`** from the tip of the **`linux`** branch.
 
 ### Release webhook
 
