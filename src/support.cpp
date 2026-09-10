@@ -236,8 +236,21 @@ bool StageSupportLogFiles(const std::wstring& installerRoot, const std::vector<s
     ClearDirectoryFiles(stagingDir);
     stagedFiles.clear();
 
+    const std::wstring logsDir = GetLogsDirectory();
+
     for (const std::wstring& name : logFiles) {
-        const std::wstring sourcePath = JoinPath(installerRoot, name);
+        const bool nested = name.find(L'\\') != std::wstring::npos || name.find(L'/') != std::wstring::npos;
+        std::wstring sourcePath;
+        if (nested) {
+            sourcePath = JoinPath(installerRoot, name);
+        } else {
+            sourcePath = JoinPath(logsDir, name);
+            if (!FileExists(sourcePath)) {
+                sourcePath = JoinPath(installerRoot, name);
+            }
+        }
+
+        // Zip entries stay flat basenames for allowlisted logs; keep Ventoy2Disk\ for CLI artifacts.
         const std::wstring destinationPath = JoinPath(stagingDir, name);
         if (!EnsureParentDirectory(destinationPath)) {
             continue;
@@ -460,24 +473,50 @@ void PostSessionReportOnce(const SessionReportRequest& request, const SessionRep
 }
 
 std::vector<std::wstring> CollectSupportLogFiles(const std::wstring& installerRoot) {
-    static const wchar_t* kRootFiles[] = {L"medicat_installer.log", L"ventoy.log", L"extract.log",
-                                          L"reextract.log",         L"check.log",  L"aria.log",
-                                          L"failed_files.txt",      nullptr};
+    static const wchar_t* kLogFiles[] = {L"medicat_installer.log",
+                                         L"ventoy.log",
+                                         L"extract.log",
+                                         L"reextract.log",
+                                         L"check.log",
+                                         L"aria.log",
+                                         L"failed_files.txt",
+                                         L"cli_log.txt",
+                                         nullptr};
     static const wchar_t* kVentoyCliFiles[] = {L"cli_log.txt", L"cli_done.txt", L"cli_percent.txt", nullptr};
 
     std::vector<std::wstring> files;
-    auto tryAdd = [&](const std::wstring& relativePath) {
+    const std::wstring logsDir = GetLogsDirectory();
+
+    auto tryAddLogBasename = [&](const wchar_t* name) {
+        std::wstring path = JoinPath(logsDir, name);
+        if ((!FileExists(path) || GetFileSizeBytes(path) == 0) && !installerRoot.empty()) {
+            path = JoinPath(installerRoot, name);
+        }
+        if (FileExists(path) && GetFileSizeBytes(path) > 0) {
+            files.push_back(name);
+        }
+    };
+
+    for (const wchar_t* const* name = kLogFiles; *name != nullptr; ++name) {
+        tryAddLogBasename(*name);
+    }
+    for (const wchar_t* const* name = kVentoyCliFiles; *name != nullptr; ++name) {
+        // Prefer flat logs\cli_log.txt; fall back to Ventoy2Disk\ for older layouts / mid-run.
+        bool already = false;
+        for (const std::wstring& existing : files) {
+            if (existing == *name) {
+                already = true;
+                break;
+            }
+        }
+        if (already) {
+            continue;
+        }
+        const std::wstring relativePath = JoinPath(L"Ventoy2Disk", *name);
         const std::wstring path = JoinPath(installerRoot, relativePath);
         if (FileExists(path) && GetFileSizeBytes(path) > 0) {
             files.push_back(relativePath);
         }
-    };
-
-    for (const wchar_t* const* name = kRootFiles; *name != nullptr; ++name) {
-        tryAdd(*name);
-    }
-    for (const wchar_t* const* name = kVentoyCliFiles; *name != nullptr; ++name) {
-        tryAdd(JoinPath(L"Ventoy2Disk", *name));
     }
     return files;
 }

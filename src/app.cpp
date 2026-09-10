@@ -84,7 +84,8 @@ struct MedicatTempDirGuard {
 App::App(HINSTANCE instance, const std::wstring& logPath) : instance_(instance) {
     i18n::Load();
     root_ = GetExeDirectory();
-    const std::wstring resolvedLog = logPath.empty() ? JoinPath(root_, L"medicat_installer.log") : logPath;
+    PrepareInstallerLogs();
+    const std::wstring resolvedLog = logPath.empty() ? GetLogFilePath(L"medicat_installer.log") : logPath;
     log_ = std::make_unique<Logger>(resolvedLog);
 
     const BundledTools tools = EnsureBundledTools(instance_);
@@ -609,7 +610,7 @@ void App::SubmitSessionReport(const bool success, const std::wstring& message, c
                                                         : i18n::Tr(L"titles.installation_error");
         }
         request.errorTitle = SanitizeTelemetryTextEnglish(errorTitle, 128);
-        request.errorDetail = SanitizeTelemetryTextEnglish(message, 900);
+        request.errorDetail = SanitizeTelemetryTextEnglish(message, 512);
     }
 
     SendSessionReport(request, headless_, TelemetryFileLogger(log_.get()));
@@ -636,7 +637,7 @@ void App::QueueFailureLogUpload(const std::string& sessionId, const std::wstring
                                                         : i18n::Tr(L"titles.installation_error");
         }
         request.errorTitle = SanitizeTelemetryTextEnglish(errorTitle, 128);
-        request.errorDetail = SanitizeTelemetryTextEnglish(message, 900);
+        request.errorDetail = SanitizeTelemetryTextEnglish(message, 512);
     }
 
     SendFailureLogUpload(
@@ -798,27 +799,34 @@ App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const 
 
     PostStatusBar(i18n::Tr(L"status.checking_medicat_presence"));
     log_->Info(i18n::Tr(L"log.medicat_presence_check", drive));
-    const MedicatPresenceResult presence = CheckMedicatPresenceOnDrive(dest);
-    log_->Info(i18n::Tr(L"log.medicat_presence_score", std::to_wstring(presence.scorePercent),
-                        std::to_wstring(presence.markersFound), std::to_wstring(presence.markersTotal)));
-    for (const std::wstring& marker : presence.foundMarkers) {
-        log_->Debug(i18n::Tr(L"log.medicat_presence_marker_found", marker));
+    if (DebugSafety().skipPresenceCheck) {
+        log_->Info(L"[Debug] Skipping MediCat presence check");
+    } else {
+        const MedicatPresenceResult presence = CheckMedicatPresenceOnDrive(dest);
+        log_->Info(i18n::Tr(L"log.medicat_presence_score", std::to_wstring(presence.scorePercent),
+                            std::to_wstring(presence.markersFound), std::to_wstring(presence.markersTotal)));
+        for (const std::wstring& marker : presence.foundMarkers) {
+            log_->Debug(i18n::Tr(L"log.medicat_presence_marker_found", marker));
+        }
+        for (const std::wstring& marker : presence.missingMarkers) {
+            log_->Debug(i18n::Tr(L"log.medicat_presence_marker_missing", marker));
+        }
+        if (!presence.likelyInstalled) {
+            log_->Error(i18n::Tr(L"log.medicat_presence_too_low", std::to_wstring(presence.scorePercent),
+                                 std::to_wstring(kMedicatPresenceProceedThresholdPercent)));
+            outcome.skipReExtract = true;
+            outcome.message =
+                i18n::Tr(L"messages.medicat_not_on_drive", drive, std::to_wstring(presence.scorePercent),
+                         std::to_wstring(presence.markersFound), std::to_wstring(presence.markersTotal));
+            outcome.title = i18n::Tr(L"titles.medicat_not_on_drive");
+            return outcome;
+        }
+        log_->Info(i18n::Tr(L"log.medicat_presence_ok", std::to_wstring(presence.scorePercent)));
     }
-    for (const std::wstring& marker : presence.missingMarkers) {
-        log_->Debug(i18n::Tr(L"log.medicat_presence_marker_missing", marker));
-    }
-    if (!presence.likelyInstalled) {
-        log_->Error(i18n::Tr(L"log.medicat_presence_too_low", std::to_wstring(presence.scorePercent),
-                             std::to_wstring(kMedicatPresenceProceedThresholdPercent)));
-        outcome.skipReExtract = true;
-        outcome.message =
-            i18n::Tr(L"messages.medicat_not_on_drive", drive, std::to_wstring(presence.scorePercent),
-                     std::to_wstring(presence.markersFound), std::to_wstring(presence.markersTotal));
-        outcome.title = i18n::Tr(L"titles.medicat_not_on_drive");
-        return outcome;
-    }
-    log_->Info(i18n::Tr(L"log.medicat_presence_ok", std::to_wstring(presence.scorePercent)));
     if (showFileProgress) {
+        // Route live lines to the Verify tab (install stays in FileLog/Extract through extract).
+        PostSetBusyMode(BusyProgressMode::Verify);
+        PostExtractProgress(0, L"", true);
         PostOpenFileLog();
     }
 
@@ -827,8 +835,8 @@ App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const 
     verifyOptions.installerRoot = root_;
     verifyOptions.tempDir = GetMedicatTempDir();
     verifyOptions.manifestPath = md5Manifest_;
-    verifyOptions.failedListPath = JoinPath(root_, L"failed_files.txt");
-    verifyOptions.checkLogPath = JoinPath(root_, L"check.log");
+    verifyOptions.failedListPath = GetLogFilePath(L"failed_files.txt");
+    verifyOptions.checkLogPath = GetLogFilePath(L"check.log");
     log_->Info(L"Writing per-file verify log to " + verifyOptions.checkLogPath);
 
     if (headless_) {
@@ -1037,9 +1045,11 @@ bool App::TryReExtractFailedFiles(const std::wstring& drive, const std::wstring&
 
     log_->Info(i18n::Tr(L"log.re_extraction_started", std::to_wstring(relPaths.size())));
     PostStatusBar(i18n::Tr(L"status.re_extracting"));
+    // Selective re-extract belongs on the Extract tab, not Verify.
+    PostSetBusyMode(BusyProgressMode::FileLog);
     PostExtractProgress(0, L"", true, L"status.re_extracting");
 
-    const std::wstring extractLogPath = JoinPath(root_, L"reextract.log");
+    const std::wstring extractLogPath = GetLogFilePath(L"reextract.log");
     log_->Info(L"Writing selective 7za output to " + extractLogPath);
 
     const ExtractResult extract = Extract7zArchiveSelective(
@@ -1134,7 +1144,10 @@ bool App::PromptConfirm(const std::wstring& message, const std::wstring& title, 
 }
 
 bool App::PromptWipeConfirm(const std::wstring& drive, const bool format, const bool runVentoy) {
-    if (ShouldAutoConfirm()) {
+    if (ShouldAutoConfirm() || DebugSafety().skipDestructiveConfirms) {
+        if (DebugSafety().skipDestructiveConfirms && log_) {
+            log_->Info(L"[Debug] Skipping wipe confirmation");
+        }
         return true;
     }
     if (IsQuiet()) {
@@ -1454,7 +1467,10 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
     };
 
     const auto confirmVentoy = [&]() -> bool {
-        if (autoYes) {
+        if (autoYes || DebugSafety().skipDestructiveConfirms) {
+            if (DebugSafety().skipDestructiveConfirms) {
+                log_->Info(L"[Debug] Skipping Ventoy warning confirmation");
+            }
             return true;
         }
         if (quiet) {
@@ -1472,7 +1488,10 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
 
     const auto confirmDriveLetterChange = [&](const std::wstring& originalDrive,
                                               const std::wstring& newDrive) -> bool {
-        if (autoYes) {
+        if (autoYes || DebugSafety().skipDestructiveConfirms) {
+            if (DebugSafety().skipDestructiveConfirms) {
+                log_->Info(L"[Debug] Skipping drive-letter change confirmation");
+            }
             return true;
         }
         if (quiet) {
@@ -1510,7 +1529,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
             return;
         }
 
-        const std::wstring ventoyLogPath = JoinPath(root, L"ventoy.log");
+        const std::wstring ventoyLogPath = GetLogFilePath(L"ventoy.log");
         log_->Info(L"Writing Ventoy diagnostics to " + ventoyLogPath);
 
         VentoyEnsureOptions ensureOptions;
@@ -1562,6 +1581,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
 
         PostProgress(0);
         log_->Info(upgrade ? L"Running Ventoy upgrade" : L"Running Ventoy fresh install");
+        log_->Info(L"Ventoy target drive: " + DescribeDrive(drive));
         log_->Info(L"Ventoy options: " + std::wstring(ventoyInstall.useGpt ? L"GPT" : L"MBR") + L", Secure Boot " +
                    (ventoyInstall.enableSecureBoot ? L"enabled" : L"disabled"));
         if (TriggerSimulatedInstallFailure(upgrade ? SimulatedFailure::VentoyUpgrade : SimulatedFailure::VentoyInstall,
@@ -1643,7 +1663,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
 
     PostExtractProgress(0, L"", true, L"status.extracting_archive");
 
-    const std::wstring extractLogPath = JoinPath(root_, L"extract.log");
+    const std::wstring extractLogPath = GetLogFilePath(L"extract.log");
     log_->Info(L"Writing raw 7za output to " + extractLogPath);
 
     if (TriggerSimulatedInstallFailure(SimulatedFailure::MediCatExtract, log_.get(), fail)) {

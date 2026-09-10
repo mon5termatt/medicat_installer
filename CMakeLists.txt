@@ -243,6 +243,8 @@ target_link_libraries(MedicatInstaller PRIVATE
     uxtheme
     gdiplus
     advapi32
+    setupapi
+    cfgmgr32
 )
 
 if(MSVC)

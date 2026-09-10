@@ -23,6 +23,22 @@ struct DriveIdentity {
     bool valid = false;
 };
 
+// Hardware identity from IOCTL_STORAGE_QUERY_PROPERTY + SetupAPI (USB VID/PID / friendly name).
+struct DiskDeviceInfo {
+    DWORD diskNumber = 0;
+    std::wstring vendor;
+    std::wstring product;
+    std::wstring revision;
+    std::wstring serial;  // hardware serial, not volume serial
+    std::wstring busTypeName;
+    std::wstring manufacturer;  // SetupAPI SPDRP_MFG
+    std::wstring friendlyName;  // SetupAPI SPDRP_FRIENDLYNAME
+    std::wstring usbVid;        // 4-digit hex, e.g. 0781
+    std::wstring usbPid;        // 4-digit hex
+    bool removableMedia = false;
+    bool valid = false;
+};
+
 // Minimum total drive capacity (28 GiB — nominal "32 GB" sticks report ~29.8 GiB).
 constexpr uint64_t kMinDriveCapacityBytes = 28ULL * 1024ULL * 1024ULL * 1024ULL;
 
@@ -30,6 +46,11 @@ constexpr uint64_t kMinDriveCapacityBytes = 28ULL * 1024ULL * 1024ULL * 1024ULL;
 std::vector<DriveInfo> ListTargetDrives(bool includeAllDrives = false);
 int DefaultDriveIndex(const std::vector<DriveInfo>& drives);
 DriveIdentity GetDriveIdentity(const std::wstring& driveLetter);
+DiskDeviceInfo QueryDiskDeviceInfo(DWORD diskNumber);
+// First physical disk for the volume letter, or invalid if extents/descriptor unavailable.
+DiskDeviceInfo GetDriveDeviceInfo(const std::wstring& driveLetter);
+// Append disk=N bus=… vendor="…" product="…" vid=… pid=… (omits empty fields) for diagnostic logs.
+std::wstring FormatDiskDeviceInfoFields(const DiskDeviceInfo& info);
 std::wstring ResolveDriveLetterAfterVentoy(const std::wstring& expectedLetter, const DriveIdentity& before);
 uint64_t GetDriveTotalBytes(const std::wstring& driveLetter);
 bool MeetsMinimumDriveCapacity(const std::wstring& driveLetter);

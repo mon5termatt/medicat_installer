@@ -46,6 +46,35 @@ Implemented (`WM_DEVICECHANGE`, debounced refresh, status-bar alerts, i18n). Rem
 
 ---
 
+## Known-bad / cheap USB warnings
+
+Warn (or strongly suggest swapping) when the selected stick matches brands/controllers that fail Ventoy/format/extract often, or that manufacturers do not treat as boot media. Use logged `vendor`/`product`/`friendly`/`vid`/`pid` from Target USB enrichment.
+
+- [ ] Build a small deny/warn list (VID/PID and/or name patterns) and surface a status-bar or confirm dialog before wipe/Ventoy.
+- [ ] Seed list (expand as we confirm from tickets + local tests):
+
+### Often fail / no-name cheap
+
+  - **Micro Center** no-name sticks (sample: `USB DISK`, `VID_090C` / `PID_2000`, Silicon Motion-class)
+  - _(add other known-bad sticks here as Matt identifies them)_
+
+### Consumer lines not marketed / guaranteed as bootable (warn, many still work)
+
+| Brand / product line | Notes |
+|---|---|
+| SanDisk Ultra Fit | Historically not tested/supported as bootable |
+| PNY Attaché / Attaché X | Consumer storage; not marketed as boot media |
+| Kingston DataTraveler (consumer) | Storage products; many work, not guaranteed |
+| Verbatim Store 'n' Go | Consumer storage; bootability not generally guaranteed |
+| Samsung BAR / FIT | Storage-focused; boot not necessarily guaranteed |
+| Lexar JumpDrive (consumer) | Consumer storage; boot support varies |
+| SanDisk Cruzer / older consumer lines | Same class of consumer-only sticks |
+
+- [ ] Optional: include match reason in Tier A session options / failure logs so support sees "warned cheap/unsupported USB".
+- [ ] i18n for the warning copy (all languages).
+
+---
+
 ## Other
 
 _Add new items below._

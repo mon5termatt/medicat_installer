@@ -8,6 +8,11 @@
 namespace medicat {
 
 std::wstring GetExeDirectory();
+std::wstring GetLogsDirectory();
+std::wstring GetLogFilePath(const std::wstring& fileName);
+// Create logs/, migrate legacy root-level logs, pull Ventoy2Disk\cli_log.txt when newer,
+// rotate all session logs into logs/archive/<timestamp>/, prune old sessions.
+void PrepareInstallerLogs();
 std::wstring GetMedicatTempRoot();
 std::wstring GetMedicatTempDir();
 void CleanupMedicatTempOnExit();

@@ -1283,6 +1283,18 @@ VentoyResult RunVentoyInstall(const std::wstring& ventoyExe, const std::wstring&
     }
 
     const std::wstring cliLogPath = JoinPath(ventoyDir, L"cli_log.txt");
+    // Flat logs\ copy only when this Ventoy run produced a newer cli_log than logs\ already has.
+    if (FileExists(cliLogPath) && GetFileSizeBytes(cliLogPath) > 0) {
+        CreateDirectoryW(GetLogsDirectory().c_str(), nullptr);
+        const std::wstring dest = GetLogFilePath(L"cli_log.txt");
+        WIN32_FILE_ATTRIBUTE_DATA srcData{};
+        WIN32_FILE_ATTRIBUTE_DATA destData{};
+        const bool haveSrc = GetFileAttributesExW(cliLogPath.c_str(), GetFileExInfoStandard, &srcData) != FALSE;
+        const bool haveDest = GetFileAttributesExW(dest.c_str(), GetFileExInfoStandard, &destData) != FALSE;
+        if (haveSrc && (!haveDest || CompareFileTime(&srcData.ftLastWriteTime, &destData.ftLastWriteTime) > 0)) {
+            CopyFileW(cliLogPath.c_str(), dest.c_str(), FALSE);
+        }
+    }
     result.cliLogExcerpt = ExtractVentoyCliLogExcerpt(cliLogPath);
     result.success = (result.exitCode == 0);
     result.ventoyExe = ventoyExe;

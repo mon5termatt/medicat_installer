@@ -27,6 +27,9 @@ void LogSystemDiagnostics(const DiagnosticContext& context,
                           const std::function<void(const std::wstring&)>& logLine,
                           const std::function<void(const std::wstring&)>& logDebug = {});
 
+// One-line drive description for medicat_installer.log (letter, size, Ventoy, USB vendor/product).
+std::wstring DescribeDrive(const std::wstring& driveLetter);
+
 std::wstring BuildMediCatArchiveSizeDebugLine(const std::wstring& path);
 
 // Installer options for the selected drive (logged after the drive list is ready).

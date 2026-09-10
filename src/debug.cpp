@@ -291,39 +291,6 @@ std::wstring ReadDriveVentoyVersion(const std::wstring& driveLetter) {
     return Utf8ToWide(content);
 }
 
-std::wstring DescribeDrive(const std::wstring& driveLetter) {
-    if (driveLetter.empty()) {
-        return L"(none selected)";
-    }
-
-    std::wstring root = driveLetter;
-    if (root.size() == 2 && root[1] == L':') {
-        root += L'\\';
-    }
-
-    wchar_t label[MAX_PATH + 1]{};
-    wchar_t fs[MAX_PATH + 1]{};
-    DWORD serial = 0;
-    DWORD maxComp = 0;
-    DWORD flags = 0;
-    if (!GetVolumeInformationW(root.c_str(), label, MAX_PATH, &serial, &maxComp, &flags, fs, MAX_PATH)) {
-        return driveLetter + L" (volume info unavailable)";
-    }
-
-    const uint64_t total = GetDriveTotalBytes(driveLetter);
-    const uint64_t free = GetDriveFreeBytes(root);
-    const bool ventoy = TestVentoyInstalled(driveLetter);
-    const std::wstring ventoyVersion = ReadDriveVentoyVersion(driveLetter);
-
-    std::wostringstream ss;
-    ss << driveLetter << L"  label=\"" << label << L"\"  fs=" << fs << L"  total=" << FormatBytes(total)
-       << L"  free=" << FormatBytes(free) << L"  ventoy=" << (ventoy ? L"yes" : L"no");
-    if (!ventoyVersion.empty()) {
-        ss << L"  ventoy_version=" << ventoyVersion;
-    }
-    return ss.str();
-}
-
 std::string TrimLineWhitespace(std::string line) {
     while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ' || line.back() == '\t')) {
         line.pop_back();
@@ -752,6 +719,44 @@ SessionSystemSnapshot BuildSessionSystemSnapshot() {
 }
 
 }  // namespace
+
+std::wstring DescribeDrive(const std::wstring& driveLetter) {
+    if (driveLetter.empty()) {
+        return L"(none selected)";
+    }
+
+    std::wstring root = driveLetter;
+    if (root.size() == 2 && root[1] == L':') {
+        root += L'\\';
+    }
+
+    wchar_t label[MAX_PATH + 1]{};
+    wchar_t fs[MAX_PATH + 1]{};
+    DWORD serial = 0;
+    DWORD maxComp = 0;
+    DWORD flags = 0;
+    if (!GetVolumeInformationW(root.c_str(), label, MAX_PATH, &serial, &maxComp, &flags, fs, MAX_PATH)) {
+        return driveLetter + L" (volume info unavailable)";
+    }
+
+    const uint64_t total = GetDriveTotalBytes(driveLetter);
+    const uint64_t free = GetDriveFreeBytes(root);
+    const bool ventoy = TestVentoyInstalled(driveLetter);
+    const std::wstring ventoyVersion = ReadDriveVentoyVersion(driveLetter);
+
+    std::wostringstream ss;
+    ss << driveLetter << L"  label=\"" << label << L"\"  fs=" << fs << L"  total=\"" << FormatBytes(total)
+       << L"\"  free=\"" << FormatBytes(free) << L"\"  ventoy=" << (ventoy ? L"yes" : L"no");
+    if (!ventoyVersion.empty()) {
+        ss << L"  ventoy_version=" << ventoyVersion;
+    }
+    const DiskDeviceInfo device = GetDriveDeviceInfo(driveLetter);
+    const std::wstring deviceFields = FormatDiskDeviceInfoFields(device);
+    if (!deviceFields.empty()) {
+        ss << L"  " << deviceFields;
+    }
+    return ss.str();
+}
 
 std::wstring BuildMediCatArchiveSizeDebugLine(const std::wstring& path) {
     if (path.empty()) {

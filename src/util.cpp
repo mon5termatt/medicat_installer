@@ -4,9 +4,11 @@
 #include <shlwapi.h>
 #include <windows.h>
 
+#include <algorithm>
 #include <cwchar>
 #include <filesystem>
 #include <sstream>
+#include <vector>
 
 namespace medicat {
 
@@ -22,6 +24,235 @@ std::wstring GetExeDirectory() {
         return L".";
     }
     return path.substr(0, pos);
+}
+
+std::wstring GetLogsDirectory() {
+    return JoinPath(GetExeDirectory(), L"logs");
+}
+
+std::wstring GetLogFilePath(const std::wstring& fileName) {
+    return JoinPath(GetLogsDirectory(), fileName);
+}
+
+namespace {
+
+constexpr size_t kMaxArchivedLogSessions = 10;
+
+// Session files written under logs/ (rotated together into archive/<timestamp>/).
+const wchar_t* const kSessionLogFiles[] = {
+    L"medicat_installer.log", L"ventoy.log", L"extract.log",     L"reextract.log",
+    L"check.log",             L"aria.log",   L"failed_files.txt", L"cli_log.txt",
+    L"cli_done.txt",          L"cli_percent.txt",
+};
+
+std::wstring FormatSessionArchiveFolderName() {
+    SYSTEMTIME st{};
+    GetLocalTime(&st);
+    wchar_t name[64]{};
+    swprintf_s(name, L"%04u-%02u-%02u_%02u%02u%02u", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute,
+               st.wSecond);
+    return name;
+}
+
+bool IsTimestampArchiveFolderName(const std::wstring& name) {
+    // YYYY-MM-DD_HHMMSS
+    if (name.size() != 17) {
+        return false;
+    }
+    for (size_t i = 0; i < name.size(); ++i) {
+        const wchar_t ch = name[i];
+        if (i == 4 || i == 7) {
+            if (ch != L'-') {
+                return false;
+            }
+        } else if (i == 10) {
+            if (ch != L'_') {
+                return false;
+            }
+        } else if (ch < L'0' || ch > L'9') {
+            return false;
+        }
+    }
+    return true;
+}
+
+void PruneLogSessionArchives(const std::wstring& archiveDir) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (!fs::exists(archiveDir, ec) || ec) {
+        return;
+    }
+
+    std::vector<fs::path> sessions;
+    for (const fs::directory_entry& entry : fs::directory_iterator(archiveDir, ec)) {
+        if (ec) {
+            break;
+        }
+        if (!entry.is_directory(ec)) {
+            continue;
+        }
+        const std::wstring name = entry.path().filename().wstring();
+        if (IsTimestampArchiveFolderName(name)) {
+            sessions.push_back(entry.path());
+        }
+    }
+
+    if (sessions.size() <= kMaxArchivedLogSessions) {
+        return;
+    }
+
+    std::sort(sessions.begin(), sessions.end());
+    const size_t removeCount = sessions.size() - kMaxArchivedLogSessions;
+    for (size_t i = 0; i < removeCount; ++i) {
+        fs::remove_all(sessions[i], ec);
+        ec.clear();
+    }
+}
+
+void MigrateLegacyLogFile(const std::wstring& exeDir, const std::wstring& logsDir, const std::wstring& archiveDir,
+                          const wchar_t* fileName) {
+    const std::wstring legacyPath = JoinPath(exeDir, fileName);
+    if (!FileExists(legacyPath)) {
+        return;
+    }
+
+    const std::wstring targetPath = JoinPath(logsDir, fileName);
+    if (!FileExists(targetPath)) {
+        MoveFileW(legacyPath.c_str(), targetPath.c_str());
+        return;
+    }
+
+    // Both exist: park the root copy under archive so logs/ stays authoritative.
+    const std::wstring legacyDir = JoinPath(archiveDir, L"legacy_root");
+    CreateDirectoryW(legacyDir.c_str(), nullptr);
+    const std::wstring archivePath = JoinPath(legacyDir, fileName);
+    if (!MoveFileW(legacyPath.c_str(), archivePath.c_str())) {
+        DeleteFileW(legacyPath.c_str());
+    }
+}
+
+bool GetFileLastWriteTime(const std::wstring& path, FILETIME& outWrite) {
+    WIN32_FILE_ATTRIBUTE_DATA data{};
+    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &data)) {
+        return false;
+    }
+    outWrite = data.ftLastWriteTime;
+    return true;
+}
+
+bool FileTimeNewer(const FILETIME& a, const FILETIME& b) {
+    return CompareFileTime(&a, &b) > 0;
+}
+
+FILETIME NewestKnownCliLogWriteTime(const std::wstring& logsDir, const std::wstring& archiveDir) {
+    FILETIME newest{};
+    bool have = false;
+
+    auto consider = [&](const std::wstring& path) {
+        FILETIME write{};
+        if (!GetFileLastWriteTime(path, write)) {
+            return;
+        }
+        if (!have || FileTimeNewer(write, newest)) {
+            newest = write;
+            have = true;
+        }
+    };
+
+    consider(JoinPath(logsDir, L"cli_log.txt"));
+
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (fs::exists(archiveDir, ec) && !ec) {
+        for (const fs::directory_entry& entry : fs::directory_iterator(archiveDir, ec)) {
+            if (ec || !entry.is_directory(ec)) {
+                continue;
+            }
+            consider(JoinPath(entry.path().wstring(), L"cli_log.txt"));
+        }
+    }
+
+    return newest;  // zeroed if none known
+}
+
+void PullVentoyCliLogIntoLogs(const std::wstring& exeDir, const std::wstring& logsDir,
+                              const std::wstring& archiveDir) {
+    const std::wstring ventoyCli = JoinPath(JoinPath(exeDir, L"Ventoy2Disk"), L"cli_log.txt");
+    if (!FileExists(ventoyCli) || GetFileSizeBytes(ventoyCli) == 0) {
+        return;
+    }
+
+    FILETIME ventoyWrite{};
+    if (!GetFileLastWriteTime(ventoyCli, ventoyWrite)) {
+        return;
+    }
+
+    // Skip stale Ventoy2Disk leftovers already captured in logs/ or a prior archive session.
+    const FILETIME known = NewestKnownCliLogWriteTime(logsDir, archiveDir);
+    const bool haveKnown = known.dwLowDateTime != 0 || known.dwHighDateTime != 0;
+    if (haveKnown && !FileTimeNewer(ventoyWrite, known)) {
+        return;
+    }
+
+    const std::wstring dest = JoinPath(logsDir, L"cli_log.txt");
+    CopyFileW(ventoyCli.c_str(), dest.c_str(), FALSE);
+}
+
+bool LogsDirHasSessionFiles(const std::wstring& logsDir) {
+    for (const wchar_t* name : kSessionLogFiles) {
+        const std::wstring path = JoinPath(logsDir, name);
+        if (FileExists(path) && GetFileSizeBytes(path) > 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void RotateSessionLogsIntoArchive(const std::wstring& logsDir, const std::wstring& archiveDir) {
+    if (!LogsDirHasSessionFiles(logsDir)) {
+        return;
+    }
+
+    std::wstring folderName = FormatSessionArchiveFolderName();
+    std::wstring sessionDir = JoinPath(archiveDir, folderName);
+    if (GetFileAttributesW(sessionDir.c_str()) != INVALID_FILE_ATTRIBUTES) {
+        folderName += L"_" + std::to_wstring(GetTickCount64() % 100000);
+        sessionDir = JoinPath(archiveDir, folderName);
+    }
+    CreateDirectoryW(sessionDir.c_str(), nullptr);
+
+    for (const wchar_t* name : kSessionLogFiles) {
+        const std::wstring src = JoinPath(logsDir, name);
+        if (!FileExists(src)) {
+            continue;
+        }
+        const std::wstring dest = JoinPath(sessionDir, name);
+        if (!MoveFileW(src.c_str(), dest.c_str())) {
+            // Keep going; truncate/delete so this session still starts clean.
+            DeleteFileW(src.c_str());
+        }
+    }
+}
+
+}  // namespace
+
+void PrepareInstallerLogs() {
+    const std::wstring exeDir = GetExeDirectory();
+    const std::wstring logsDir = GetLogsDirectory();
+    const std::wstring archiveDir = JoinPath(logsDir, L"archive");
+    CreateDirectoryW(logsDir.c_str(), nullptr);
+    CreateDirectoryW(archiveDir.c_str(), nullptr);
+
+    for (const wchar_t* name : kSessionLogFiles) {
+        // cli_* live under Ventoy2Disk historically; others may sit beside the exe.
+        if (wcsncmp(name, L"cli_", 4) == 0) {
+            continue;
+        }
+        MigrateLegacyLogFile(exeDir, logsDir, archiveDir, name);
+    }
+    PullVentoyCliLogIntoLogs(exeDir, logsDir, archiveDir);
+    RotateSessionLogsIntoArchive(logsDir, archiveDir);
+    PruneLogSessionArchives(archiveDir);
 }
 
 std::wstring GetMedicatTempRoot() {

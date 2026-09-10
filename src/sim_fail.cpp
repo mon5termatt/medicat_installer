@@ -135,4 +135,39 @@ std::optional<SimulatedInstallFailure> MakeSimulatedInstallFailure(const Simulat
     }
 }
 
+DebugSafetyFlags& DebugSafety() {
+    static DebugSafetyFlags flags;
+    return flags;
+}
+
+const wchar_t* DebugSafetyFlagLabel(const int flagId) {
+    switch (static_cast<DebugSafetyMenuId>(flagId)) {
+        case DebugSafetyMenuId::SkipArchiveValidation:
+            return L"Skip archive MD5 validation";
+        case DebugSafetyMenuId::SkipDestructiveConfirms:
+            return L"Skip wipe / Ventoy confirms";
+        case DebugSafetyMenuId::SkipPresenceCheck:
+            return L"Skip MediCat presence check";
+        default:
+            return L"(unknown safety flag)";
+    }
+}
+
+bool ToggleDebugSafetyFlag(const int flagId) {
+    DebugSafetyFlags& flags = DebugSafety();
+    switch (static_cast<DebugSafetyMenuId>(flagId)) {
+        case DebugSafetyMenuId::SkipArchiveValidation:
+            flags.skipArchiveValidation = !flags.skipArchiveValidation;
+            return flags.skipArchiveValidation;
+        case DebugSafetyMenuId::SkipDestructiveConfirms:
+            flags.skipDestructiveConfirms = !flags.skipDestructiveConfirms;
+            return flags.skipDestructiveConfirms;
+        case DebugSafetyMenuId::SkipPresenceCheck:
+            flags.skipPresenceCheck = !flags.skipPresenceCheck;
+            return flags.skipPresenceCheck;
+        default:
+            return false;
+    }
+}
+
 }  // namespace medicat

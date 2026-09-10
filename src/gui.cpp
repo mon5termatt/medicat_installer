@@ -15,10 +15,12 @@
 #include <commctrl.h>
 #include <commdlg.h>
 #include <dbt.h>
+#include <shellapi.h>
 #include <uxtheme.h>
 #include <windowsx.h>
 
 #include <algorithm>
+#include <cstring>
 #include <memory>
 #include <sstream>
 #include <thread>
@@ -71,8 +73,6 @@ constexpr int kDiscordFooterBtnWidth = kCreditsBtnHeight;
 constexpr int kDiscordFooterIconSize = kCreditsBtnHeight;
 constexpr int kActionRowGap = 12;
 constexpr int kStatusBarHeight = 20;
-constexpr int kBetaNoticeMinHeight = 20;
-constexpr int kBetaNoticeGap = 4;
 constexpr int kCheckboxRowHeight = kCheckboxHeight + 8;
 constexpr int kProgressRowHeight = std::max(kProgressHeight, kOpenLogBtnHeight);
 constexpr int kBottomChrome = 28;
@@ -96,15 +96,12 @@ struct MainContentLayout {
     int progressY = 0;
     int openLogY = 0;
     int statusBarY = 0;
-    int betaNoticeY = 0;
-    int betaNoticeHeight = kBetaNoticeMinHeight;
     int manualInstallY = 0;
     int creditsBtnY = 0;
     int requiredClientHeight = 0;
 };
 
-MainContentLayout ComputeMainContentLayout(const bool expanded, const bool archiveMissing,
-                                           const int betaNoticeHeight = kBetaNoticeMinHeight) {
+MainContentLayout ComputeMainContentLayout(const bool expanded, const bool archiveMissing) {
     MainContentLayout layout{};
     layout.contentTop = archiveMissing ? (kContentTop + kArchivePanelHeight) : kContentTop;
     layout.driveComboY = layout.contentTop + 22;
@@ -122,9 +119,7 @@ MainContentLayout ComputeMainContentLayout(const bool expanded, const bool archi
     layout.progressY = layout.installY + kInstallBtnHeight + kActionRowGap;
     layout.openLogY = layout.progressY + (kProgressHeight - kOpenLogBtnHeight) / 2;
     layout.statusBarY = layout.progressY + kProgressRowHeight + 8;
-    layout.betaNoticeY = layout.statusBarY + kStatusBarHeight + kBetaNoticeGap;
-    layout.betaNoticeHeight = betaNoticeHeight;
-    layout.manualInstallY = layout.betaNoticeY + betaNoticeHeight + kManualInstallGap;
+    layout.manualInstallY = layout.statusBarY + kStatusBarHeight + kManualInstallGap;
     layout.creditsBtnY = layout.manualInstallY + kManualInstallBtnHeight + kCreditsBtnGap;
     layout.requiredClientHeight = layout.creditsBtnY + kCreditsBtnHeight + kBottomChrome;
     return layout;
@@ -196,7 +191,19 @@ constexpr int kAdvancedCheckId = 1007;
 constexpr int kPinVentoyCheckId = 1008;
 constexpr int kVentoyVersionEditId = 1009;
 constexpr int kOpenLogBtnId = 1010;
-constexpr int kFileLogListId = 1011;
+constexpr int kFileLogViewId = 1011;
+constexpr int kFileLogTabExtractBtnId = 1016;
+constexpr int kFileLogTabVerifyBtnId = 1017;
+constexpr int kFileLogTabInstallerBtnId = 1018;
+constexpr int kFileLogCopyBtnId = 1032;
+constexpr int kFileLogRefreshBtnId = 1033;
+constexpr int kFileLogOpenFolderBtnId = 1034;
+constexpr int kFileLogToolbarHeight = 36;
+constexpr uint64_t kFileLogInitialTailBytes = 512ull * 1024ull;
+constexpr uint64_t kFileLogOlderChunkBytes = 256ull * 1024ull;
+constexpr int kFileLogMaxEditChars = 900000;
+constexpr size_t kMaxLiveFileLogLines = 2500;
+constexpr UINT_PTR kFileLogEditSubclassId = 1;
 constexpr int kStatusBarId = 1012;
 constexpr int kVentoySecureBootCheckId = 1013;
 constexpr int kVentoyGptCheckId = 1014;
@@ -215,6 +222,9 @@ constexpr int kDiscordFooterBtnId = 1027;
 constexpr int kLogoStaticId = 1028;
 constexpr int kDebugMenuBase = 4000;
 constexpr int kDebugMenuLast = kDebugMenuBase + static_cast<int>(SimulatedFailure::VerificationFailed);
+constexpr int kDebugSafetyBase = 4100;
+constexpr int kDebugSafetyLast =
+    kDebugSafetyBase + static_cast<int>(DebugSafetyMenuId::SkipPresenceCheck);
 constexpr int kCreditsIntroId = 1130;
 constexpr int kCreditsSevenZipBtnId = 1131;
 constexpr int kCreditsVentoyBtnId = 1132;
@@ -996,6 +1006,18 @@ void SubclassGlowButton(HWND hwnd, const bool primary) {
     SetPropW(hwnd, L"MedicatGlowBtn", state);
 }
 
+void SetGlowButtonPrimary(const HWND hwnd, const bool primary) {
+    auto* state = reinterpret_cast<GlowButtonState*>(GetPropW(hwnd, L"MedicatGlowBtn"));
+    if (!state) {
+        return;
+    }
+    if (state->primary == primary) {
+        return;
+    }
+    state->primary = primary;
+    InvalidateRect(hwnd, nullptr, FALSE);
+}
+
 void SubclassGlowIconButton(HWND hwnd, HICON icon, const bool fullBleed = false) {
     SetWindowTheme(hwnd, L"", L"");
     SendMessageW(hwnd, BM_SETSTYLE, BS_PUSHBUTTON, TRUE);
@@ -1127,7 +1149,7 @@ bool Gui::Create(HINSTANCE instance) {
 
     INITCOMMONCONTROLSEX icc{};
     icc.dwSize = sizeof(icc);
-    icc.dwICC = ICC_PROGRESS_CLASS | ICC_STANDARD_CLASSES;
+    icc.dwICC = ICC_PROGRESS_CLASS | ICC_STANDARD_CLASSES | ICC_TAB_CLASSES;
     InitCommonControlsEx(&icc);
 
     const HICON appIcon = LoadAppWindowIcon(instance);
@@ -1399,6 +1421,9 @@ void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
         EnableWindow(ventoyVersionCombo_, FALSE);
         UpdateVerifyFilesButton();
         if (progressMode == BusyProgressMode::FileLog || progressMode == BusyProgressMode::Verify) {
+            SelectFileLogTab(TabFromBusyMode());
+            OpenFileLogWindow();
+            RefreshFileLogWindowTitle();
             SetTimer(hwnd_, kUiRefreshTimerId, kUiRefreshIntervalMs, nullptr);
         }
     } else {
@@ -1407,6 +1432,12 @@ void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
             FlushInstallUi();
         }
         busyProgressMode_ = BusyProgressMode::None;
+        if (fileLogWindow_ && IsWindow(fileLogWindow_)) {
+            SelectFileLogTab(FileLogTab::Installer);
+        } else {
+            fileLogActiveTab_ = FileLogTab::Installer;
+            RefreshFileLogWindowTitle();
+        }
         UpdateVerifyFilesButton();
         if (pendingDriveRefresh_) {
             pendingDriveRefresh_ = false;
@@ -1417,21 +1448,69 @@ void Gui::SetBusy(const bool busy, const BusyProgressMode progressMode) {
     }
 }
 
+FileLogTab Gui::TabFromBusyMode() const {
+    switch (busyProgressMode_) {
+        case BusyProgressMode::Verify:
+            return FileLogTab::Verify;
+        case BusyProgressMode::FileLog:
+            return FileLogTab::Extract;
+        default:
+            return FileLogTab::Installer;
+    }
+}
+
+std::vector<std::wstring>& Gui::ActiveFileLogLines() {
+    switch (fileLogActiveTab_) {
+        case FileLogTab::Verify:
+            return fileLogLinesVerify_;
+        case FileLogTab::Installer:
+            return fileLogLinesInstaller_;
+        case FileLogTab::Extract:
+        default:
+            return fileLogLinesExtract_;
+    }
+}
+
+const std::vector<std::wstring>& Gui::ActiveFileLogLines() const {
+    switch (fileLogActiveTab_) {
+        case FileLogTab::Verify:
+            return fileLogLinesVerify_;
+        case FileLogTab::Installer:
+            return fileLogLinesInstaller_;
+        case FileLogTab::Extract:
+        default:
+            return fileLogLinesExtract_;
+    }
+}
+
 void Gui::NotifyExtractProgress(const int percent, const std::wstring& file, const bool resetLog) {
     std::lock_guard lock(uiMutex_);
+    std::vector<std::wstring>& lines =
+        (busyProgressMode_ == BusyProgressMode::Verify) ? fileLogLinesVerify_ : fileLogLinesExtract_;
     if (resetLog) {
-        fileLogLines_.clear();
+        lines.clear();
         pendingFileLines_.clear();
-        fileLogDisplayLines_.clear();
+        if (busyProgressMode_ == BusyProgressMode::Verify) {
+            fileLogSeqVerify_ = 0;
+        } else {
+            fileLogSeqExtract_ = 0;
+        }
         pendingPercent_ = 0;
         pendingResetLog_ = true;
         return;
     }
 
     pendingPercent_ = percent;
-    if (!file.empty() && (fileLogLines_.empty() || fileLogLines_.back() != file)) {
-        fileLogLines_.push_back(file);
+    if (!file.empty() && (lines.empty() || lines.back() != file)) {
+        size_t& seq =
+            (busyProgressMode_ == BusyProgressMode::Verify) ? fileLogSeqVerify_ : fileLogSeqExtract_;
+        ++seq;
+        lines.push_back(file);
         pendingFileLines_.push_back(file);
+        if (lines.size() > kMaxLiveFileLogLines) {
+            lines.erase(lines.begin(),
+                        lines.begin() + static_cast<std::ptrdiff_t>(lines.size() - kMaxLiveFileLogLines));
+        }
     }
 }
 
@@ -1440,6 +1519,7 @@ void Gui::FlushInstallUi() {
     bool reset = false;
     std::vector<std::wstring> newFiles;
     size_t startIndex = 0;
+    const bool verifyMode = busyProgressMode_ == BusyProgressMode::Verify;
 
     {
         std::lock_guard lock(uiMutex_);
@@ -1448,13 +1528,21 @@ void Gui::FlushInstallUi() {
         pendingResetLog_ = false;
         newFiles.swap(pendingFileLines_);
         if (!newFiles.empty()) {
-            startIndex = fileLogLines_.size() - newFiles.size() + 1;
+            const size_t seq = verifyMode ? fileLogSeqVerify_ : fileLogSeqExtract_;
+            startIndex = seq - newFiles.size() + 1;
         }
     }
 
     if (reset) {
-        ClearFileLog();
+        // Clear only the active operation's view; buffers already cleared in Notify.
+        if (fileLogView_) {
+            fileLogDiskPath_.clear();
+            fileLogDiskByteStart_ = 0;
+            fileLogDiskFileSize_ = 0;
+            SetFileLogViewText(L"", false);
+        }
         ClearStatusBar();
+        RefreshFileLogWindowTitle();
     }
 
     progressPercentValue_ = percent;
@@ -1462,11 +1550,17 @@ void Gui::FlushInstallUi() {
     InvalidateRect(progressBar_, nullptr, FALSE);
 
     if (!newFiles.empty()) {
-        SetStatusBar(i18n::Tr(L"status.extracting_file", std::to_wstring(percent),
-                              ShortDisplayPath(newFiles.back())));
-        if (fileLogList_) {
+        const wchar_t* statusKey = verifyMode ? L"status.verifying_file" : L"status.extracting_file";
+        SetStatusBar(i18n::Tr(statusKey, std::to_wstring(percent), ShortDisplayPath(newFiles.back())));
+        // Ensure the matching tab is visible while streaming.
+        const FileLogTab want = verifyMode ? FileLogTab::Verify : FileLogTab::Extract;
+        if (fileLogActiveTab_ != want) {
+            // SelectFileLogTab rebuilds the view from the buffer (already includes newFiles).
+            SelectFileLogTab(want);
+        } else if (fileLogView_) {
             BatchAppendDetailLog(newFiles, startIndex);
         }
+        RefreshFileLogWindowTitle();
     }
 }
 
@@ -1616,11 +1710,17 @@ void Gui::ClearStatusBar() {
 void Gui::ClearFileLog() {
     {
         std::lock_guard lock(uiMutex_);
-        fileLogLines_.clear();
-        fileLogDisplayLines_.clear();
+        fileLogLinesExtract_.clear();
+        fileLogLinesVerify_.clear();
+        pendingFileLines_.clear();
+        fileLogSeqExtract_ = 0;
+        fileLogSeqVerify_ = 0;
     }
-    if (fileLogList_) {
-        SendMessageW(fileLogList_, LB_RESETCONTENT, 0, 0);
+    if (fileLogView_ && (fileLogActiveTab_ == FileLogTab::Extract || fileLogActiveTab_ == FileLogTab::Verify)) {
+        fileLogDiskPath_.clear();
+        fileLogDiskByteStart_ = 0;
+        fileLogDiskFileSize_ = 0;
+        SetFileLogViewText(L"", false);
     }
 }
 
@@ -1630,55 +1730,628 @@ std::wstring Gui::FormatLogLine(const size_t index, const std::wstring& path) co
     return std::wstring(prefix) + path;
 }
 
-void Gui::BatchAppendDetailLog(const std::vector<std::wstring>& files, const size_t startIndex) {
-    if (!fileLogList_ || files.empty()) {
+bool Gui::FileLogPinnedToBottom() const {
+    if (!fileLogView_ || !IsWindow(fileLogView_)) {
+        return true;
+    }
+    SCROLLINFO si{};
+    si.cbSize = sizeof(si);
+    si.fMask = SIF_POS | SIF_RANGE | SIF_PAGE;
+    if (!GetScrollInfo(fileLogView_, SB_VERT, &si)) {
+        return true;
+    }
+    const int maxPos = si.nMax - static_cast<int>(si.nPage) + 1;
+    if (maxPos <= 0) {
+        return true;
+    }
+    return si.nPos >= maxPos - 2;
+}
+
+void Gui::SetFileLogViewText(const std::wstring& text, const bool scrollToEnd) {
+    if (!fileLogView_ || !IsWindow(fileLogView_)) {
         return;
     }
-
-    for (size_t i = 0; i < files.size(); ++i) {
-        fileLogDisplayLines_.push_back(FormatLogLine(startIndex + i, files[i]));
-        SendMessageW(fileLogList_, LB_ADDSTRING, 0,
-                     reinterpret_cast<LPARAM>(fileLogDisplayLines_.back().c_str()));
-    }
-
-    const int count = static_cast<int>(SendMessageW(fileLogList_, LB_GETCOUNT, 0, 0));
-    if (count > 0) {
-        SendMessageW(fileLogList_, LB_SETTOPINDEX, count - 1, 0);
+    SetWindowTextW(fileLogView_, text.c_str());
+    if (scrollToEnd) {
+        const int len = GetWindowTextLengthW(fileLogView_);
+        SendMessageW(fileLogView_, EM_SETSEL, len, len);
+        SendMessageW(fileLogView_, EM_SCROLLCARET, 0, 0);
+    } else {
+        SendMessageW(fileLogView_, EM_SETSEL, 0, 0);
+        SendMessageW(fileLogView_, EM_SCROLLCARET, 0, 0);
     }
 }
 
-void Gui::SyncDetailLog() {
-    if (!fileLogList_) {
+void Gui::AppendFileLogViewText(const std::wstring& text, const bool follow) {
+    if (!fileLogView_ || !IsWindow(fileLogView_) || text.empty()) {
+        return;
+    }
+    const LONG_PTR style = GetWindowLongPtrW(fileLogView_, GWL_STYLE);
+    SetWindowLongPtrW(fileLogView_, GWL_STYLE, style & ~ES_READONLY);
+    const int len = GetWindowTextLengthW(fileLogView_);
+    SendMessageW(fileLogView_, EM_SETSEL, len, len);
+    SendMessageW(fileLogView_, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(text.c_str()));
+    SetWindowLongPtrW(fileLogView_, GWL_STYLE, style);
+    if (follow) {
+        const int end = GetWindowTextLengthW(fileLogView_);
+        SendMessageW(fileLogView_, EM_SETSEL, end, end);
+        SendMessageW(fileLogView_, EM_SCROLLCARET, 0, 0);
+    }
+    TrimFileLogViewIfHuge();
+}
+
+void Gui::TrimFileLogViewIfHuge() {
+    if (!fileLogView_ || !IsWindow(fileLogView_)) {
+        return;
+    }
+    const int len = GetWindowTextLengthW(fileLogView_);
+    if (len <= kFileLogMaxEditChars) {
+        return;
+    }
+    const int keep = (kFileLogMaxEditChars * 2) / 3;
+    const int dropTarget = len - keep;
+    std::wstring text(static_cast<size_t>(len) + 1, L'\0');
+    const int got = GetWindowTextW(fileLogView_, text.data(), len + 1);
+    if (got <= 0) {
+        return;
+    }
+    text.resize(static_cast<size_t>(got));
+    size_t cut = static_cast<size_t>(dropTarget);
+    const size_t nl = text.find(L'\n', cut);
+    if (nl != std::wstring::npos && nl + 1 < text.size()) {
+        cut = nl + 1;
+    }
+    SetFileLogViewText(L"[... earlier lines trimmed ...]\r\n" + text.substr(cut), true);
+    // Live stream trim invalidates any disk-backed scroll-up window.
+    fileLogDiskPath_.clear();
+    fileLogDiskByteStart_ = 0;
+    fileLogDiskFileSize_ = 0;
+}
+
+void Gui::BatchAppendDetailLog(const std::vector<std::wstring>& files, const size_t startIndex) {
+    if (!fileLogView_ || files.empty()) {
         return;
     }
 
-    fileLogDisplayLines_.clear();
-    SendMessageW(fileLogList_, LB_RESETCONTENT, 0, 0);
-    for (size_t i = 0; i < fileLogLines_.size(); ++i) {
-        fileLogDisplayLines_.push_back(FormatLogLine(i + 1, fileLogLines_[i]));
-        SendMessageW(fileLogList_, LB_ADDSTRING, 0,
-                     reinterpret_cast<LPARAM>(fileLogDisplayLines_.back().c_str()));
+    const bool follow = FileLogPinnedToBottom();
+    std::wstring chunk;
+    chunk.reserve(files.size() * 80);
+    for (size_t i = 0; i < files.size(); ++i) {
+        chunk += FormatLogLine(startIndex + i, files[i]);
+        chunk += L"\r\n";
+    }
+    AppendFileLogViewText(chunk, follow);
+}
+
+void Gui::SyncDetailLog() {
+    if (!fileLogView_) {
+        return;
     }
 
-    const int count = static_cast<int>(SendMessageW(fileLogList_, LB_GETCOUNT, 0, 0));
-    if (count > 0) {
-        SendMessageW(fileLogList_, LB_SETTOPINDEX, count - 1, 0);
+    fileLogDiskPath_.clear();
+    fileLogDiskByteStart_ = 0;
+    fileLogDiskFileSize_ = 0;
+
+    std::wstring text;
+    {
+        std::lock_guard lock(uiMutex_);
+        const std::vector<std::wstring>& lines = ActiveFileLogLines();
+        const bool numbered =
+            fileLogActiveTab_ == FileLogTab::Extract || fileLogActiveTab_ == FileLogTab::Verify;
+        const size_t seq =
+            fileLogActiveTab_ == FileLogTab::Verify ? fileLogSeqVerify_ : fileLogSeqExtract_;
+        size_t start = 0;
+        if (lines.size() > kMaxLiveFileLogLines) {
+            start = lines.size() - kMaxLiveFileLogLines;
+            text = L"[... earlier lines omitted ...]\r\n";
+        }
+        const size_t firstIndex = numbered ? (seq >= lines.size() ? seq - lines.size() + 1 : 1) : 1;
+        for (size_t i = start; i < lines.size(); ++i) {
+            if (numbered) {
+                text += FormatLogLine(firstIndex + i, lines[i]);
+            } else {
+                text += lines[i];
+            }
+            text += L"\r\n";
+        }
+    }
+    SetFileLogViewText(text, true);
+}
+
+std::wstring Gui::FileLogPathForTab(const FileLogTab tab) const {
+    switch (tab) {
+        case FileLogTab::Verify:
+            return GetLogFilePath(L"check.log");
+        case FileLogTab::Installer:
+            return GetLogFilePath(L"medicat_installer.log");
+        case FileLogTab::Extract:
+        default:
+            return GetLogFilePath(L"extract.log");
+    }
+}
+
+namespace {
+
+FILETIME CurrentProcessStartTime() {
+    FILETIME creation{};
+    FILETIME exitTime{};
+    FILETIME kernel{};
+    FILETIME user{};
+    if (!GetProcessTimes(GetCurrentProcess(), &creation, &exitTime, &kernel, &user)) {
+        GetSystemTimeAsFileTime(&creation);
+    }
+    return creation;
+}
+
+bool FileWrittenDuringThisProcess(const std::wstring& path) {
+    WIN32_FILE_ATTRIBUTE_DATA data{};
+    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &data)) {
+        return false;
+    }
+    const FILETIME start = CurrentProcessStartTime();
+    return CompareFileTime(&data.ftLastWriteTime, &start) >= 0;
+}
+
+struct LogFileByteChunk {
+    std::wstring text;
+    uint64_t byteStart = 0;
+    uint64_t fileSize = 0;
+    bool hasMoreBefore = false;
+};
+
+std::wstring Utf8BufferToWide(const char* data, size_t size) {
+    if (!data || size == 0) {
+        return {};
+    }
+    return Utf8ToWide(std::string(data, size));
+}
+
+LogFileByteChunk ReadLogFileByteRange(const std::wstring& path, uint64_t start, uint64_t endExclusive) {
+    LogFileByteChunk out;
+    if (endExclusive <= start || !FileExists(path)) {
+        return out;
+    }
+
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        return out;
+    }
+
+    LARGE_INTEGER sizeLi{};
+    if (!GetFileSizeEx(file, &sizeLi) || sizeLi.QuadPart <= 0) {
+        CloseHandle(file);
+        return out;
+    }
+    out.fileSize = static_cast<uint64_t>(sizeLi.QuadPart);
+    if (start >= out.fileSize) {
+        CloseHandle(file);
+        return out;
+    }
+    if (endExclusive > out.fileSize) {
+        endExclusive = out.fileSize;
+    }
+
+    LARGE_INTEGER seek{};
+    seek.QuadPart = static_cast<LONGLONG>(start);
+    if (!SetFilePointerEx(file, seek, nullptr, FILE_BEGIN)) {
+        CloseHandle(file);
+        return out;
+    }
+
+    const size_t want = static_cast<size_t>(endExclusive - start);
+    std::string bytes(want, '\0');
+    DWORD read = 0;
+    if (!ReadFile(file, bytes.data(), static_cast<DWORD>(want), &read, nullptr) || read == 0) {
+        CloseHandle(file);
+        return out;
+    }
+    CloseHandle(file);
+    bytes.resize(read);
+
+    size_t contentStart = 0;
+    uint64_t byteStart = start;
+    if (start == 0 && bytes.size() >= 3 &&
+        static_cast<unsigned char>(bytes[0]) == 0xEF &&
+        static_cast<unsigned char>(bytes[1]) == 0xBB &&
+        static_cast<unsigned char>(bytes[2]) == 0xBF) {
+        contentStart = 3;
+        byteStart = 3;
+    } else if (start > 0) {
+        const size_t nl = bytes.find('\n');
+        if (nl != std::string::npos && nl + 1 < bytes.size()) {
+            contentStart = nl + 1;
+            byteStart = start + static_cast<uint64_t>(contentStart);
+        }
+    }
+
+    out.byteStart = byteStart;
+    out.hasMoreBefore = byteStart > 0;
+    std::string utf8 = bytes.substr(contentStart);
+    // Normalize newlines for EDIT control.
+    std::wstring wide = Utf8BufferToWide(utf8.data(), utf8.size());
+    std::wstring normalized;
+    normalized.reserve(wide.size() + wide.size() / 16);
+    for (size_t i = 0; i < wide.size(); ++i) {
+        if (wide[i] == L'\r') {
+            continue;
+        }
+        if (wide[i] == L'\n') {
+            normalized += L"\r\n";
+        } else {
+            normalized.push_back(wide[i]);
+        }
+    }
+    out.text = std::move(normalized);
+    return out;
+}
+
+LogFileByteChunk ReadLogFileTail(const std::wstring& path, const uint64_t maxBytes) {
+    LogFileByteChunk empty;
+    if (!FileExists(path)) {
+        return empty;
+    }
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        return empty;
+    }
+    LARGE_INTEGER sizeLi{};
+    if (!GetFileSizeEx(file, &sizeLi)) {
+        CloseHandle(file);
+        return empty;
+    }
+    CloseHandle(file);
+    const uint64_t fileSize = sizeLi.QuadPart > 0 ? static_cast<uint64_t>(sizeLi.QuadPart) : 0;
+    const uint64_t start = fileSize > maxBytes ? fileSize - maxBytes : 0;
+    return ReadLogFileByteRange(path, start, fileSize);
+}
+
+}  // namespace
+
+void Gui::LoadFileLogTabFromDisk(const FileLogTab tab) {
+    std::wstring path = FileLogPathForTab(tab);
+    bool usePath = false;
+    if (tab == FileLogTab::Installer) {
+        usePath = FileExists(path);
+    } else if (FileWrittenDuringThisProcess(path)) {
+        usePath = true;
+    } else if (tab == FileLogTab::Extract) {
+        const std::wstring reextract = GetLogFilePath(L"reextract.log");
+        if (FileWrittenDuringThisProcess(reextract)) {
+            path = reextract;
+            usePath = true;
+        }
+    }
+
+    if (!usePath) {
+        fileLogDiskPath_.clear();
+        fileLogDiskByteStart_ = 0;
+        fileLogDiskFileSize_ = 0;
+        {
+            std::lock_guard lock(uiMutex_);
+            switch (tab) {
+                case FileLogTab::Verify:
+                    fileLogLinesVerify_.clear();
+                    break;
+                case FileLogTab::Installer:
+                    fileLogLinesInstaller_.clear();
+                    break;
+                case FileLogTab::Extract:
+                default:
+                    fileLogLinesExtract_.clear();
+                    break;
+            }
+        }
+        SetFileLogViewText(L"", false);
+        return;
+    }
+
+    const LogFileByteChunk chunk = ReadLogFileTail(path, kFileLogInitialTailBytes);
+    fileLogDiskPath_ = path;
+    fileLogDiskByteStart_ = chunk.byteStart;
+    fileLogDiskFileSize_ = chunk.fileSize;
+
+    std::wstring text;
+    if (chunk.hasMoreBefore) {
+        text = L"[... earlier log omitted; scroll up to load more ...]\r\n";
+    }
+    text += chunk.text;
+    SetFileLogViewText(text, true);
+
+    // Disk view is authoritative; keep live buffers empty for this tab.
+    {
+        std::lock_guard lock(uiMutex_);
+        switch (tab) {
+            case FileLogTab::Verify:
+                fileLogLinesVerify_.clear();
+                break;
+            case FileLogTab::Installer:
+                fileLogLinesInstaller_.clear();
+                break;
+            case FileLogTab::Extract:
+            default:
+                fileLogLinesExtract_.clear();
+                break;
+        }
+    }
+}
+
+bool Gui::TryLoadOlderFileLogChunk() {
+    if (fileLogLoadingOlder_ || !fileLogView_ || !IsWindow(fileLogView_)) {
+        return false;
+    }
+    if (fileLogDiskPath_.empty() || fileLogDiskByteStart_ == 0) {
+        return false;
+    }
+
+    SCROLLINFO si{};
+    si.cbSize = sizeof(si);
+    si.fMask = SIF_POS | SIF_RANGE | SIF_PAGE;
+    if (GetScrollInfo(fileLogView_, SB_VERT, &si) && si.nPos > 3) {
+        return false;
+    }
+
+    fileLogLoadingOlder_ = true;
+    const uint64_t endExclusive = fileLogDiskByteStart_;
+    const uint64_t start =
+        endExclusive > kFileLogOlderChunkBytes ? endExclusive - kFileLogOlderChunkBytes : 0;
+    const LogFileByteChunk older = ReadLogFileByteRange(fileLogDiskPath_, start, endExclusive);
+    if (older.text.empty()) {
+        // Skip an unalignable window so scroll-up can keep walking backward.
+        fileLogDiskByteStart_ = start;
+        fileLogLoadingOlder_ = false;
+        return false;
+    }
+
+    const int firstLine = static_cast<int>(SendMessageW(fileLogView_, EM_GETFIRSTVISIBLELINE, 0, 0));
+    const int firstChar = static_cast<int>(SendMessageW(fileLogView_, EM_LINEINDEX, firstLine, 0));
+    const int curLen = GetWindowTextLengthW(fileLogView_);
+    std::wstring current(static_cast<size_t>(curLen) + 1, L'\0');
+    const int got = GetWindowTextW(fileLogView_, current.data(), curLen + 1);
+    if (got < 0) {
+        fileLogLoadingOlder_ = false;
+        return false;
+    }
+    current.resize(static_cast<size_t>(got));
+
+    // Drop the "scroll up" banner if present; we'll re-add if still truncated.
+    constexpr wchar_t kBanner[] = L"[... earlier log omitted; scroll up to load more ...]\r\n";
+    if (current.rfind(kBanner, 0) == 0) {
+        current.erase(0, wcslen(kBanner));
+    }
+
+    std::wstring combined;
+    if (older.hasMoreBefore || older.byteStart > 0) {
+        combined = kBanner;
+    }
+    combined += older.text;
+    if (!older.text.empty() && older.text.back() != L'\n' && !current.empty()) {
+        combined += L"\r\n";
+    }
+    const size_t inserted = combined.size();
+    combined += current;
+
+    fileLogDiskByteStart_ = older.byteStart;
+    SetWindowTextW(fileLogView_, combined.c_str());
+
+    const int restoreChar = static_cast<int>(inserted) + (firstChar > 0 ? firstChar : 0);
+    const int restoreLine =
+        static_cast<int>(SendMessageW(fileLogView_, EM_LINEFROMCHAR, restoreChar, 0));
+    const int nowFirst = static_cast<int>(SendMessageW(fileLogView_, EM_GETFIRSTVISIBLELINE, 0, 0));
+    SendMessageW(fileLogView_, EM_LINESCROLL, 0, restoreLine - nowFirst);
+
+    fileLogLoadingOlder_ = false;
+    return true;
+}
+
+LRESULT CALLBACK Gui::FileLogEditSubclassProc(const HWND hwnd, const UINT msg, const WPARAM wp,
+                                              const LPARAM lp, const UINT_PTR /*id*/,
+                                              const DWORD_PTR data) {
+    Gui* self = reinterpret_cast<Gui*>(data);
+    const LRESULT result = DefSubclassProc(hwnd, msg, wp, lp);
+    if (!self) {
+        return result;
+    }
+    switch (msg) {
+        case WM_VSCROLL:
+        case WM_MOUSEWHEEL:
+        case WM_KEYUP:
+            self->TryLoadOlderFileLogChunk();
+            break;
+        default:
+            break;
+    }
+    return result;
+}
+
+void Gui::RefreshFileLogFromDisk(const bool forceReload) {
+    if (!forceReload) {
+        if (busyProgressMode_ == BusyProgressMode::FileLog && fileLogActiveTab_ == FileLogTab::Extract) {
+            SyncDetailLog();
+            return;
+        }
+        if (busyProgressMode_ == BusyProgressMode::Verify && fileLogActiveTab_ == FileLogTab::Verify) {
+            SyncDetailLog();
+            return;
+        }
+    }
+    LoadFileLogTabFromDisk(fileLogActiveTab_);
+    RefreshFileLogWindowTitle();
+}
+
+void Gui::CopyActiveFileLogToClipboard() {
+    std::wstring text;
+    if (fileLogView_ && IsWindow(fileLogView_)) {
+        const int len = GetWindowTextLengthW(fileLogView_);
+        if (len > 0) {
+            text.resize(static_cast<size_t>(len) + 1, L'\0');
+            const int got = GetWindowTextW(fileLogView_, text.data(), len + 1);
+            if (got > 0) {
+                text.resize(static_cast<size_t>(got));
+            } else {
+                text.clear();
+            }
+        }
+    }
+    if (text.empty()) {
+        std::lock_guard lock(uiMutex_);
+        const std::vector<std::wstring>& lines = ActiveFileLogLines();
+        for (const std::wstring& line : lines) {
+            text += line;
+            text += L"\r\n";
+        }
+    }
+    if (!OpenClipboard(fileLogWindow_ ? fileLogWindow_ : hwnd_)) {
+        return;
+    }
+    EmptyClipboard();
+    const size_t bytes = (text.size() + 1) * sizeof(wchar_t);
+    HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, bytes);
+    if (mem) {
+        void* ptr = GlobalLock(mem);
+        if (ptr) {
+            memcpy(ptr, text.c_str(), bytes);
+            GlobalUnlock(mem);
+            SetClipboardData(CF_UNICODETEXT, mem);
+        } else {
+            GlobalFree(mem);
+        }
+    }
+    CloseClipboard();
+}
+
+void Gui::OpenFileLogFolder() {
+    const std::wstring logsDir = GetLogsDirectory();
+    CreateDirectoryW(logsDir.c_str(), nullptr);
+    const std::wstring path = FileLogPathForTab(fileLogActiveTab_);
+    if (FileExists(path)) {
+        const std::wstring args = L"/select,\"" + path + L"\"";
+        ShellExecuteW(nullptr, L"open", L"explorer.exe", args.c_str(), nullptr, SW_SHOWNORMAL);
+    } else {
+        ShellExecuteW(nullptr, L"open", logsDir.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    }
+}
+
+void Gui::UpdateFileLogTabLabels() {
+    auto setText = [](HWND btn, const wchar_t* key) {
+        if (btn && IsWindow(btn)) {
+            SetWindowTextW(btn, i18n::Tr(key).c_str());
+            InvalidateRect(btn, nullptr, FALSE);
+        }
+    };
+    setText(fileLogTabExtractBtn_, L"ui.file_log_tab_extract");
+    setText(fileLogTabVerifyBtn_, L"ui.file_log_tab_verify");
+    setText(fileLogTabInstallerBtn_, L"ui.file_log_tab_installer");
+    setText(fileLogCopyBtn_, L"ui.file_log_copy_button");
+    setText(fileLogRefreshBtn_, L"ui.file_log_refresh_button");
+    setText(fileLogOpenFolderBtn_, L"ui.file_log_open_folder_button");
+}
+
+void Gui::UpdateFileLogTabButtonStyles() {
+    SetGlowButtonPrimary(fileLogTabExtractBtn_, fileLogActiveTab_ == FileLogTab::Extract);
+    SetGlowButtonPrimary(fileLogTabVerifyBtn_, fileLogActiveTab_ == FileLogTab::Verify);
+    SetGlowButtonPrimary(fileLogTabInstallerBtn_, fileLogActiveTab_ == FileLogTab::Installer);
+}
+
+void Gui::RefreshFileLogWindowTitle() {
+    if (!fileLogWindow_ || !IsWindow(fileLogWindow_)) {
+        return;
+    }
+    std::wstring title = i18n::Tr(L"ui.file_log_title");
+    switch (fileLogActiveTab_) {
+        case FileLogTab::Extract:
+            title += L"  ·  " + i18n::Tr(L"ui.file_log_tab_extract");
+            break;
+        case FileLogTab::Verify:
+            title += L"  ·  " + i18n::Tr(L"ui.file_log_tab_verify");
+            break;
+        case FileLogTab::Installer:
+            title += L"  ·  " + i18n::Tr(L"ui.file_log_tab_installer");
+            break;
+    }
+    if (busyProgressMode_ == BusyProgressMode::Verify && fileLogActiveTab_ == FileLogTab::Verify &&
+        progressPercentValue_ > 0) {
+        title += L"  (" + std::to_wstring(progressPercentValue_) + L"%)";
+    } else if (busyProgressMode_ == BusyProgressMode::FileLog && fileLogActiveTab_ == FileLogTab::Extract &&
+               progressPercentValue_ > 0) {
+        title += L"  (" + std::to_wstring(progressPercentValue_) + L"%)";
+    }
+    SetWindowTextW(fileLogWindow_, title.c_str());
+}
+
+void Gui::SelectFileLogTab(const FileLogTab tab) {
+    fileLogActiveTab_ = tab;
+    UpdateFileLogTabButtonStyles();
+    if (tab == FileLogTab::Installer ||
+        (tab == FileLogTab::Extract && busyProgressMode_ != BusyProgressMode::FileLog) ||
+        (tab == FileLogTab::Verify && busyProgressMode_ != BusyProgressMode::Verify)) {
+        RefreshFileLogFromDisk(true);
+    } else {
+        SyncDetailLog();
+        RefreshFileLogWindowTitle();
+    }
+}
+
+void Gui::OnFileLogTabChanged() {
+}
+
+void Gui::LayoutFileLogToolbar(const HWND hwnd) {
+    RECT rc{};
+    GetClientRect(hwnd, &rc);
+    constexpr int kPad = 8;
+    constexpr int kGap = 6;
+    constexpr int kTabW = 118;
+    constexpr int kActionW = 100;
+    constexpr int kBtnH = 28;
+    const int y = kPad;
+    int x = kPad;
+
+    auto place = [&](HWND btn, int width) {
+        if (btn && IsWindow(btn)) {
+            SetWindowPos(btn, nullptr, x, y, width, kBtnH, SWP_NOZORDER);
+            x += width + kGap;
+        }
+    };
+
+    place(fileLogTabInstallerBtn_, 88);
+    place(fileLogTabExtractBtn_, kTabW);
+    place(fileLogTabVerifyBtn_, kTabW);
+
+    int actionX = rc.right - kPad - kActionW;
+    if (fileLogOpenFolderBtn_ && IsWindow(fileLogOpenFolderBtn_)) {
+        SetWindowPos(fileLogOpenFolderBtn_, nullptr, actionX, y, kActionW, kBtnH, SWP_NOZORDER);
+        actionX -= kActionW + kGap;
+    }
+    if (fileLogRefreshBtn_ && IsWindow(fileLogRefreshBtn_)) {
+        SetWindowPos(fileLogRefreshBtn_, nullptr, actionX, y, kActionW, kBtnH, SWP_NOZORDER);
+        actionX -= kActionW + kGap;
+    }
+    if (fileLogCopyBtn_ && IsWindow(fileLogCopyBtn_)) {
+        SetWindowPos(fileLogCopyBtn_, nullptr, actionX, y, kActionW, kBtnH, SWP_NOZORDER);
     }
 }
 
 void Gui::ResizeFileLogWindow(const HWND hwnd) {
-    if (!fileLogList_) {
+    if (!fileLogView_) {
         return;
     }
+    LayoutFileLogToolbar(hwnd);
     RECT rc{};
     GetClientRect(hwnd, &rc);
-    SetWindowPos(fileLogList_, nullptr, 8, 8, rc.right - 16, rc.bottom - 16, SWP_NOZORDER);
+    constexpr int kPad = 8;
+    const int listTop = kPad + kFileLogToolbarHeight;
+    SetWindowPos(fileLogView_, nullptr, kPad, listTop, rc.right - (kPad * 2), rc.bottom - listTop - kPad, SWP_NOZORDER);
 }
 
 void Gui::OpenFileLogWindow() {
     if (fileLogWindow_ && IsWindow(fileLogWindow_)) {
         ShowWindow(fileLogWindow_, SW_SHOW);
         SetForegroundWindow(fileLogWindow_);
+        UpdateFileLogTabButtonStyles();
+        RefreshFileLogWindowTitle();
         return;
     }
 
@@ -1687,7 +2360,7 @@ void Gui::OpenFileLogWindow() {
 
     fileLogWindow_ = CreateWindowExW(
         0, kFileLogWindowClass, i18n::Tr(L"ui.file_log_title").c_str(),
-        WS_OVERLAPPEDWINDOW, mainRc.right + 12, mainRc.top, 720, 480, hwnd_, nullptr, instance_,
+        WS_OVERLAPPEDWINDOW, mainRc.right + 12, mainRc.top, 1040, 560, hwnd_, nullptr, instance_,
         this);
     if (!fileLogWindow_) {
         return;
@@ -1695,17 +2368,45 @@ void Gui::OpenFileLogWindow() {
 
     theme::EnableDarkModeRecursive(fileLogWindow_);
 
+    const HFONT uiFont = theme::MakeUiFont();
     const HFONT logFont = theme::MakeLogFont();
-    fileLogList_ = CreateWindowW(
-        L"LISTBOX", nullptr,
-        WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | WS_HSCROLL | LBS_NOINTEGRALHEIGHT,
-        8, 8, 680, 420, fileLogWindow_,
-        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFileLogListId)), instance_, nullptr);
-    SendMessageW(fileLogList_, WM_SETFONT, reinterpret_cast<WPARAM>(logFont), TRUE);
 
-    SyncDetailLog();
-    SendMessageW(fileLogList_, LB_SETHORIZONTALEXTENT, 8000, 0);
+    auto makeBtn = [&](const wchar_t* textKey, int id) -> HWND {
+        HWND btn = CreateWindowW(
+            L"BUTTON", i18n::Tr(textKey).c_str(),
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+            0, 0, 100, 28, fileLogWindow_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance_, nullptr);
+        SendMessageW(btn, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+        return btn;
+    };
+
+    fileLogTabExtractBtn_ = makeBtn(L"ui.file_log_tab_extract", kFileLogTabExtractBtnId);
+    fileLogTabVerifyBtn_ = makeBtn(L"ui.file_log_tab_verify", kFileLogTabVerifyBtnId);
+    fileLogTabInstallerBtn_ = makeBtn(L"ui.file_log_tab_installer", kFileLogTabInstallerBtnId);
+    fileLogCopyBtn_ = makeBtn(L"ui.file_log_copy_button", kFileLogCopyBtnId);
+    fileLogRefreshBtn_ = makeBtn(L"ui.file_log_refresh_button", kFileLogRefreshBtnId);
+    fileLogOpenFolderBtn_ = makeBtn(L"ui.file_log_open_folder_button", kFileLogOpenFolderBtnId);
+
+    SubclassGlowButton(fileLogTabExtractBtn_, fileLogActiveTab_ == FileLogTab::Extract);
+    SubclassGlowButton(fileLogTabVerifyBtn_, fileLogActiveTab_ == FileLogTab::Verify);
+    SubclassGlowButton(fileLogTabInstallerBtn_, fileLogActiveTab_ == FileLogTab::Installer);
+    SubclassGlowButton(fileLogCopyBtn_, false);
+    SubclassGlowButton(fileLogRefreshBtn_, false);
+    SubclassGlowButton(fileLogOpenFolderBtn_, false);
+
+    fileLogView_ = CreateWindowExW(
+        WS_EX_CLIENTEDGE, L"EDIT", nullptr,
+        WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL |
+            ES_AUTOHSCROLL | ES_NOHIDESEL,
+        8, 48, 780, 420, fileLogWindow_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kFileLogViewId)), instance_, nullptr);
+    SendMessageW(fileLogView_, WM_SETFONT, reinterpret_cast<WPARAM>(logFont), TRUE);
+    SendMessageW(fileLogView_, EM_SETLIMITTEXT, 0x7FFFFFFE, 0);
+    SetWindowSubclass(fileLogView_, FileLogEditSubclassProc, kFileLogEditSubclassId,
+                      reinterpret_cast<DWORD_PTR>(this));
+
     ResizeFileLogWindow(fileLogWindow_);
+    SelectFileLogTab(fileLogActiveTab_);
     ShowWindow(fileLogWindow_, SW_SHOW);
     UpdateWindow(fileLogWindow_);
 }
@@ -1728,6 +2429,34 @@ LRESULT CALLBACK Gui::FileLogWndProc(const HWND hwnd, const UINT msg, const WPAR
         case WM_SIZE:
             self->ResizeFileLogWindow(hwnd);
             return 0;
+        case WM_COMMAND: {
+            const int id = LOWORD(wp);
+            if (id == kFileLogTabExtractBtnId) {
+                self->SelectFileLogTab(FileLogTab::Extract);
+                return 0;
+            }
+            if (id == kFileLogTabVerifyBtnId) {
+                self->SelectFileLogTab(FileLogTab::Verify);
+                return 0;
+            }
+            if (id == kFileLogTabInstallerBtnId) {
+                self->SelectFileLogTab(FileLogTab::Installer);
+                return 0;
+            }
+            if (id == kFileLogCopyBtnId) {
+                self->CopyActiveFileLogToClipboard();
+                return 0;
+            }
+            if (id == kFileLogRefreshBtnId) {
+                self->RefreshFileLogFromDisk(true);
+                return 0;
+            }
+            if (id == kFileLogOpenFolderBtnId) {
+                self->OpenFileLogFolder();
+                return 0;
+            }
+            break;
+        }
         case WM_ERASEBKGND: {
             HDC hdc = reinterpret_cast<HDC>(wp);
             RECT rc{};
@@ -1736,19 +2465,32 @@ LRESULT CALLBACK Gui::FileLogWndProc(const HWND hwnd, const UINT msg, const WPAR
             return 1;
         }
         case WM_CTLCOLORLISTBOX:
+        case WM_CTLCOLOREDIT:
         case WM_CTLCOLORSTATIC: {
             HDC hdc = reinterpret_cast<HDC>(wp);
             SetBkMode(hdc, OPAQUE);
-            SetBkColor(hdc, theme::Colors().control);
             SetTextColor(hdc, theme::Colors().text);
+            SetBkColor(hdc, theme::Colors().control);
             return reinterpret_cast<LRESULT>(theme::GetBrushes().control);
         }
         case WM_CLOSE:
             DestroyWindow(hwnd);
             return 0;
         case WM_DESTROY:
+            if (self->fileLogView_ && IsWindow(self->fileLogView_)) {
+                RemoveWindowSubclass(self->fileLogView_, FileLogEditSubclassProc, kFileLogEditSubclassId);
+            }
             self->fileLogWindow_ = nullptr;
-            self->fileLogList_ = nullptr;
+            self->fileLogTabExtractBtn_ = nullptr;
+            self->fileLogTabVerifyBtn_ = nullptr;
+            self->fileLogTabInstallerBtn_ = nullptr;
+            self->fileLogCopyBtn_ = nullptr;
+            self->fileLogRefreshBtn_ = nullptr;
+            self->fileLogOpenFolderBtn_ = nullptr;
+            self->fileLogView_ = nullptr;
+            self->fileLogDiskPath_.clear();
+            self->fileLogDiskByteStart_ = 0;
+            self->fileLogDiskFileSize_ = 0;
             return 0;
         default:
             break;
@@ -3174,13 +3916,7 @@ void Gui::UpdateArchivePanel() {
 void Gui::LayoutMainContent() {
     const bool expanded = AdvancedChecked();
 
-    int betaNoticeHeight = kBetaNoticeMinHeight;
-    if (betaNoticeLabel_ && IsWindow(betaNoticeLabel_)) {
-        betaNoticeHeight = MeasureWrappedStaticHeight(betaNoticeLabel_, i18n::Tr(L"ui.beta_telemetry_notice"),
-                                                      kContentWidth, kBetaNoticeMinHeight);
-    }
-
-    const MainContentLayout layout = ComputeMainContentLayout(expanded, archiveMissing_, betaNoticeHeight);
+    const MainContentLayout layout = ComputeMainContentLayout(expanded, archiveMissing_);
 
     RECT clientRect{};
     GetClientRect(hwnd_, &clientRect);
@@ -3289,10 +4025,6 @@ void Gui::LayoutMainContent() {
     }
     if (statusBar_ && IsWindow(statusBar_)) {
         SetWindowPos(statusBar_, nullptr, contentLeft, layout.statusBarY, kContentWidth, kStatusBarHeight,
-                     SWP_NOZORDER | SWP_NOACTIVATE);
-    }
-    if (betaNoticeLabel_ && IsWindow(betaNoticeLabel_)) {
-        SetWindowPos(betaNoticeLabel_, nullptr, contentLeft, layout.betaNoticeY, kContentWidth, layout.betaNoticeHeight,
                      SWP_NOZORDER | SWP_NOACTIVATE);
     }
     if (manualInstallBtn_ && IsWindow(manualInstallBtn_)) {
@@ -3458,7 +4190,7 @@ LRESULT CALLBACK Gui::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 SetTextColor(hdc, theme::Colors().text);
                 return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
             }
-            if (ctl == self->versionLabel_ || ctl == self->statusBar_ || ctl == self->betaNoticeLabel_) {
+            if (ctl == self->versionLabel_ || ctl == self->statusBar_) {
                 SetTextColor(hdc, theme::Colors().muted);
                 return reinterpret_cast<LRESULT>(theme::GetBrushes().window);
             }
@@ -3734,11 +4466,6 @@ void Gui::OnCreate(HWND hwnd) {
         kMargin, initialLayout.statusBarY, kContentWidth, kStatusBarHeight, hwnd,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(kStatusBarId)), instance_, nullptr);
 
-    betaNoticeLabel_ = CreateWindowW(
-        L"STATIC", i18n::Tr(L"ui.beta_telemetry_notice").c_str(),
-        WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
-        kMargin, initialLayout.betaNoticeY, kContentWidth, kBetaNoticeMinHeight, hwnd, nullptr, instance_, nullptr);
-
     manualInstallBtn_ = CreateWindowW(
         L"BUTTON", i18n::Tr(L"ui.manual_install_button").c_str(),
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
@@ -3775,16 +4502,13 @@ void Gui::OnCreate(HWND hwnd) {
           driveLabel_, driveCombo_,
           showAllDrivesCheck_, formatCheck_, ventoyActionCheck_, advancedCheck_, pinVentoyCheck_,
           ventoySecureBootCheck_, ventoyGptCheck_, ventoyVersionCombo_, installBtn_, verifyFilesBtn_,
-          openLogBtn_, manualInstallBtn_, creditsBtn_, discordFooterBtn_, feedbackBtn_, progressBar_, statusBar_,
-          betaNoticeLabel_}) {
+          openLogBtn_, manualInstallBtn_, creditsBtn_, discordFooterBtn_, feedbackBtn_, progressBar_, statusBar_}) {
         if (child && IsWindow(child)) {
             SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
         }
     }
     SendMessageW(titleLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(titleFont), TRUE);
     SendMessageW(versionLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(subtitleFont), TRUE);
-    SendMessageW(betaNoticeLabel_, WM_SETFONT, reinterpret_cast<WPARAM>(subtitleFont), TRUE);
-    SubclassWrappedStatic(betaNoticeLabel_, true);
 
     theme::EnableDarkMode(hwnd);
     theme::EnableDarkModeRecursive(hwnd);
@@ -3827,6 +4551,10 @@ void Gui::OnCommand(WPARAM wp, LPARAM lp) {
         return;
     }
     if (id >= kDebugMenuBase && id <= kDebugMenuLast) {
+        HandleDebugMenuCommand(id);
+        return;
+    }
+    if (id >= kDebugSafetyBase && id <= kDebugSafetyLast) {
         HandleDebugMenuCommand(id);
         return;
     }
@@ -3964,6 +4692,22 @@ void Gui::OpenDebugMenu(const int screenX, const int screenY) {
         return;
     }
 
+    const DebugSafetyFlags& safety = DebugSafety();
+    auto addSafety = [&](const DebugSafetyMenuId flag, const bool checked) {
+        UINT flags = MF_STRING;
+        if (checked) {
+            flags |= MF_CHECKED;
+        }
+        AppendMenuW(menu, flags, kDebugSafetyBase + static_cast<int>(flag),
+                    DebugSafetyFlagLabel(static_cast<int>(flag)));
+    };
+
+    AppendMenuW(menu, MF_STRING | MF_DISABLED, 0, L"Safety (this session)");
+    addSafety(DebugSafetyMenuId::SkipArchiveValidation, safety.skipArchiveValidation);
+    addSafety(DebugSafetyMenuId::SkipDestructiveConfirms, safety.skipDestructiveConfirms);
+    addSafety(DebugSafetyMenuId::SkipPresenceCheck, safety.skipPresenceCheck);
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+
     const SimulatedFailure active = ActiveSimulatedFailure();
 
     auto addItem = [&](const SimulatedFailure failure, const wchar_t* label) {
@@ -4004,6 +4748,16 @@ void Gui::OpenDebugMenu(const int screenX, const int screenY) {
 }
 
 void Gui::HandleDebugMenuCommand(const int id) {
+    if (id >= kDebugSafetyBase && id <= kDebugSafetyLast) {
+        const int flagId = id - kDebugSafetyBase;
+        const bool enabled = ToggleDebugSafetyFlag(flagId);
+        if (onLog_) {
+            onLog_(std::wstring(L"[Debug] Safety ") + DebugSafetyFlagLabel(flagId) +
+                   (enabled ? L": ON" : L": OFF"));
+        }
+        return;
+    }
+
     if (id == kDebugMenuBase) {
         ClearSimulatedFailure();
     } else {
@@ -4089,9 +4843,6 @@ void Gui::RefreshTranslatedUi() {
     if (feedbackBtn_ && IsWindow(feedbackBtn_)) {
         SetWindowTextW(feedbackBtn_, i18n::Tr(L"ui.feedback_button").c_str());
     }
-    if (betaNoticeLabel_ && IsWindow(betaNoticeLabel_)) {
-        SetWindowTextW(betaNoticeLabel_, i18n::Tr(L"ui.beta_telemetry_notice").c_str());
-    }
     RefreshMessageDialogText();
     RefreshCreditsWindowText();
     if (archiveMissingLabel_ && IsWindow(archiveMissingLabel_)) {
@@ -4119,7 +4870,8 @@ void Gui::RefreshTranslatedUi() {
         SetWindowTextW(browseArchiveBtn_, i18n::Tr(L"ui.browse_archive").c_str());
     }
     if (fileLogWindow_ && IsWindow(fileLogWindow_)) {
-        SetWindowTextW(fileLogWindow_, i18n::Tr(L"ui.file_log_title").c_str());
+        UpdateFileLogTabLabels();
+        RefreshFileLogWindowTitle();
     }
     if (versionLabel_ && IsWindow(versionLabel_)) {
         SetWindowTextW(versionLabel_, InstallerVersionLabel().c_str());
@@ -4130,7 +4882,7 @@ void Gui::RefreshTranslatedUi() {
                        driveCombo_,
                        showAllDrivesCheck_, formatCheck_, ventoyActionCheck_, advancedCheck_, pinVentoyCheck_,
                        ventoySecureBootCheck_, ventoyGptCheck_, installBtn_, verifyFilesBtn_, openLogBtn_, manualInstallBtn_, creditsBtn_, progressBar_, statusBar_,
-                       betaNoticeLabel_, languageCombo_, versionLabel_}) {
+                       languageCombo_, versionLabel_}) {
         refreshControl(child);
     }
     LayoutMainContent();

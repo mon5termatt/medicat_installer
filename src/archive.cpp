@@ -7,6 +7,7 @@
 #include "downloads.h"
 #include "i18n.h"
 #include "offline.h"
+#include "sim_fail.h"
 #include "util.h"
 #include "verify.h"
 
@@ -393,6 +394,13 @@ bool IsMediCatArchiveReadyForInstall(
                                FormatBytes(info.sizeBytes), FormatBytes(minBytes));
         userTitle = i18n::Tr(L"titles.archive_incomplete");
         return false;
+    }
+
+    if (DebugSafety().skipArchiveValidation) {
+        if (onLog) {
+            onLog(L"[Debug] Skipping MediCat archive MD5 validation");
+        }
+        return true;
     }
 
     if (onStatus) {

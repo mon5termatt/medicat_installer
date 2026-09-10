@@ -278,7 +278,7 @@ Diagnostics:
 
 Exit codes: 0 ok, 1 error, 2 bad args, 3 need admin, 4 cancelled, 5 verify failed, 6 re-extract incomplete
 
-Administrator required for /install. Logs: medicat_installer.log beside the exe.)");
+Administrator required for /install. Logs: logs\\ beside the exe.)");
 }
 
 void PrintCliVersion() {

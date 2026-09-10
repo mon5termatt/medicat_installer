@@ -24,7 +24,7 @@ struct VentoyEnsureOptions {
     std::wstring root;
     std::wstring sevenZipExe;
     std::wstring pinVersion;  // empty = always fetch/use latest
-    std::wstring logPath;     // optional ventoy.log beside installer
+    std::wstring logPath;     // optional ventoy.log under logs/
     std::function<void(const std::wstring&)> onStatus;
     std::function<void(const std::wstring&)> onLog;
 };
@@ -32,7 +32,7 @@ struct VentoyEnsureOptions {
 struct VentoyInstallOptions {
     bool useGpt = false;           // default MBR; append /GPT when true
     bool enableSecureBoot = true;  // Ventoy default; append /NOSB when false
-    std::wstring logPath;          // optional ventoy.log beside installer (append)
+    std::wstring logPath;          // optional ventoy.log under logs/ (append)
 };
 
 // Fetch newest tag from GitHub (e.g. "1.0.99").

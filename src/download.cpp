@@ -27,6 +27,32 @@ struct UrlParts {
     INTERNET_PORT port = 0;
 };
 
+#ifndef WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY
+#define WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY 4
+#endif
+
+HINTERNET OpenWinHttpSession() {
+    // AUTOMATIC_PROXY avoids WPAD stalls that DEFAULT_PROXY can hit on cold starts (ERROR_WINHTTP_TIMEOUT).
+    return WinHttpOpen(L"MedicatInstaller/1.0", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME,
+                       WINHTTP_NO_PROXY_BYPASS, 0);
+}
+
+void EnableWinHttpTls(HINTERNET session) {
+    if (!session) {
+        return;
+    }
+    DWORD protocols = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2;
+#ifdef WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3
+    protocols |= WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
+#endif
+    WinHttpSetOption(session, WINHTTP_OPTION_SECURE_PROTOCOLS, &protocols, sizeof(protocols));
+}
+
+std::wstring FormatWinHttpFailure(const wchar_t* what) {
+    const DWORD err = GetLastError();
+    return std::wstring(what) + L" (WinHTTP " + std::to_wstring(err) + L")";
+}
+
 bool ParseUrl(const std::wstring& url, UrlParts& parts, std::wstring& error) {
     URL_COMPONENTS uc{};
     uc.dwStructSize = sizeof(uc);
@@ -124,14 +150,14 @@ bool OpenHttpGetRequest(const std::wstring& url, HINTERNET& outRequest, HINTERNE
         return false;
     }
 
-    outSession = WinHttpOpen(L"MedicatInstaller/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME,
-                             WINHTTP_NO_PROXY_BYPASS, 0);
+    outSession = OpenWinHttpSession();
     if (!outSession) {
-        error = L"WinHttpOpen failed";
+        error = FormatWinHttpFailure(L"WinHttpOpen failed");
         AppendFailedUrl(error, url);
         return false;
     }
 
+    EnableWinHttpTls(outSession);
     WinHttpSetTimeouts(outSession, 30000, 30000, 300000, 1800000);
 
     outConnect = WinHttpConnect(outSession, parts.host.c_str(), parts.port, 0);
@@ -156,7 +182,7 @@ bool OpenHttpGetRequest(const std::wstring& url, HINTERNET& outRequest, HINTERNE
     const wchar_t* headers = L"User-Agent: MedicatInstaller/1.0\r\nAccept: */*";
     if (!WinHttpSendRequest(outRequest, headers, static_cast<DWORD>(-1), WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
         !WinHttpReceiveResponse(outRequest, nullptr)) {
-        error = L"HTTP request failed";
+        error = FormatWinHttpFailure(L"HTTP request failed");
         AppendFailedUrl(error, url);
         return false;
     }
@@ -191,14 +217,14 @@ bool OpenHttpDownloadRequest(const std::wstring& url, const uint64_t resumeFrom,
         return false;
     }
 
-    outSession = WinHttpOpen(L"MedicatInstaller/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME,
-                             WINHTTP_NO_PROXY_BYPASS, 0);
+    outSession = OpenWinHttpSession();
     if (!outSession) {
-        error = L"WinHttpOpen failed";
+        error = FormatWinHttpFailure(L"WinHttpOpen failed");
         AppendFailedUrl(error, url);
         return false;
     }
 
+    EnableWinHttpTls(outSession);
     WinHttpSetTimeouts(outSession, 30000, 30000, 300000, 1800000);
 
     outConnect = WinHttpConnect(outSession, parts.host.c_str(), parts.port, 0);
@@ -354,18 +380,19 @@ int HttpPostJsonInternal(const std::wstring& url, const std::string& jsonBody, c
         return 0;
     }
 
-    HINTERNET session = WinHttpOpen(L"MedicatInstaller/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-                                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    HINTERNET session = OpenWinHttpSession();
     if (!session) {
-        error = L"WinHttpOpen failed";
+        error = FormatWinHttpFailure(L"WinHttpOpen failed");
         AppendFailedUrl(error, url);
         return 0;
     }
-    WinHttpSetTimeouts(session, 5000, 5000, 5000, 5000);
+    EnableWinHttpTls(session);
+    // Session reports are small, but cold proxy discovery under DEFAULT_PROXY could exceed 5s.
+    WinHttpSetTimeouts(session, 30000, 30000, 30000, 30000);
 
     HINTERNET connect = WinHttpConnect(session, parts.host.c_str(), parts.port, 0);
     if (!connect) {
-        error = L"WinHttpConnect failed";
+        error = FormatWinHttpFailure(L"WinHttpConnect failed");
         AppendFailedUrl(error, url);
         WinHttpCloseHandle(session);
         return 0;
@@ -376,7 +403,7 @@ int HttpPostJsonInternal(const std::wstring& url, const std::string& jsonBody, c
         WinHttpOpenRequest(connect, L"POST", parts.path.c_str(), nullptr, WINHTTP_NO_REFERER,
                            WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
     if (!request) {
-        error = L"WinHttpOpenRequest failed";
+        error = FormatWinHttpFailure(L"WinHttpOpenRequest failed");
         AppendFailedUrl(error, url);
         CloseHttpHandles(nullptr, connect, session);
         return 0;
@@ -392,7 +419,7 @@ int HttpPostJsonInternal(const std::wstring& url, const std::string& jsonBody, c
         jsonBody.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(jsonBody.data()),
         static_cast<DWORD>(jsonBody.size()), static_cast<DWORD>(jsonBody.size()), 0);
     if (!sent || !WinHttpReceiveResponse(request, nullptr)) {
-        error = L"HTTP POST failed";
+        error = FormatWinHttpFailure(L"HTTP POST failed");
         AppendFailedUrl(error, url);
         CloseHttpHandles(request, connect, session);
         return 0;
@@ -631,7 +658,7 @@ Aria2DownloadResult DownloadFileWithAria2(const std::wstring& aria2c, const std:
     CreateDirectoryW(dir.c_str(), nullptr);
     EnsureSparseOutputFile(outputPath);
 
-    const std::wstring logPath = JoinPath(GetExeDirectory(), L"aria.log");
+    const std::wstring logPath = GetLogFilePath(L"aria.log");
     DeleteFileW(logPath.c_str());
 
     std::wstring cmd = L"\"" + aria2c +
@@ -981,18 +1008,18 @@ HttpMultipartResult HttpPostMultipartUpload(const std::wstring& url, const std::
         return result;
     }
 
-    HINTERNET session = WinHttpOpen(L"MedicatInstaller/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-                                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    HINTERNET session = OpenWinHttpSession();
     if (!session) {
-        result.error = L"WinHttpOpen failed";
+        result.error = FormatWinHttpFailure(L"WinHttpOpen failed");
         AppendFailedUrl(result.error, url);
         return result;
     }
+    EnableWinHttpTls(session);
     WinHttpSetTimeouts(session, 30000, 30000, 120000, 120000);
 
     HINTERNET connect = WinHttpConnect(session, parts.host.c_str(), parts.port, 0);
     if (!connect) {
-        result.error = L"WinHttpConnect failed";
+        result.error = FormatWinHttpFailure(L"WinHttpConnect failed");
         AppendFailedUrl(result.error, url);
         WinHttpCloseHandle(session);
         return result;
@@ -1003,7 +1030,7 @@ HttpMultipartResult HttpPostMultipartUpload(const std::wstring& url, const std::
         WinHttpOpenRequest(connect, L"POST", parts.path.c_str(), nullptr, WINHTTP_NO_REFERER,
                            WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
     if (!request) {
-        result.error = L"WinHttpOpenRequest failed";
+        result.error = FormatWinHttpFailure(L"WinHttpOpenRequest failed");
         AppendFailedUrl(result.error, url);
         CloseHttpHandles(nullptr, connect, session);
         return result;
@@ -1018,7 +1045,7 @@ HttpMultipartResult HttpPostMultipartUpload(const std::wstring& url, const std::
                                          static_cast<DWORD>(payload.size()),
                                          static_cast<DWORD>(payload.size()), 0);
     if (!sent || !WinHttpReceiveResponse(request, nullptr)) {
-        result.error = L"HTTP multipart upload failed";
+        result.error = FormatWinHttpFailure(L"HTTP multipart upload failed");
         AppendFailedUrl(result.error, url);
         CloseHttpHandles(request, connect, session);
         return result;

@@ -33,6 +33,8 @@ enum class MessageDialogFooter { Ok, OkWithDiag, YesNo };
 
 enum class BusyProgressMode { FileLog, Verify, Download, None };
 
+enum class FileLogTab { Extract = 0, Verify = 1, Installer = 2 };
+
 struct ConfirmPromptState {
     HANDLE doneEvent = nullptr;
     std::atomic<bool> result{false};
@@ -131,6 +133,11 @@ public:
     // Clears the optional detail file-log popup only; does not touch the status bar.
     void ClearFileLog();
     void OpenFileLogWindow();
+    void SelectFileLogTab(FileLogTab tab);
+    void RefreshFileLogWindowTitle();
+    void RefreshFileLogFromDisk(bool forceReload = true);
+    void CopyActiveFileLogToClipboard();
+    void OpenFileLogFolder();
     void OpenCreditsWindow();
     void OpenReExtractPrompt(ReExtractPromptPayload* payload);
     void FinishReExtractPrompt(bool wantReExtract);
@@ -191,8 +198,23 @@ private:
     void FlushInstallUi();
     void BatchAppendDetailLog(const std::vector<std::wstring>& files, size_t startIndex);
     void SyncDetailLog();
-    void ResizeFileLogWindow(HWND hwnd);
     std::wstring FormatLogLine(size_t index, const std::wstring& path) const;
+    void SetFileLogViewText(const std::wstring& text, bool scrollToEnd);
+    void AppendFileLogViewText(const std::wstring& text, bool follow);
+    void TrimFileLogViewIfHuge();
+    bool TryLoadOlderFileLogChunk();
+    void ResizeFileLogWindow(HWND hwnd);
+    std::vector<std::wstring>& ActiveFileLogLines();
+    const std::vector<std::wstring>& ActiveFileLogLines() const;
+    FileLogTab TabFromBusyMode() const;
+    bool FileLogPinnedToBottom() const;
+    void UpdateFileLogTabLabels();
+    void OnFileLogTabChanged();
+    void UpdateFileLogTabButtonStyles();
+    void LayoutFileLogToolbar(HWND hwnd);
+    std::wstring FileLogPathForTab(FileLogTab tab) const;
+    void LoadFileLogTabFromDisk(FileLogTab tab);
+    static LRESULT CALLBACK FileLogEditSubclassProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data);
     void UpdateAdvancedControls();
     void LayoutHeader();
     void LayoutMainContent();
@@ -254,7 +276,6 @@ private:
     HWND feedbackBtn_ = nullptr;
     HWND progressBar_ = nullptr;
     HWND statusBar_ = nullptr;
-    HWND betaNoticeLabel_ = nullptr;
     HWND archiveMissingLabel_ = nullptr;
     HWND downloadMirror1Btn_ = nullptr;
     HWND downloadMirror2Btn_ = nullptr;
@@ -264,7 +285,18 @@ private:
     HWND downloadMegaBtn_ = nullptr;
     HWND browseArchiveBtn_ = nullptr;
     HWND fileLogWindow_ = nullptr;
-    HWND fileLogList_ = nullptr;
+    HWND fileLogTabExtractBtn_ = nullptr;
+    HWND fileLogTabVerifyBtn_ = nullptr;
+    HWND fileLogTabInstallerBtn_ = nullptr;
+    HWND fileLogCopyBtn_ = nullptr;
+    HWND fileLogRefreshBtn_ = nullptr;
+    HWND fileLogOpenFolderBtn_ = nullptr;
+    HWND fileLogView_ = nullptr;
+    FileLogTab fileLogActiveTab_ = FileLogTab::Installer;
+    std::wstring fileLogDiskPath_;
+    uint64_t fileLogDiskByteStart_ = 0;
+    uint64_t fileLogDiskFileSize_ = 0;
+    bool fileLogLoadingOlder_ = false;
     HWND creditsWindow_ = nullptr;
     HWND creditsIntro_ = nullptr;
     HWND creditsSevenZipBtn_ = nullptr;
@@ -311,9 +343,12 @@ private:
     std::mutex uiMutex_;
     int pendingPercent_ = 0;
     bool pendingResetLog_ = false;
-    std::vector<std::wstring> fileLogLines_;
-    std::vector<std::wstring> fileLogDisplayLines_;
+    std::vector<std::wstring> fileLogLinesExtract_;
+    std::vector<std::wstring> fileLogLinesVerify_;
+    std::vector<std::wstring> fileLogLinesInstaller_;
     std::vector<std::wstring> pendingFileLines_;
+    size_t fileLogSeqExtract_ = 0;
+    size_t fileLogSeqVerify_ = 0;
     int progressPercentValue_ = 0;
     std::wstring progressPercentText_ = L"0%";
     InstallHandler onInstall_;
