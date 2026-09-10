@@ -17,6 +17,9 @@
 # be invoked from this workflow (workflow_call). Manual publishes still use
 # release: published. Do not also create the release with a PAT, or Discord
 # would get both the event and this job.
+#
+# concurrency below also cancels duplicate tag-push deliveries so Discord is
+# only notified once per tag.
 
 name: Release build
 
@@ -37,6 +40,11 @@ on:
 
 permissions:
   contents: write
+
+# Same tag can occasionally get duplicate push deliveries; only one release job should win.
+concurrency:
+  group: medicat-release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:

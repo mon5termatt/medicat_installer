@@ -99,13 +99,21 @@ jobs:
           prerelease = bool(release.get("prerelease"))
           assets = release.get("assets") or []
           asset_lines = []
+
+          def format_size(size: int) -> str:
+              if size < 1024:
+                  return f"{size} B"
+              if size < 1024 * 1024:
+                  return f"{size / 1024:.1f} KiB"
+              return f"{size / (1024 * 1024):.1f} MiB"
+
           for asset in assets:
               aname = asset.get("name") or "asset"
               aurl = asset.get("browser_download_url") or ""
               size = int(asset.get("size") or 0)
-              mb = size / (1024 * 1024) if size else 0.0
+              size_label = format_size(size)
               if aurl:
-                  asset_lines.append(f"• [{aname}]({aurl}) ({mb:.1f} MiB)")
+                  asset_lines.append(f"• [{aname}]({aurl}) ({size_label})")
               else:
                   asset_lines.append(f"• {aname}")
 
