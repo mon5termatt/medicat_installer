@@ -42,7 +42,6 @@ constexpr size_t kMaxArchivedLogSessions = 10;
 const wchar_t* const kSessionLogFiles[] = {
     L"medicat_installer.log", L"ventoy.log", L"extract.log",     L"reextract.log",
     L"check.log",             L"aria.log",   L"failed_files.txt", L"cli_log.txt",
-    L"cli_done.txt",          L"cli_percent.txt",
 };
 
 std::wstring FormatSessionArchiveFolderName() {

@@ -905,7 +905,7 @@ std::wstring ExtractVentoyCliLogExcerpt(const std::wstring& cliLogPath) {
 }
 
 void AppendVentoyCliArtifacts(const std::wstring& ventoyDir, VentoyFileLog& fileLog) {
-    static const wchar_t* kFiles[] = {L"cli_log.txt", L"cli_done.txt", L"cli_percent.txt", nullptr};
+    static const wchar_t* kFiles[] = {L"cli_log.txt", nullptr};
     for (const wchar_t* const* name = kFiles; *name != nullptr; ++name) {
         const std::wstring path = JoinPath(ventoyDir, *name);
         if (!FileExists(path) || GetFileSizeBytes(path) == 0) {

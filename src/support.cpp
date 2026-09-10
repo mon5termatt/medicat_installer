@@ -482,7 +482,7 @@ std::vector<std::wstring> CollectSupportLogFiles(const std::wstring& installerRo
                                          L"failed_files.txt",
                                          L"cli_log.txt",
                                          nullptr};
-    static const wchar_t* kVentoyCliFiles[] = {L"cli_log.txt", L"cli_done.txt", L"cli_percent.txt", nullptr};
+    static const wchar_t* kVentoyCliFiles[] = {L"cli_log.txt", nullptr};
 
     std::vector<std::wstring> files;
     const std::wstring logsDir = GetLogsDirectory();
