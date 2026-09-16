@@ -823,6 +823,25 @@ App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const 
         }
         log_->Info(i18n::Tr(L"log.medicat_presence_ok", std::to_wstring(presence.scorePercent)));
     }
+
+    {
+        std::wstring autorunPath = dest;
+        if (!autorunPath.empty() && autorunPath.back() != L'\\' && autorunPath.back() != L'/') {
+            autorunPath += L'\\';
+        }
+        autorunPath += L"autorun.ico";
+        const bool hadAutorun = FileExists(autorunPath) && GetFileSizeBytes(autorunPath) > 0;
+        if (!hadAutorun) {
+            PostStatusBar(i18n::Tr(L"status.writing_autorun_icon"));
+            log_->Info(L"autorun.ico missing on " + drive + L"; restoring from installer icon");
+            if (EnsureInstallerAutorunIcon(instance_, dest)) {
+                log_->Info(L"Restored autorun.ico on " + drive);
+            } else {
+                log_->Error(L"Failed to restore autorun.ico on " + drive + L" (continuing verify)");
+            }
+        }
+    }
+
     if (showFileProgress) {
         // Route live lines to the Verify tab (install stays in FileLog/Extract through extract).
         PostSetBusyMode(BusyProgressMode::Verify);
@@ -926,9 +945,6 @@ App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const 
                                std::to_wstring(verify.totalFiles));
     if (!verify.checkLogPath.empty()) {
         log_->Info(L"Per-file verify log: " + verify.checkLogPath);
-    }
-    if (verify.skippedFiles > 0) {
-        outcome.message += L"\n\n" + i18n::Tr(L"messages.verify_skipped_files", std::to_wstring(verify.skippedFiles));
     }
     outcome.title = i18n::Tr(L"titles.verification_complete");
     return outcome;
@@ -1690,6 +1706,13 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
         fail(i18n::Tr(L"messages.extraction_failed", FormatExtractFailureMessage(extract)),
              i18n::Tr(L"titles.extraction_failed"));
         return;
+    }
+
+    PostStatusBar(i18n::Tr(L"status.writing_autorun_icon"));
+    if (WriteInstallerAutorunIcon(instance_, dest)) {
+        log_->Info(L"Wrote installer icon as autorun.ico on " + drive);
+    } else {
+        log_->Error(L"Failed to write autorun.ico on " + drive + L" (continuing to verify)");
     }
 
     PostProgress(0);

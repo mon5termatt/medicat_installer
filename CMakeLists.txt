@@ -83,8 +83,9 @@ add_custom_command(
 )
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/res/bundle.rc.in" "${CMAKE_BINARY_DIR}/bundle.rc" @ONLY)
+set(APP_ICO "${CMAKE_CURRENT_SOURCE_DIR}/res/icon.ico")
 set_source_files_properties("${CMAKE_BINARY_DIR}/bundle.rc" PROPERTIES
-    OBJECT_DEPENDS "${VENTOY_VERSIONS_GEN};${BUNDLE_MD5_GZ};${BUNDLE_7ZA};${BUNDLE_ARIA2_GZ};${DISCORD_ICO}"
+    OBJECT_DEPENDS "${VENTOY_VERSIONS_GEN};${BUNDLE_MD5_GZ};${BUNDLE_7ZA};${BUNDLE_ARIA2_GZ};${DISCORD_ICO};${APP_ICO}"
 )
 
 set(BUILD_NUMBER_FILE "${REPO_ROOT}/build_number.txt")

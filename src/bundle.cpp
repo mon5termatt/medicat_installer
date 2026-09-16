@@ -205,4 +205,31 @@ BundledTools EnsureBundledTools(const HINSTANCE instance) {
     return tools;
 }
 
+bool WriteInstallerAutorunIcon(const HINSTANCE instance, const std::wstring& driveRoot) {
+    std::wstring dest = driveRoot;
+    if (dest.size() == 2 && dest[1] == L':') {
+        dest += L'\\';
+    }
+    if (!dest.empty() && dest.back() != L'\\' && dest.back() != L'/') {
+        dest += L'\\';
+    }
+    dest += L"autorun.ico";
+    return ExtractResourceToFile(instance, IDR_AUTORUN_ICO, dest);
+}
+
+bool EnsureInstallerAutorunIcon(const HINSTANCE instance, const std::wstring& driveRoot) {
+    std::wstring path = driveRoot;
+    if (path.size() == 2 && path[1] == L':') {
+        path += L'\\';
+    }
+    if (!path.empty() && path.back() != L'\\' && path.back() != L'/') {
+        path += L'\\';
+    }
+    path += L"autorun.ico";
+    if (FileExists(path) && GetFileSizeBytes(path) > 0) {
+        return true;
+    }
+    return WriteInstallerAutorunIcon(instance, driveRoot);
+}
+
 }  // namespace medicat
