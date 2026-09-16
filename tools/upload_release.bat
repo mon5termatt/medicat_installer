@@ -86,9 +86,20 @@ goto upload_assets
 :create_release
 echo Creating GitHub release %TAG%...
 REM Prefer annotated tag message, else the tagged commit message (not empty
-REM generate-notes changelog-only stubs). Do not pass --repo here: gh rejects
-REM combining --notes-from-tag with --repo.
-gh release create "%TAG%" --title "%TAG%" --notes-from-tag --latest
+REM generate-notes changelog-only stubs). Resolve notes ourselves: gh rejects
+REM --notes-from-tag with --repo, and --notes-from-tag needs the tag locally
+REM (workflow_dispatch checkouts often lack refs/tags/1.0.N).
+git rev-parse -q --verify "refs/tags/%TAG%" >nul 2>&1
+if not errorlevel 1 goto have_local_tag
+echo Fetching tag %TAG% for release notes...
+git fetch --no-tags origin "refs/tags/%TAG%:refs/tags/%TAG%"
+if errorlevel 1 goto create_failed
+
+:have_local_tag
+set "NOTES_FILE=%TEMP%\medicat_release_notes_%TAG%.txt"
+git tag -l --format=%%(contents) "%TAG%" > "%NOTES_FILE%" 2>nul
+for %%A in ("%NOTES_FILE%") do if %%~zA==0 git log -1 --format=%%B "%TAG%" > "%NOTES_FILE%"
+gh release create "%TAG%" --title "%TAG%" --notes-file "%NOTES_FILE%" --latest --repo "%REPO%"
 if errorlevel 1 goto create_failed
 goto upload_assets
 
