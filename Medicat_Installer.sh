@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ScriptVersion="0024"
+ScriptVersion="0025"
 
 # See CHANGELOG.md for changes.
 #
@@ -54,6 +54,7 @@ wget["nixos"]="nixos.wget"
 wget["default"]="wget"
 declare -A zip
 zip["arch"]="p7zip"
+zip["cachyos"]="p7zip"
 zip["nixos"]="nixos.p7zip"
 zip["fedora"]="p7zip p7zip-plugins"
 zip["nobara"]="p7zip-full p7zip-plugins"
@@ -70,6 +71,7 @@ declare -A ntfs
 ntfs["centos"]="ntfsprogs"
 ntfs["fedora"]="ntfsprogs"
 ntfs["arch"]="ntfsprogs"
+ntfs["cachyos"]="ntfsprogs"
 ntfs["nixos"]="nixos.ntfs3g"
 ntfs["default"]="ntfs-3g"
 declare -A aria
@@ -87,6 +89,7 @@ exfat["debian"]="exfatprogs"
 exfat["fedora"]="exfatprogs"
 exfat["centos"]="exfatprogs"
 exfat["arch"]="exfatprogs"
+exfat["cachyos"]="exfatprogs"
 exfat["alpine"]="exfatprogs"
 exfat["void"]="exfatprogs"
 exfat["default"]="exfatprogs"
@@ -119,6 +122,19 @@ if [[ -n "$NumColours" && "$NumColours" -ge 8 ]]; then
 	cyanN="$(tput setaf 6 2>/dev/null || true)";    cyanB="$(tput bold 2>/dev/null; tput setaf 6 2>/dev/null || true)"
 	whiteN="$(tput setaf 7 2>/dev/null || true)";   whiteB="$(tput bold 2>/dev/null; tput setaf 7 2>/dev/null || true)"
 fi
+
+# Debian/Ubuntu omit /sbin from a normal user's PATH (#175).
+# mkntfs, mkfs.vfat, mkfs.exfat, and parted live under /usr/sbin.
+for _sbinDir in /usr/local/sbin /usr/sbin /sbin; do
+	if [[ -d "$_sbinDir" ]]; then
+		case ":$PATH:" in
+			*":${_sbinDir}:"*) ;;
+			*) PATH="${PATH}:${_sbinDir}" ;;
+		esac
+	fi
+done
+unset _sbinDir
+export PATH
 #-----------------------------------------------------------------------------#
 
 
@@ -219,6 +235,21 @@ function CheckNotElevated {
     fi
 }
 
+# True if $1 is on PATH or executable in a common sbin directory (#175).
+function commandExists() {
+	local cmd="$1"
+	local dir
+	if command -v "$cmd" >/dev/null 2>&1; then
+		return 0
+	fi
+	for dir in /usr/local/sbin /usr/sbin /sbin; do
+		if [[ -x "${dir}/${cmd}" ]]; then
+			return 0
+		fi
+	done
+	return 1
+}
+
 # Function to handle dependecies list
 function dependenciesHandler() {
 	local toInstall=()
@@ -228,7 +259,7 @@ function dependenciesHandler() {
 	# Check what is missing before refreshing package indexes (#139).
 	# apt update / pacman -Syy / etc. are slow and unnecessary when everything is present.
 	for command in "${!depCommands[@]}"; do
-		if ! command -v "$command" >/dev/null 2>&1; then
+		if ! commandExists "$command"; then
 			declare -n ref="${depCommands[$command]}"
 			local pkgList
 			if [ -z "${ref[$os]}" ]; then
@@ -274,29 +305,41 @@ function dependenciesHandler() {
 		colEcho $yellowB "Some packages failed:$whiteB ${failedPkgs[*]}"
 	fi
 
-	# ntfs-3g may already be installed while mkntfs lives in ntfsprogs (Arch issue. Cause arch is being a bitch).
-	if ! command -v mkntfs >/dev/null 2>&1 && [ "$os" != "nixos" ]; then
-		if [[ " ${toInstall[*]} " != *" ntfsprogs "* ]]; then
-			colEcho $cyanB "Installing$whiteB ntfsprogs$cyanB (provides mkntfs)..."
-			# shellcheck disable=SC2086
-			if ! $sudo $pkgmgr $install_arg ntfsprogs; then
-				colEcho $yellowB "WARNING: Failed to install ntfsprogs - continuing."
-				failedPkgs+=("ntfsprogs")
-			fi
-		fi
+	# Arch/CachyOS/Fedora/CentOS split mkntfs into ntfsprogs. Debian/Ubuntu still
+	# ship it in ntfs-3g; do not try to apt-install a package that no longer exists (#175).
+	if ! commandExists mkntfs; then
+		case "$os" in
+			arch|cachyos|fedora|centos)
+				if [[ " ${toInstall[*]} " != *" ntfsprogs "* ]]; then
+					colEcho $cyanB "Installing$whiteB ntfsprogs$cyanB (provides mkntfs)..."
+					# shellcheck disable=SC2086
+					if ! $sudo $pkgmgr $install_arg ntfsprogs; then
+						colEcho $yellowB "WARNING: Failed to install ntfsprogs - continuing."
+						failedPkgs+=("ntfsprogs")
+					fi
+				fi
+				;;
+		esac
 	fi
 
 	# Only hard-fail for commands that are still missing after best-effort install.
 	local stillMissing=""
 	for command in "${!depCommands[@]}"; do
-		if ! command -v "$command" >/dev/null 2>&1; then
+		if ! commandExists "$command"; then
 			stillMissing+=" $command"
 		fi
 	done
 	if [ -n "$stillMissing" ]; then
 		colEcho $redB "ERROR: Required commands still missing after install:$whiteB$stillMissing"
 		if [[ "$stillMissing" == *" mkntfs"* ]]; then
-			colEcho $yellowB "mkntfs comes from ntfsprogs on Arch/Fedora (not from ntfs-3g)."
+			case "$os" in
+				arch|cachyos|fedora|centos)
+					colEcho $yellowB "mkntfs comes from ntfsprogs on Arch/Fedora (not from ntfs-3g)."
+					;;
+				debian|ubuntu)
+					colEcho $yellowB "mkntfs comes from ntfs-3g on Debian/Ubuntu. If it is already installed, /usr/sbin may be missing from PATH."
+					;;
+			esac
 		fi
 		colEcho $redB "Install them manually (or install an equivalent package), then re-run this script."
 		exit 1
@@ -821,6 +864,13 @@ elif [[ -e /etc/nobara ]]; then
 	install_arg="install -y"
 	update_arg="update"
 	alias mkexfatfs=mkfs.exfat
+elif grep -qs "cachyos" /etc/os-release; then
+	# Must run before /etc/arch-release: CachyOS is Arch-based and often has that file.
+	os="cachyos"
+	colEcho $blueB "CachyOS, Arch but faster"
+	pkgmgr="pacman"
+	install_arg="-S --needed --noconfirm"
+	update_arg="-Syy"
 elif [[ -e /etc/arch-release ]]; then
 	os="arch"
 	colEcho $blueB "I use Arch btw"

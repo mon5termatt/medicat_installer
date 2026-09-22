@@ -21,7 +21,7 @@ chmod +x Medicat_Installer.sh
 
 ## Compatibility
 
-Ubuntu · Arch · Debian · CentOS · FreeBSD · Fedora · Void · NixOS (and similar)
+Ubuntu · Arch · CachyOS · Debian · CentOS · FreeBSD · Fedora · Void · NixOS (and similar)
 
 ## Requirements
 

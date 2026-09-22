@@ -2,6 +2,12 @@
 
 All notable changes to `Medicat_Installer.sh` (linux branch).
 
+## 0025
+
+- Fix Debian/Ubuntu as a normal user (#175): append `/usr/local/sbin`, `/usr/sbin`, and `/sbin` to `PATH`, and treat those directories as valid when checking for `mkntfs`, `mkfs.vfat`, `mkfs.exfat`, and `parted`.
+- Only install `ntfsprogs` on Arch, CachyOS, Fedora, and CentOS. Debian/Ubuntu still get `mkntfs` from `ntfs-3g`; the script no longer tries to apt-install an obsolete `ntfsprogs` package.
+- Detect CachyOS before `/etc/arch-release` so it is not misclassified as Arch.
+
 ## 0024
 
 - Install `ntfsprogs` for `mkntfs` on Arch and Fedora. `ntfs-3g` no longer ships the NTFS userspace tools after the 2026 package split, so the script no longer treats a missing `mkntfs` as a missing `ntfs-3g`. Falls back to `ntfsprogs` if `mkntfs` is still absent after the first install.
