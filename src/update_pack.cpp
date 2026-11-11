@@ -58,6 +58,25 @@ std::string ToLowerAscii(std::string value) {
     return value;
 }
 
+bool WriteFileUtf8(const std::wstring& path, const std::string& contents, std::wstring& error) {
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
+                              nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        error = L"Could not write file: " + path;
+        return false;
+    }
+    DWORD written = 0;
+    if (!contents.empty() &&
+        (!WriteFile(file, contents.data(), static_cast<DWORD>(contents.size()), &written, nullptr) ||
+         written != contents.size())) {
+        CloseHandle(file);
+        error = L"Failed writing file: " + path;
+        return false;
+    }
+    CloseHandle(file);
+    return true;
+}
+
 bool ReadFileUtf8(const std::wstring& path, std::string& out, std::wstring& error) {
     out.clear();
     HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
@@ -116,8 +135,14 @@ bool ExtractJsonStringField(const std::string& json, const char* key, std::strin
                 out.push_back(esc);
             } else if (esc == 'n') {
                 out.push_back('\n');
+            } else if (esc == 'r') {
+                out.push_back('\r');
             } else if (esc == 't') {
                 out.push_back('\t');
+            } else if (esc == 'b') {
+                out.push_back('\b');
+            } else if (esc == 'f') {
+                out.push_back('\f');
             } else {
                 out.push_back(esc);
             }
@@ -300,6 +325,74 @@ bool EnsureDirectoryDeep(const std::wstring& path) {
     return CreateDirectoryW(normalized.c_str(), nullptr) || GetLastError() == ERROR_ALREADY_EXISTS;
 }
 
+bool IsDriveRootPath(std::wstring path) {
+    while (!path.empty() && (path.back() == L'\\' || path.back() == L'/')) {
+        path.pop_back();
+    }
+    return path.size() == 2 && path[1] == L':';
+}
+
+bool DirectoryHasChildren(const std::wstring& path) {
+    const std::wstring pattern = JoinPath(path, L"*");
+    WIN32_FIND_DATAW findData{};
+    HANDLE find = FindFirstFileW(pattern.c_str(), &findData);
+    if (find == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+    bool hasChildren = false;
+    do {
+        const std::wstring name = findData.cFileName;
+        if (name == L"." || name == L"..") {
+            continue;
+        }
+        hasChildren = true;
+        break;
+    } while (FindNextFileW(find, &findData));
+    FindClose(find);
+    return hasChildren;
+}
+
+// Remove empty parent folders up to (but not including) driveRoot after a file/dir delete.
+void PruneEmptyParentDirs(const std::wstring& deletedPath, const std::wstring& driveRoot,
+                          const std::function<void(const std::wstring&)>& onLog) {
+    std::wstring current = deletedPath;
+    for (;;) {
+        const size_t slash = current.find_last_of(L"\\/");
+        if (slash == std::wstring::npos || slash < 2) {
+            break;
+        }
+        current = current.substr(0, slash);
+        if (current.size() == 2 && current[1] == L':') {
+            break;
+        }
+        if (IsDriveRootPath(current) || ToLowerCopy(current) == ToLowerCopy(driveRoot)) {
+            break;
+        }
+        // Stay under the destination drive root.
+        std::wstring root = driveRoot;
+        while (!root.empty() && (root.back() == L'\\' || root.back() == L'/')) {
+            root.pop_back();
+        }
+        if (ToLowerCopy(current).rfind(ToLowerCopy(root), 0) != 0) {
+            break;
+        }
+
+        const DWORD attrs = GetFileAttributesW(current.c_str());
+        if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+            break;
+        }
+        if (DirectoryHasChildren(current)) {
+            break;
+        }
+        if (RemoveDirectoryW(current.c_str()) == 0) {
+            break;
+        }
+        if (onLog) {
+            onLog(L"Update pack pruned empty dir: " + current);
+        }
+    }
+}
+
 bool DeletePathRecursive(const std::wstring& path) {
     const DWORD attrs = GetFileAttributesW(path.c_str());
     if (attrs == INVALID_FILE_ATTRIBUTES) {
@@ -424,6 +517,9 @@ bool ParseUpdatePackInfoJson(const std::string& jsonUtf8, UpdatePackInfo& info, 
     info.contentRoot = NormalizePackRelPath(Utf8ToWide(contentRoot));
     info.manifest = NormalizePackRelPath(Utf8ToWide(manifest));
     info.archiveMd5 = ToLowerAscii(archiveMd5);
+    std::string md5Manifest;
+    ExtractJsonStringField(jsonUtf8, "md5Manifest", md5Manifest);
+    info.md5Manifest = std::move(md5Manifest);
     bool bootablesOnly = false;
     ExtractJsonBoolField(jsonUtf8, "bootablesOnly", bootablesOnly);
     info.bootablesOnly = bootablesOnly;
@@ -533,27 +629,34 @@ bool LoadUpdatePackInfo(const std::wstring& sevenZipExe, const std::wstring& arc
     info.archivePath = archivePath;
 
     const std::wstring manifestDest = JoinPath(workDir, info.manifest);
-    const std::wstring sidecarManifest = ReplaceArchiveExtension(archivePath, L".md5manifest");
-    const std::wstring looseManifest = JoinPath(ParentOfPath(archivePath), info.manifest);
-    if (FileExists(sidecarManifest)) {
-        if (!CopyFileToWorkDir(sidecarManifest, manifestDest, error)) {
-            return false;
-        }
-    } else if (loadedJsonFromSidecar && FileExists(looseManifest)) {
-        if (!CopyFileToWorkDir(looseManifest, manifestDest, error)) {
+    if (!info.md5Manifest.empty()) {
+        // Prefer embedded md5Manifest from JSON (ship .7z + .json only).
+        if (!WriteFileUtf8(manifestDest, info.md5Manifest, error)) {
             return false;
         }
     } else {
-        if (sevenZipExe.empty() || !FileExists(sevenZipExe)) {
-            error = L"7za.exe not available to extract pack manifest (no sidecar .md5manifest found)";
-            return false;
-        }
-        const std::vector<std::wstring> manifestMembers = {info.manifest};
-        const ExtractResult manifestExtract =
-            Extract7zArchiveSelective(sevenZipExe, archivePath, workDir, manifestMembers, {}, extractLogPath, false);
-        if (!manifestExtract.success) {
-            error = L"Could not extract pack manifest: " + FormatExtractFailureMessage(manifestExtract);
-            return false;
+        const std::wstring sidecarManifest = ReplaceArchiveExtension(archivePath, L".md5manifest");
+        const std::wstring looseManifest = JoinPath(ParentOfPath(archivePath), info.manifest);
+        if (FileExists(sidecarManifest)) {
+            if (!CopyFileToWorkDir(sidecarManifest, manifestDest, error)) {
+                return false;
+            }
+        } else if (loadedJsonFromSidecar && FileExists(looseManifest)) {
+            if (!CopyFileToWorkDir(looseManifest, manifestDest, error)) {
+                return false;
+            }
+        } else {
+            if (sevenZipExe.empty() || !FileExists(sevenZipExe)) {
+                error = L"7za.exe not available to extract pack manifest (no md5Manifest in JSON)";
+                return false;
+            }
+            const std::vector<std::wstring> manifestMembers = {info.manifest};
+            const ExtractResult manifestExtract = Extract7zArchiveSelective(
+                sevenZipExe, archivePath, workDir, manifestMembers, {}, extractLogPath, false);
+            if (!manifestExtract.success) {
+                error = L"Could not extract pack manifest: " + FormatExtractFailureMessage(manifestExtract);
+                return false;
+            }
         }
     }
 
@@ -610,6 +713,16 @@ UpdatePackApplyResult ApplyUpdatePack(const std::wstring& sevenZipExe, const std
     }
 
     std::wstring error;
+    {
+        const std::wstring sidecarJson = ReplaceArchiveExtension(archivePath, L".json");
+        if (onLog) {
+            if (FileExists(sidecarJson)) {
+                onLog(L"Reading update pack metadata from " + sidecarJson);
+            } else {
+                onLog(L"No sidecar .json beside pack; extracting info.json from archive (may take a while)...");
+            }
+        }
+    }
     if (!LoadUpdatePackInfo(sevenZipExe, archivePath, workDir, result.info, error, extractLogPath)) {
         result.error = error;
         return result;
@@ -619,7 +732,6 @@ UpdatePackApplyResult ApplyUpdatePack(const std::wstring& sevenZipExe, const std
 
     if (onLog) {
         onLog(L"Applying update pack " + result.info.version + L" from " + archivePath);
-        onLog(L"Preparing update pack (please wait)...");
     }
 
     std::wstring dest = driveRoot;
@@ -645,6 +757,8 @@ UpdatePackApplyResult ApplyUpdatePack(const std::wstring& sevenZipExe, const std
             if (onLog) {
                 onLog(L"Update pack remove skip (missing): " + relative);
             }
+            // Still drop empty parents left behind by earlier partial removes.
+            PruneEmptyParentDirs(target, dest, onLog);
             continue;
         }
         if (!DeletePathRecursive(target)) {
@@ -654,6 +768,7 @@ UpdatePackApplyResult ApplyUpdatePack(const std::wstring& sevenZipExe, const std
         if (onLog) {
             onLog(L"Update pack removed: " + relative);
         }
+        PruneEmptyParentDirs(target, dest, onLog);
     }
 
     // Extract USB-relative add[] paths straight onto the drive (flat archive layout).
@@ -681,7 +796,7 @@ UpdatePackApplyResult ApplyUpdatePack(const std::wstring& sevenZipExe, const std
     }
 
     if (onLog) {
-        onLog(L"Extracting update pack content directly to " + dest);
+        onLog(L"Extracting update pack content to " + dest + L" (please wait while the archive opens)...");
     }
 
     const ExtractResult contentExtract = Extract7zArchiveSelective(

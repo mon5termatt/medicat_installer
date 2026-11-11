@@ -1527,7 +1527,8 @@ void Gui::NotifyExtractProgress(const int percent, const std::wstring& file, con
         }
         pendingPercent_ = 0;
         pendingResetLog_ = true;
-        return;
+        // Fall through so a seed line (e.g. "Please wait...") can land in the same flush
+        // and the file log never paints blank between reset and the next progress post.
     }
 
     pendingPercent_ = percent;

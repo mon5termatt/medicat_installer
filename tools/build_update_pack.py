@@ -20,6 +20,7 @@ Layout of the produced archive:
   (other USB-relative add paths)
 
 info.json contentRoot is "." (flat). archiveMd5 is the MD5 of MedicatUpdate.md5.
+A sidecar <out>.json embeds info + md5Manifest (ship .7z + .json).
 A sidecar <out>.md5 records the MD5 of the finished .7z for CDN checks.
 
 Example (complete new tree vs release manifest):
@@ -48,6 +49,14 @@ Example (bootables only; ignore PortableApps and Programs):
     --version 21.12.1-beta1 ^
     --base 21.12 ^
     --out D:\\packs\\MediCat.USB.v21.12.bootables.update.7z
+
+Example (refresh sidecar .json only; no 7z recompress):
+  python tools/build_update_pack.py ^
+    --content F:\\MEDICAT2026\\26.12 ^
+    --release MedicatFiles.md5 ^
+    --complete --bootables --json-only ^
+    --version 26.12 --base 21.12 ^
+    --out F:\\MEDICAT2026\\MediCat.USB.v26.12.update.7z
 """
 
 from __future__ import annotations
@@ -255,7 +264,8 @@ def diff_against_release(
 
 def write_manifest(entries: list[tuple[str, Path]], dest: Path) -> None:
     lines = [f"{md5_file(full)} *{rel}" for rel, full in entries]
-    dest.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    # LF-only bytes: Path.write_text on Windows would translate to CRLF and break archiveMd5.
+    dest.write_bytes(("\n".join(lines) + ("\n" if lines else "")).encode("utf-8"))
 
 
 def find_7za(explicit: Path | None) -> Path:
@@ -354,8 +364,11 @@ def build_pack(args: argparse.Namespace) -> None:
 
     out_path = args.out.resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    seven_za = find_7za(args.seven_za)
+    json_only = bool(args.json_only)
+    if json_only and not out_path.is_file():
+        raise SystemExit(
+            f"--json-only expects an existing pack archive at --out (sidecar path is derived from it):\n  {out_path}"
+        )
 
     staging_parent = args.staging.resolve() if args.staging else Path(tempfile.mkdtemp(prefix="medicat_update_pack_"))
     staging = staging_parent / "stage"
@@ -377,7 +390,10 @@ def build_pack(args: argparse.Namespace) -> None:
                 "or add a placeholder marker file under --content."
             )
 
-        archive_md5 = md5_file(manifest_path)
+        # Fingerprint the exact on-disk bytes that become md5Manifest / MedicatUpdate.md5.
+        manifest_bytes = manifest_path.read_bytes()
+        archive_md5 = hashlib.md5(manifest_bytes).hexdigest()
+        md5_manifest_text = manifest_bytes.decode("utf-8")
 
         info: dict[str, Any] = {
             "name": args.name,
@@ -386,6 +402,7 @@ def build_pack(args: argparse.Namespace) -> None:
             "contentRoot": content_root,
             "manifest": MANIFEST_NAME,
             "archiveMd5": archive_md5,
+            "md5Manifest": md5_manifest_text,
             "bootablesOnly": bootables,
             "remove": remove_paths,
             "add": add_paths,
@@ -404,6 +421,40 @@ def build_pack(args: argparse.Namespace) -> None:
         }
         write_info_json(staging / "info.json", info)
 
+        sidecar_json = out_path.with_suffix(".json")
+        write_info_json(sidecar_json, info)
+        legacy_manifest_sidecar = out_path.with_suffix(".md5manifest")
+        if legacy_manifest_sidecar.exists():
+            legacy_manifest_sidecar.unlink()
+        write_info_json(
+            out_path.with_suffix(".diff.json"),
+            {
+                "add": add_paths,
+                "remove": remove_paths,
+                "stats": stats,
+                "release": str(release_path),
+                "content": str(content_dir),
+                "bootablesOnly": bootables,
+                "flatContent": True,
+                "jsonOnly": json_only,
+            },
+        )
+
+        if json_only:
+            print(f"Wrote sidecar only (skipped 7z recompress): {sidecar_json}")
+            print(f"  existing archive left untouched: {out_path}")
+            print(f"  version={args.version} base={args.base} contentRoot={content_root} (flat)")
+            if bootables:
+                print("  scope: bootables only (ignored PortableApps/, Programs/)")
+            print(
+                f"  diff: added={stats['added']} changed={stats['changed']} "
+                f"unchanged_skipped={stats['unchanged']} remove={stats['remove']}"
+            )
+            print(f"  pack add={len(add_paths)} remove={len(remove_paths)}")
+            print(f"  archiveMd5 (manifest fingerprint)={archive_md5}")
+            print("  note: only use --json-only when the .7z payload already matches this diff")
+            return
+
         for rel, full in add_files:
             dest = staging / Path(rel)
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -412,6 +463,7 @@ def build_pack(args: argparse.Namespace) -> None:
         if out_path.exists():
             out_path.unlink()
 
+        seven_za = find_7za(args.seven_za)
         top_levels = sorted({Path(rel).parts[0] for rel, _ in add_files})
         cmd = [
             str(seven_za),
@@ -433,25 +485,8 @@ def build_pack(args: argparse.Namespace) -> None:
         sidecar = Path(str(out_path) + ".md5")
         sidecar.write_text(f"{seven_md5} *{out_path.name}\n", encoding="utf-8")
 
-        # Sidecars beside the archive: <name>.json + <name>.md5manifest (installer prefers these
-        # over extracting meta from the solid .7z).
-        sidecar_json = out_path.with_suffix(".json")
-        sidecar_manifest = out_path.with_suffix(".md5manifest")
+        # Rewrite sidecar after archive exists (same info; keeps timestamps consistent).
         write_info_json(sidecar_json, info)
-        shutil.copy2(manifest_path, sidecar_manifest)
-        # Machine-readable diff summary for review before shipping.
-        write_info_json(
-            out_path.with_suffix(".diff.json"),
-            {
-                "add": add_paths,
-                "remove": remove_paths,
-                "stats": stats,
-                "release": str(release_path),
-                "content": str(content_dir),
-                "bootablesOnly": bootables,
-                "flatContent": True,
-            },
-        )
 
         print(f"Wrote {out_path}")
         print(f"  version={args.version} base={args.base} contentRoot={content_root} (flat)")
@@ -463,8 +498,7 @@ def build_pack(args: argparse.Namespace) -> None:
         )
         print(f"  pack add={len(add_paths)} remove={len(remove_paths)}")
         print(f"  archiveMd5 (manifest fingerprint)={archive_md5}")
-        print(f"  sidecar json ({sidecar_json.name})")
-        print(f"  sidecar manifest ({sidecar_manifest.name})")
+        print(f"  sidecar json ({sidecar_json.name}) embeds md5Manifest")
         print(f"  sidecar 7z md5 ({sidecar.name})={seven_md5}")
     finally:
         if args.staging is None:
@@ -504,6 +538,11 @@ def main() -> int:
     parser.add_argument("--base", required=True, help="Base MediCat version this pack targets (e.g. 21.12)")
     parser.add_argument("--name", default="MediCat USB Update Pack", help="Human-readable pack name")
     parser.add_argument("--out", type=Path, required=True, help="Output .7z path (e.g. MediCat.USB.v21.12.update.7z)")
+    parser.add_argument(
+        "--json-only",
+        action="store_true",
+        help="Rebuild sidecar <out>.json (with embedded md5Manifest) from the diff; do not recompress the .7z",
+    )
     parser.add_argument("--staging", type=Path, default=None, help="Optional staging directory (kept on disk)")
     parser.add_argument("--7za", dest="seven_za", type=Path, default=None, help="Path to 7za.exe")
     args = parser.parse_args()

@@ -457,12 +457,13 @@ void App::PostExtractProgress(const int percent, const std::wstring& file, const
             if (cliTipKey) {
                 WriteCliTip(i18n::Tr(cliTipKey));
             }
-            return;
         }
         if (!file.empty()) {
             cliProgressFile_ = file;
         }
-        WriteCliProgress(FormatCliFileProgress(percent, cliProgressFile_));
+        if (!resetLog || !file.empty()) {
+            WriteCliProgress(FormatCliFileProgress(percent, cliProgressFile_));
+        }
         return;
     }
 
@@ -850,8 +851,8 @@ bool App::ApplySelectedUpdatePack(const std::wstring& drive, const std::wstring&
     }
 
     const std::wstring workDir = JoinPath(GetMedicatTempDir(), L"update_pack_apply");
-    PostExtractProgress(0, L"", true, L"status.applying_update_pack");
-    PostExtractProgress(0, i18n::Tr(L"status.update_pack_please_wait"), false);
+    // One reset+seed so the file log never paints blank while opening a large solid pack.
+    PostExtractProgress(0, i18n::Tr(L"status.update_pack_please_wait"), true, L"status.applying_update_pack");
     PostStatusBar(i18n::Tr(L"status.applying_update_pack"));
 
     const std::wstring packLog = GetLogFilePath(L"update_pack.log");
@@ -1388,8 +1389,7 @@ void App::OnApplyUpdatePack() {
 }
 
 void App::RunApplyUpdatePackThread(std::wstring drive, std::wstring packBrowse) {
-    PostExtractProgress(0, L"", true, L"status.applying_update_pack");
-
+    // ApplySelectedUpdatePack posts reset + "Please wait..." itself.
     try {
         std::wstring mergedManifest;
         std::wstring packError;

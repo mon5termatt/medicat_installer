@@ -96,7 +96,13 @@ std::wstring NormalizeRelativePath(std::wstring path) {
         path.erase(path.begin());
     }
     for (wchar_t& ch : path) {
+        if (ch == L'\\') {
+            ch = L'/';
+        }
         ch = static_cast<wchar_t>(towlower(ch));
+    }
+    while (!path.empty() && path.back() == L'/') {
+        path.pop_back();
     }
     return path;
 }

@@ -18,6 +18,8 @@ struct UpdatePackInfo {
     std::wstring contentRoot;
     std::wstring manifest;
     std::string archiveMd5;
+    // Optional embedded MedicatUpdate.md5 body from info.json "md5Manifest" (avoids sidecar/.7z extract).
+    std::string md5Manifest;
     // From info.json diff.bootablesOnly: pack must not touch PortableApps/ or Programs/.
     bool bootablesOnly = false;
     std::vector<std::wstring> remove;
