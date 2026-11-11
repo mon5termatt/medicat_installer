@@ -40,12 +40,15 @@ ExtractResult Extract7zArchive(
 
 // Selectively extract only specific archive entries into destinationRoot.
 // `relativePaths` should match archive entry paths (e.g. "Ventoy/..." or "EFI\\...").
+// monitorDestinationDrive: when true, abort if the destination drive letter disappears
+// (USB re-extract). Keep false for temp-folder extracts (update pack metadata/content).
 ExtractResult Extract7zArchiveSelective(
     const std::wstring& sevenZipExe,
     const std::wstring& archivePath,
     const std::wstring& destinationRoot,
     const std::vector<std::wstring>& relativePaths,
     ProgressCallback onProgress,
-    const std::wstring& logFilePath = L"");
+    const std::wstring& logFilePath = L"",
+    bool monitorDestinationDrive = false);
 
 }  // namespace medicat

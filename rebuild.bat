@@ -34,7 +34,7 @@ if /i "%~1"=="/release" (
 echo Unknown option: %~1
 echo Usage: rebuild.bat [as BUILD] [release [TAG]]
 echo   BUILD is a full version 1.0.N or a patch number N
-echo   Default bump = one above the latest GitHub release tag
+echo   Default = one above the latest GitHub release tag
 echo   TAG defaults to the version in build_number.txt when omitted
 exit /b 1
 

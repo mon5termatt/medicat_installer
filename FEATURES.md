@@ -17,6 +17,7 @@ Legend: ✅ done · 🟡 partial · ⬜ not started
 | Format checkbox (NTFS) | 🟡 | `format.com` only; forced on when Ventoy not on drive |
 | Ventoy action checkbox | ✅ | **Install Ventoy** (forced) vs **Update Ventoy** (optional) based on detection |
 | MediCat `.7z` extraction | ✅ | Bundled `7za.exe`, byte-based progress |
+| Additional Update Pack | ✅ | Optional `MediCat.USB.*update.7z` (auto-discover or Advanced Browse); validated `info.json` remove/add; overlay after main extract; merged MD5 verify. Author with `tools/build_update_pack.py --release MedicatFiles.md5` (diffs version folder vs current release) |
 | Post-extract MD5 verification | ✅ | `MedicatFiles.md5` manifest; missing + hash mismatch |
 | Progress bar + status bar | ✅ | Single-line status bar below progress; `SetStatusBar` / `PostStatusBar` |
 | File log popup during extract/verify | ✅ | Optional listbox window; status bar shows `status.extracting_file` |

@@ -481,6 +481,7 @@ std::vector<std::wstring> CollectSupportLogFiles(const std::wstring& installerRo
                                          L"aria.log",
                                          L"failed_files.txt",
                                          L"cli_log.txt",
+                                         L"update_pack.log",
                                          nullptr};
     static const wchar_t* kVentoyCliFiles[] = {L"cli_log.txt", nullptr};
 

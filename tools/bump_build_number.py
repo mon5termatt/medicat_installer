@@ -253,6 +253,16 @@ def main() -> int:
         print(f"Build number pinned: {version}")
         return 0
 
+    if args.keep:
+        parsed = read_counter(args.counter, default_major, default_minor)
+        if parsed is None:
+            print(f"No build number in {args.counter}; use --set or bump once first", file=sys.stderr)
+            return 1
+        major, minor, build = parsed
+        version = write_build_version(args.output, major, minor, build)
+        print(f"Build number kept: {version}")
+        return 0
+
     if args.skip_if_env and os.environ.get(args.skip_if_env):
         parsed = read_counter(args.counter, default_major, default_minor)
         if parsed is not None:

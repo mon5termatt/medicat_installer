@@ -12,6 +12,7 @@
 #include "cli.h"
 #include "debug.h"
 #include "download.h"
+#include "downloads.h"
 #include "drives.h"
 #include "extract.h"
 #include "failure_tracker.h"
@@ -19,6 +20,7 @@
 #include "offline.h"
 #include "sim_fail.h"
 #include "support.h"
+#include "update_pack.h"
 #include "util.h"
 #include "ventoy.h"
 #include "verify.h"
@@ -116,7 +118,18 @@ void App::LogCommandLine(int argc, wchar_t** argv) {
     log_->Info(L"Command line: " + joined);
 }
 
-std::wstring App::ResolveArchivePath(const std::wstring& overridePath) const {
+std::wstring App::CurrentReleaseVersion() const {
+    if (!headless_) {
+        const std::wstring selected = gui_.SelectedReleaseVersion();
+        if (!selected.empty()) {
+            return selected;
+        }
+    }
+    return DefaultMediCatRelease().version;
+}
+
+std::wstring App::ResolveArchivePath(const std::wstring& overridePath,
+                                     const std::wstring& releaseVersion) const {
     if (!overridePath.empty()) {
         return NormalizeMediCatArchivePath(overridePath);
     }
@@ -126,7 +139,8 @@ std::wstring App::ResolveArchivePath(const std::wstring& overridePath) const {
             return NormalizeMediCatArchivePath(browsed);
         }
     }
-    return ResolveMediCatArchivePath(root_);
+    const std::wstring version = releaseVersion.empty() ? CurrentReleaseVersion() : releaseVersion;
+    return ResolveMediCatArchivePath(root_, ResolveMediCatRelease(version));
 }
 
 void App::LogMediCatArchiveDebug(const std::wstring& path) const {
@@ -314,6 +328,7 @@ int App::RunGui() {
 
     gui_.SetInstallHandler([this] { OnInstall(); });
     gui_.SetVerifyHandler([this] { OnVerify(); });
+    gui_.SetApplyUpdatePackHandler([this] { OnApplyUpdatePack(); });
     gui_.SetUpdateCheckHandler([this] { StartUpdateCheck(); });
     gui_.SetApplyInstallerUpdateHandler([this](const InstallerUpdateInfo& info) { ApplyInstallerUpdate(info); });
     gui_.ScheduleUpdateCheck();
@@ -376,7 +391,8 @@ int App::RunHeadlessInstall(const CliOptions& cli) {
     installing_ = true;
     currentOperation_ = L"install";
     log_->Info(L"Headless install started on " + cli.drive);
-    RunPreInstallThread(cli.drive, format, runVentoy, std::move(pinVersion), ventoyInstall, std::move(archive));
+    RunPreInstallThread(cli.drive, format, runVentoy, std::move(pinVersion), ventoyInstall, std::move(archive), L"",
+                        DefaultMediCatRelease().version);
     return headlessResult_.completed ? headlessResult_.exitCode : 1;
 }
 
@@ -784,7 +800,88 @@ void App::PostDone(const bool success, const std::wstring& message, const std::w
     PostToGui(gui_.Hwnd(), WM_MEDICAT_DONE, reinterpret_cast<LPARAM>(payload));
 }
 
-App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const bool showFileProgress) {
+bool App::PrepareUpdatePackManifest(const std::wstring& packBrowse, std::wstring& mergedManifestPath,
+                                    std::wstring& error) {
+    mergedManifestPath.clear();
+    error.clear();
+
+    const UpdatePackResolveResult resolved = ResolveUpdatePackPath(root_, packBrowse);
+    for (const std::wstring& candidate : resolved.candidates) {
+        log_->Debug(L"Update pack candidate: " + candidate);
+    }
+    if (!resolved.found || resolved.path.empty()) {
+        return true;
+    }
+
+    const std::wstring workDir = JoinPath(GetMedicatTempDir(), L"update_pack_meta");
+    const std::wstring packLog = GetLogFilePath(L"update_pack.log");
+    UpdatePackInfo info;
+    if (!LoadUpdatePackInfo(sevenZa_, resolved.path, workDir, info, error, packLog)) {
+        if (packBrowse.empty()) {
+            // Auto-discovered pack that fails validation: skip rather than hard-fail verify-only.
+            log_->Error(L"Ignoring invalid auto-discovered update pack: " + error);
+            error.clear();
+            return true;
+        }
+        return false;
+    }
+
+    mergedManifestPath = JoinPath(GetMedicatTempDir(), L"MedicatFiles.merged.md5");
+    if (!WriteMergedMd5Manifest(md5Manifest_, JoinPath(workDir, info.manifest), info.remove, mergedManifestPath,
+                                error)) {
+        return false;
+    }
+    log_->Info(L"Using update pack for verify: " + resolved.path + L" (version " + info.version + L")");
+    return true;
+}
+
+bool App::ApplySelectedUpdatePack(const std::wstring& drive, const std::wstring& packBrowse,
+                                  std::wstring& mergedManifestPath, std::wstring& error) {
+    mergedManifestPath.clear();
+    error.clear();
+
+    const UpdatePackResolveResult resolved = ResolveUpdatePackPath(root_, packBrowse);
+    for (const std::wstring& candidate : resolved.candidates) {
+        log_->Debug(L"Update pack candidate: " + candidate);
+    }
+    if (!resolved.found || resolved.path.empty()) {
+        log_->Info(L"No update pack selected or discovered; skipping");
+        return true;
+    }
+
+    const std::wstring workDir = JoinPath(GetMedicatTempDir(), L"update_pack_apply");
+    PostExtractProgress(0, L"", true, L"status.applying_update_pack");
+    PostExtractProgress(0, i18n::Tr(L"status.update_pack_please_wait"), false);
+    PostStatusBar(i18n::Tr(L"status.applying_update_pack"));
+
+    const std::wstring packLog = GetLogFilePath(L"update_pack.log");
+    const UpdatePackApplyResult applied = ApplyUpdatePack(
+        sevenZa_, resolved.path, drive, workDir,
+        [this](const ExtractProgress& progress) { PostExtractProgress(progress.percent, progress.file, false); },
+        [this](const std::wstring& line) {
+            log_->Info(line);
+            PostExtractProgress(0, line, false);
+        },
+        packLog);
+
+    if (!applied.success) {
+        error = applied.error.empty() ? L"Update pack apply failed" : applied.error;
+        return false;
+    }
+    if (applied.skipped) {
+        return true;
+    }
+
+    mergedManifestPath = JoinPath(GetMedicatTempDir(), L"MedicatFiles.merged.md5");
+    if (!WriteMergedMd5Manifest(md5Manifest_, applied.extractedManifestPath, applied.info.remove, mergedManifestPath,
+                                error)) {
+        return false;
+    }
+    return true;
+}
+
+App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const bool showFileProgress,
+                                               const std::wstring& manifestOverride) {
     VerificationOutcome outcome;
 
     std::wstring dest = drive;
@@ -793,8 +890,9 @@ App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const 
     }
 
     log_->Info(i18n::Tr(L"log.file_check_started", drive));
-    if (!md5Manifest_.empty()) {
-        log_->Debug(L"Using MD5 manifest: " + md5Manifest_);
+    const std::wstring activeManifest = manifestOverride.empty() ? md5Manifest_ : manifestOverride;
+    if (!activeManifest.empty()) {
+        log_->Debug(L"Using MD5 manifest: " + activeManifest);
     }
 
     PostStatusBar(i18n::Tr(L"status.checking_medicat_presence"));
@@ -853,7 +951,7 @@ App::VerificationOutcome App::VerifyDriveFiles(const std::wstring& drive, const 
     verifyOptions.driveRoot = dest;
     verifyOptions.installerRoot = root_;
     verifyOptions.tempDir = GetMedicatTempDir();
-    verifyOptions.manifestPath = md5Manifest_;
+    verifyOptions.manifestPath = activeManifest;
     verifyOptions.failedListPath = GetLogFilePath(L"failed_files.txt");
     verifyOptions.checkLogPath = GetLogFilePath(L"check.log");
     log_->Info(L"Writing per-file verify log to " + verifyOptions.checkLogPath);
@@ -1049,7 +1147,7 @@ bool App::TryReExtractFailedFiles(const std::wstring& drive, const std::wstring&
     std::wstring archiveMessage;
     std::wstring archiveTitle;
     if (!IsMediCatArchiveReadyForInstall(
-            archive, archiveMessage, archiveTitle,
+            archive, ResolveMediCatRelease(CurrentReleaseVersion()), archiveMessage, archiveTitle,
             [this](const std::wstring& status) { PostStatusBar(status); },
             [this](const std::wstring& msg) { log_->Info(msg); })) {
         log_->Error(archiveMessage);
@@ -1070,7 +1168,7 @@ bool App::TryReExtractFailedFiles(const std::wstring& drive, const std::wstring&
 
     const ExtractResult extract = Extract7zArchiveSelective(
         sevenZa_, archive, dest, relPaths,
-        [this](const ExtractProgress& p) { PostExtractProgress(p.percent, p.file, false); }, extractLogPath);
+        [this](const ExtractProgress& p) { PostExtractProgress(p.percent, p.file, false); }, extractLogPath, true);
     if (headless_) {
         WriteCliProgressFinish();
     }
@@ -1230,11 +1328,105 @@ void App::OnVerify() {
     MarkOperationStart();
     log_->Info(L"File verification started on " + drive);
 
-    std::thread worker(&App::RunVerifyThread, this, drive);
+    const std::wstring packBrowse = gui_.UpdatePackPath();
+    std::thread worker(&App::RunVerifyThread, this, drive, packBrowse);
     worker.detach();
 }
 
-void App::RunVerifyThread(std::wstring drive) {
+void App::OnApplyUpdatePack() {
+    if (installing_.exchange(true)) {
+        return;
+    }
+
+    if (!EnsureHelpGateAcknowledged()) {
+        installing_ = false;
+        return;
+    }
+
+    const std::wstring drive = gui_.SelectedDrive();
+    if (drive.empty()) {
+        gui_.ShowMessageDialog(i18n::Tr(L"messages.no_drive_selected"), i18n::Tr(L"titles.no_drive_selected"),
+                               MessageDialogKind::Warning);
+        installing_ = false;
+        return;
+    }
+
+    if (!MeetsMinimumDriveCapacity(drive)) {
+        gui_.ShowMessageDialog(i18n::Tr(L"messages.drive_under_minimum", drive),
+                               i18n::Tr(L"titles.drive_under_minimum"), MessageDialogKind::Warning);
+        installing_ = false;
+        return;
+    }
+
+    const std::wstring packBrowse = gui_.UpdatePackPath();
+    const UpdatePackResolveResult resolved = ResolveUpdatePackPath(root_, packBrowse);
+    if (!resolved.found || resolved.path.empty()) {
+        gui_.ShowMessageDialog(i18n::Tr(L"messages.update_pack_none_found"), i18n::Tr(L"titles.update_pack_none_found"),
+                               MessageDialogKind::Warning);
+        installing_ = false;
+        return;
+    }
+
+    // Already on the UI thread: use ShowConfirmDialog directly. PromptConfirm posts a
+    // message then WaitForSingleObject, which deadlocks the message pump.
+    if (!gui_.ShowConfirmDialog(i18n::Tr(L"messages.update_pack_apply_confirm", drive, resolved.path),
+                                i18n::Tr(L"titles.update_pack_apply_confirm"), MessageDialogKind::Warning)) {
+        installing_ = false;
+        return;
+    }
+
+    gui_.SetBusy(true, BusyProgressMode::FileLog);
+    gui_.ClearFileLog();
+    gui_.SetProgress(0);
+    gui_.SetStatusBar(i18n::Tr(L"status.applying_update_pack"));
+    currentOperation_ = L"update_pack";
+    MarkOperationStart();
+    log_->Info(L"Update-pack-only apply started on " + drive + L" using " + resolved.path);
+
+    std::thread worker(&App::RunApplyUpdatePackThread, this, drive, packBrowse);
+    worker.detach();
+}
+
+void App::RunApplyUpdatePackThread(std::wstring drive, std::wstring packBrowse) {
+    PostExtractProgress(0, L"", true, L"status.applying_update_pack");
+
+    try {
+        std::wstring mergedManifest;
+        std::wstring packError;
+        if (!ApplySelectedUpdatePack(drive, packBrowse, mergedManifest, packError)) {
+            PostDone(false, i18n::Tr(L"messages.update_pack_failed", packError),
+                     i18n::Tr(L"titles.update_pack_failed"));
+            return;
+        }
+        if (mergedManifest.empty()) {
+            PostDone(false, i18n::Tr(L"messages.update_pack_none_found"),
+                     i18n::Tr(L"titles.update_pack_none_found"));
+            return;
+        }
+
+        PostProgress(0);
+        const VerificationOutcome outcome = VerifyDriveFiles(drive, true, mergedManifest);
+        if (IsCancelRequested() || (!outcome.success && outcome.message.empty() && outcome.title.empty())) {
+            log_->Info(i18n::Tr(L"log.user_cancelled"));
+            PostDone(false, L"");
+            return;
+        }
+        if (!outcome.success) {
+            PostDone(false, outcome.message, outcome.title);
+            return;
+        }
+
+        log_->Info(L"Update pack apply completed successfully");
+        PostDone(true, i18n::Tr(L"messages.update_pack_apply_complete", drive),
+                 i18n::Tr(L"titles.update_pack_apply_complete"));
+    } catch (...) {
+        log_->Error(L"Update pack apply thread crashed with an unexpected exception");
+        PostDone(false, i18n::Tr(L"messages.installation_error", L"unexpected error"),
+                 i18n::Tr(L"titles.installation_error"));
+    }
+}
+
+void App::RunVerifyThread(std::wstring drive, std::wstring packBrowse) {
     PostExtractProgress(0, L"", true);
 
     try {
@@ -1245,7 +1437,15 @@ void App::RunVerifyThread(std::wstring drive) {
             return;
         }
 
-        const VerificationOutcome outcome = VerifyDriveFiles(drive, true);
+        std::wstring mergedManifest;
+        std::wstring packError;
+        if (!PrepareUpdatePackManifest(packBrowse, mergedManifest, packError)) {
+            PostDone(false, i18n::Tr(L"messages.update_pack_invalid", packError),
+                     i18n::Tr(L"titles.update_pack_invalid"));
+            return;
+        }
+
+        const VerificationOutcome outcome = VerifyDriveFiles(drive, true, mergedManifest);
         if (IsCancelRequested() || (!outcome.success && outcome.message.empty() && outcome.title.empty())) {
             log_->Info(i18n::Tr(L"log.user_cancelled"));
             PostDone(false, L"");
@@ -1334,7 +1534,8 @@ void App::OnInstall() {
         return;
     }
 
-    const std::wstring archive = ResolveArchivePath(L"");
+    const std::wstring releaseVersion = gui_.SelectedReleaseVersion();
+    const std::wstring archive = ResolveArchivePath(L"", releaseVersion);
     LogMediCatArchiveDebug(archive);
 
     gui_.SetBusy(true, BusyProgressMode::Download);
@@ -1342,17 +1543,18 @@ void App::OnInstall() {
     gui_.SetProgress(0);
     gui_.SetStatusBar(i18n::Tr(L"status.verifying_archive"));
     currentOperation_ = L"install";
-    log_->Info(L"Install started on " + drive);
+    log_->Info(L"Install started on " + drive + L" (release " + releaseVersion + L")");
 
     const bool format = gui_.FormatChecked();
     const bool runVentoy = gui_.RunVentoyChecked();
     const std::wstring pinVersion = gui_.PinnedVentoyVersion();
+    const std::wstring packBrowse = gui_.UpdatePackPath();
     VentoyInstallOptions ventoyInstall;
     ventoyInstall.enableSecureBoot = gui_.VentoySecureBootChecked();
     ventoyInstall.useGpt = gui_.VentoyGptChecked();
 
     std::thread worker(&App::RunPreInstallThread, this, drive, format, runVentoy, pinVersion, ventoyInstall,
-                       archive);
+                       archive, packBrowse, releaseVersion);
     worker.detach();
 }
 
@@ -1400,16 +1602,18 @@ bool ReconcileDriveLetter(
 }  // namespace
 
 void App::RunPreInstallThread(std::wstring drive, const bool format, const bool runVentoy, std::wstring pinVersion,
-                               VentoyInstallOptions ventoyInstall, std::wstring archive) {
+                               VentoyInstallOptions ventoyInstall, std::wstring archive, std::wstring packBrowse,
+                               std::wstring releaseVersion) {
     try {
         if (headless_) {
             WriteCliTip(i18n::Tr(L"status.verifying_archive"));
         }
 
+        const MediCatReleaseInfo& release = ResolveMediCatRelease(releaseVersion);
         std::wstring archiveMessage;
         std::wstring archiveTitle;
         if (!IsMediCatArchiveReadyForInstall(
-                archive, archiveMessage, archiveTitle,
+                archive, release, archiveMessage, archiveTitle,
                 [this](const std::wstring& status) { PostStatusBar(status); },
                 [this](const std::wstring& msg) { log_->Info(msg); },
                 [this](const uint64_t bytesRead, const uint64_t totalBytes) {
@@ -1439,7 +1643,8 @@ void App::RunPreInstallThread(std::wstring drive, const bool format, const bool 
 
         PostSetBusyMode(BusyProgressMode::FileLog);
         MarkOperationStart();
-        RunInstallThread(std::move(drive), format, runVentoy, std::move(pinVersion), ventoyInstall);
+        RunInstallThread(std::move(drive), format, runVentoy, std::move(pinVersion), ventoyInstall,
+                         std::move(packBrowse));
     } catch (...) {
         log_->Error(L"Pre-install thread crashed with an unexpected exception");
         PostDone(false, i18n::Tr(L"messages.installation_error", L"unexpected error"),
@@ -1448,7 +1653,7 @@ void App::RunPreInstallThread(std::wstring drive, const bool format, const bool 
 }
 
 void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
-                            VentoyInstallOptions ventoyInstall) {
+                            VentoyInstallOptions ventoyInstall, std::wstring packBrowse) {
     const std::wstring root = root_;
     const std::wstring archive = ResolveArchivePath(cliOptions_.has_value() ? cliOptions_->archivePath : L"");
     const std::wstring sevenZip = sevenZa_;
@@ -1715,8 +1920,15 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
         log_->Error(L"Failed to write autorun.ico on " + drive + L" (continuing to verify)");
     }
 
+    std::wstring mergedManifest;
+    std::wstring packError;
+    if (!ApplySelectedUpdatePack(drive, packBrowse, mergedManifest, packError)) {
+        fail(i18n::Tr(L"messages.update_pack_failed", packError), i18n::Tr(L"titles.update_pack_failed"));
+        return;
+    }
+
     PostProgress(0);
-    const VerificationOutcome outcome = VerifyDriveFiles(drive);
+    const VerificationOutcome outcome = VerifyDriveFiles(drive, true, mergedManifest);
     if (IsCancelRequested() || (!outcome.success && outcome.message.empty() && outcome.title.empty())) {
         cancel();
         return;
@@ -1739,7 +1951,7 @@ void App::RunInstallThread(std::wstring drive, bool format, bool runVentoy, std:
                 }
 
                 PostProgress(0);
-                const VerificationOutcome after = VerifyDriveFiles(drive, false);
+                const VerificationOutcome after = VerifyDriveFiles(drive, false, mergedManifest);
                 if (IsCancelRequested() || (!after.success && after.message.empty() && after.title.empty())) {
                     cancel();
                     return;

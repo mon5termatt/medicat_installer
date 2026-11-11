@@ -73,4 +73,9 @@ using FileHashProgressFn = std::function<void(uint64_t bytesRead, uint64_t total
 bool ComputeFileMd5(const std::wstring& path, std::string& outHex, std::wstring& error, uint64_t* outBytesRead = nullptr,
                     const FileHashProgressFn& onProgress = {});
 
+// Merge base MedicatFiles.md5 with an update-pack manifest: drop remove paths, pack entries win.
+bool WriteMergedMd5Manifest(const std::wstring& baseManifestPath, const std::wstring& packManifestPath,
+                            const std::vector<std::wstring>& removePaths, const std::wstring& outPath,
+                            std::wstring& error);
+
 }  // namespace medicat

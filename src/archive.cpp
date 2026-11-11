@@ -4,7 +4,6 @@
 
 #include <windows.h>
 
-#include "downloads.h"
 #include "i18n.h"
 #include "offline.h"
 #include "sim_fail.h"
@@ -19,7 +18,7 @@ namespace medicat {
 namespace {
 
 bool Md5HexEquals(const std::string& actual, const char* expected) {
-    if (actual.size() != 32 || !expected) {
+    if (actual.size() != 32 || !expected || !*expected) {
         return false;
     }
     for (size_t i = 0; i < 32; ++i) {
@@ -129,20 +128,30 @@ bool AnySplitPartExistsInDirectory(const std::wstring& directory) {
     return false;
 }
 
-MediCatArchiveInfo InspectSolidArchive(const std::wstring& path) {
+std::wstring ReleaseArchiveFileName(const MediCatReleaseInfo& release) {
+    return release.archiveFileName ? release.archiveFileName : kMediCatArchiveFileName;
+}
+
+// Google Drive / Mega split zip parts are only published for the default (21.12) release.
+bool ReleaseUsesSplitParts(const MediCatReleaseInfo& release) {
+    return EqualsIgnoreCase(ReleaseArchiveFileName(release), kMediCatArchiveFileName);
+}
+
+MediCatArchiveInfo InspectSolidArchive(const std::wstring& path, const MediCatReleaseInfo& release) {
     MediCatArchiveInfo info{};
     info.kind = MediCatArchiveKind::Solid7z;
     info.path = path;
-    info.displayName = kMediCatArchiveFileName;
-    info.expectedMd5Hex = kMediCatArchiveMd5;
-    info.expectedMinBytes = kMediCatArchiveMinBytes;
+    info.displayName = ReleaseArchiveFileName(release);
+    info.expectedMd5Hex = release.md5 ? release.md5 : "";
+    info.expectedMinBytes = MediCatReleaseMinBytes(release);
 
     if (path.empty() || !FileExists(path)) {
         return info;
     }
 
     info.sizeBytes = GetFileSizeBytes(path);
-    if (info.sizeBytes < kMediCatArchiveMinBytes) {
+    const uint64_t minBytes = MediCatReleaseMinBytes(release);
+    if (info.sizeBytes < minBytes) {
         info.state = MediCatArchiveState::Incomplete;
         return info;
     }
@@ -192,16 +201,22 @@ MediCatArchiveInfo InspectSplitArchive(const std::wstring& firstVolumePath) {
     return info;
 }
 
-bool VerifySolidMd5(MediCatArchiveInfo& info, std::wstring& error, const FileHashProgressFn& onProgress) {
+bool VerifySolidMd5(MediCatArchiveInfo& info, const MediCatReleaseInfo& release, std::wstring& error,
+                    const FileHashProgressFn& onProgress) {
+    if (!MediCatReleaseHasMd5(release)) {
+        info.state = MediCatArchiveState::Verified;
+        return true;
+    }
+
     std::string md5Hex;
     if (!ComputeFileMd5(info.path, md5Hex, error, nullptr, onProgress)) {
         return false;
     }
     info.md5Hex = md5Hex;
 
-    if (!Md5HexEquals(md5Hex, kMediCatArchiveMd5)) {
+    if (!Md5HexEquals(md5Hex, release.md5)) {
         info.state = MediCatArchiveState::HashMismatch;
-        info.expectedMd5Hex = kMediCatArchiveMd5;
+        info.expectedMd5Hex = release.md5;
         error = L"MD5 mismatch";
         return false;
     }
@@ -275,15 +290,20 @@ std::wstring NormalizeMediCatArchivePath(const std::wstring& path) {
     return JoinPath(ParentDirectory(path), kMediCatSplitFirstFileName);
 }
 
-std::wstring ResolveMediCatArchivePath(const std::wstring& root) {
-    const std::wstring sevenZBeside = JoinPath(root, kMediCatArchiveFileName);
+std::wstring ResolveMediCatArchivePath(const std::wstring& root, const MediCatReleaseInfo& release) {
+    const std::wstring fileName = ReleaseArchiveFileName(release);
+    const std::wstring sevenZBeside = JoinPath(root, fileName);
     if (FileExists(sevenZBeside)) {
         return sevenZBeside;
     }
 
-    const std::wstring sevenZOffline = ResolveOfflineArchivePath(kMediCatArchiveFileName);
+    const std::wstring sevenZOffline = ResolveOfflineArchivePath(fileName);
     if (!sevenZOffline.empty()) {
         return sevenZOffline;
+    }
+
+    if (!ReleaseUsesSplitParts(release)) {
+        return sevenZBeside;
     }
 
     const std::wstring splitBeside = JoinPath(root, kMediCatSplitFirstFileName);
@@ -303,10 +323,10 @@ std::wstring ResolveMediCatArchivePath(const std::wstring& root) {
     return sevenZBeside;
 }
 
-MediCatArchiveInfo InspectMediCatArchive(const std::wstring& path) {
+MediCatArchiveInfo InspectMediCatArchive(const std::wstring& path, const MediCatReleaseInfo& release) {
     const std::wstring normalized = NormalizeMediCatArchivePath(path);
     if (normalized.empty()) {
-        return InspectSolidArchive(path);
+        return InspectSolidArchive(path, release);
     }
 
     if (IsSplitZipPath(normalized)) {
@@ -314,17 +334,19 @@ MediCatArchiveInfo InspectMediCatArchive(const std::wstring& path) {
     }
 
     // Resolve may still point at the default .7z name while only Drive parts exist.
-    if (EqualsIgnoreCase(FileNameOnly(normalized), kMediCatArchiveFileName) && !FileExists(normalized)) {
+    if (ReleaseUsesSplitParts(release) &&
+        EqualsIgnoreCase(FileNameOnly(normalized), kMediCatArchiveFileName) && !FileExists(normalized)) {
         const std::wstring directory = ParentDirectory(normalized);
         if (AnySplitPartExistsInDirectory(directory)) {
             return InspectSplitArchive(JoinPath(directory, kMediCatSplitFirstFileName));
         }
     }
 
-    return InspectSolidArchive(normalized);
+    return InspectSolidArchive(normalized, release);
 }
 
-bool VerifyMediCatArchiveMd5(MediCatArchiveInfo& info, std::wstring& error, const FileHashProgressFn& onProgress) {
+bool VerifyMediCatArchiveMd5(MediCatArchiveInfo& info, const MediCatReleaseInfo& release, std::wstring& error,
+                             const FileHashProgressFn& onProgress) {
     error.clear();
     if (info.path.empty()) {
         info.state = MediCatArchiveState::Missing;
@@ -356,25 +378,25 @@ bool VerifyMediCatArchiveMd5(MediCatArchiveInfo& info, std::wstring& error, cons
     if (info.sizeBytes == 0) {
         info.sizeBytes = GetFileSizeBytes(info.path);
     }
-    if (info.sizeBytes < kMediCatArchiveMinBytes) {
+    const uint64_t minBytes = MediCatReleaseMinBytes(release);
+    if (info.sizeBytes < minBytes) {
         info.state = MediCatArchiveState::Incomplete;
         error = L"Archive file is too small";
         return false;
     }
 
-    return VerifySolidMd5(info, error, onProgress);
+    return VerifySolidMd5(info, release, error, onProgress);
 }
 
 bool IsMediCatArchiveReadyForInstall(
-    const std::wstring& path, std::wstring& userMessage, std::wstring& userTitle,
-    const std::function<void(const std::wstring&)>& onStatus,
-    const std::function<void(const std::wstring&)>& onLog,
-    const FileHashProgressFn& onProgress) {
+    const std::wstring& path, const MediCatReleaseInfo& release, std::wstring& userMessage,
+    std::wstring& userTitle, const std::function<void(const std::wstring&)>& onStatus,
+    const std::function<void(const std::wstring&)>& onLog, const FileHashProgressFn& onProgress) {
     userMessage.clear();
     userTitle.clear();
 
     const std::wstring normalized = NormalizeMediCatArchivePath(path);
-    MediCatArchiveInfo info = InspectMediCatArchive(normalized);
+    MediCatArchiveInfo info = InspectMediCatArchive(normalized, release);
     if (info.state == MediCatArchiveState::Missing) {
         userMessage = i18n::Tr(L"messages.archive_not_found", normalized.empty() ? path : normalized);
         userTitle = i18n::Tr(L"titles.archive_not_found");
@@ -385,7 +407,7 @@ bool IsMediCatArchiveReadyForInstall(
         const uint64_t minBytes =
             info.expectedMinBytes > 0 ? info.expectedMinBytes
                                       : (info.kind == MediCatArchiveKind::SplitZip ? TotalSplitMinBytes()
-                                                                                   : kMediCatArchiveMinBytes);
+                                                                                   : MediCatReleaseMinBytes(release));
         if (onLog) {
             onLog(i18n::Tr(L"log.archive_incomplete", std::to_wstring(info.sizeBytes),
                            std::to_wstring(minBytes)));
@@ -407,10 +429,10 @@ bool IsMediCatArchiveReadyForInstall(
         onStatus(i18n::Tr(L"status.verifying_archive"));
     }
     std::wstring hashError;
-    if (!VerifyMediCatArchiveMd5(info, hashError, onProgress)) {
+    if (!VerifyMediCatArchiveMd5(info, release, hashError, onProgress)) {
         const std::wstring expectedMd5 = Utf8ToWide(
             info.expectedMd5Hex.empty()
-                ? (info.kind == MediCatArchiveKind::Solid7z ? kMediCatArchiveMd5 : "")
+                ? (info.kind == MediCatArchiveKind::Solid7z && release.md5 ? release.md5 : "")
                 : info.expectedMd5Hex);
         const std::wstring corruptName =
             !info.failingPartName.empty() ? info.failingPartName : info.displayName;

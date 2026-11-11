@@ -40,8 +40,9 @@ constexpr size_t kMaxArchivedLogSessions = 10;
 
 // Session files written under logs/ (rotated together into archive/<timestamp>/).
 const wchar_t* const kSessionLogFiles[] = {
-    L"medicat_installer.log", L"ventoy.log", L"extract.log",     L"reextract.log",
-    L"check.log",             L"aria.log",   L"failed_files.txt", L"cli_log.txt",
+    L"medicat_installer.log", L"ventoy.log",      L"extract.log",      L"reextract.log",
+    L"check.log",             L"aria.log",        L"failed_files.txt",  L"cli_log.txt",
+    L"update_pack.log",
 };
 
 std::wstring FormatSessionArchiveFolderName() {

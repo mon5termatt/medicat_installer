@@ -118,6 +118,7 @@ public:
     int Run();
     void SetInstallHandler(InstallHandler handler);
     void SetVerifyHandler(InstallHandler handler);
+    void SetApplyUpdatePackHandler(InstallHandler handler);
     void SetLogHandler(std::function<void(const std::wstring&)> handler);
     void SetUpdateCheckHandler(std::function<void()> handler);
     void SetApplyInstallerUpdateHandler(std::function<void(const InstallerUpdateInfo&)> handler);
@@ -165,6 +166,10 @@ public:
     bool VentoyGptChecked() const;
     bool ShowAllDrivesChecked() const;
     std::wstring PinnedVentoyVersion() const;
+    // Selected MediCat release id from Advanced dropdown (e.g. L"21.12").
+    std::wstring SelectedReleaseVersion() const;
+    // Empty = auto-discover MediCat.USB.*update.7z; otherwise explicit browse path.
+    std::wstring UpdatePackPath() const;
     HWND Hwnd() const { return hwnd_; }
 
 private:
@@ -216,6 +221,12 @@ private:
     void LoadFileLogTabFromDisk(FileLogTab tab);
     static LRESULT CALLBACK FileLogEditSubclassProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR data);
     void UpdateAdvancedControls();
+    void PopulateReleaseVersionCombo();
+    void OnReleaseVersionChanged();
+    void UpdateUpdatePackPathDisplay();
+    void BrowseUpdatePack();
+    void ClearUpdatePack();
+    void ApplyUpdatePackClicked();
     void LayoutHeader();
     void LayoutMainContent();
     void RefreshCreditsWindowText();
@@ -250,6 +261,8 @@ private:
     void TryOpenDebugMenuFromLogoClick(HWND source);
     void OpenDebugMenu(int screenX, int screenY);
     void HandleDebugMenuCommand(int id);
+    void ApplyDownloadSectionForce(int forceMode);
+    bool EffectiveArchiveMissing(bool realMissing) const;
 
     HINSTANCE instance_ = nullptr;
     HWND hwnd_ = nullptr;
@@ -263,11 +276,19 @@ private:
     HWND formatCheck_ = nullptr;
     HWND ventoyActionCheck_ = nullptr;
     HWND advancedCheck_ = nullptr;
+    HWND releaseVersionLabel_ = nullptr;
+    HWND releaseVersionCombo_ = nullptr;
     HWND pinVentoyCheck_ = nullptr;
     HWND ventoySecureBootCheck_ = nullptr;
     HWND ventoyGptCheck_ = nullptr;
     HWND ventoyVersionCombo_ = nullptr;
+    HWND updatePackLabel_ = nullptr;
+    HWND updatePackEdit_ = nullptr;
+    HWND updatePackBrowseBtn_ = nullptr;
+    HWND updatePackClearBtn_ = nullptr;
+    HWND updatePackApplyBtn_ = nullptr;
     HWND installBtn_ = nullptr;
+    std::wstring updatePackPath_;
     HWND verifyFilesBtn_ = nullptr;
     HWND openLogBtn_ = nullptr;
     HWND manualInstallBtn_ = nullptr;
@@ -281,6 +302,7 @@ private:
     HWND downloadMirror2Btn_ = nullptr;
     HWND downloadTorrentBtn_ = nullptr;
     HWND downloadMagnetBtn_ = nullptr;
+    HWND downloadUnreliableLabel_ = nullptr;
     HWND downloadGoogleDriveBtn_ = nullptr;
     HWND downloadMegaBtn_ = nullptr;
     HWND browseArchiveBtn_ = nullptr;
@@ -353,6 +375,7 @@ private:
     std::wstring progressPercentText_ = L"0%";
     InstallHandler onInstall_;
     InstallHandler onVerify_;
+    InstallHandler onApplyUpdatePack_;
     std::function<void(const std::wstring&)> onLog_;
     std::function<void()> onUpdateCheck_;
     std::function<void(const InstallerUpdateInfo&)> onApplyInstallerUpdate_;
@@ -367,6 +390,7 @@ private:
     bool ventoyVersionsLoaded_ = false;
     bool archiveMissing_ = false;
     std::wstring archiveOverridePath_;
+    int downloadSectionForce_ = 0;  // DebugUiSectionForce: Auto / ForceShow / ForceHide
     bool ventoyOnDrive_ = false;
     bool medicatOnDrive_ = false;
     std::wstring lastVentoyControlDrive_;

@@ -40,6 +40,7 @@ private:
 
     void OnInstall();
     void OnVerify();
+    void OnApplyUpdatePack();
     void PostProgress(int percent, bool clearLog = false);
     void PostExtractProgress(int percent, const std::wstring& file = L"", bool resetLog = false,
                              const wchar_t* cliTipKey = nullptr);
@@ -59,7 +60,13 @@ private:
     void ApplyInstallerUpdate(const InstallerUpdateInfo& info);
     void LogOperationFailure(const std::wstring& message, const std::wstring& title);
     DiagnosticContext BuildDiagnosticContext() const;
-    VerificationOutcome VerifyDriveFiles(const std::wstring& drive, bool showFileProgress = true);
+    VerificationOutcome VerifyDriveFiles(const std::wstring& drive, bool showFileProgress = true,
+                                         const std::wstring& manifestOverride = L"");
+    // Resolve optional update pack and build a merged MD5 manifest for verify. empty packBrowse = auto-discover.
+    bool PrepareUpdatePackManifest(const std::wstring& packBrowse, std::wstring& mergedManifestPath,
+                                   std::wstring& error);
+    bool ApplySelectedUpdatePack(const std::wstring& drive, const std::wstring& packBrowse,
+                                 std::wstring& mergedManifestPath, std::wstring& error);
     bool TryReExtractFailedFiles(const std::wstring& drive, const std::wstring& archive,
                                  const std::vector<std::wstring>& failureDetails,
                                  std::wstring* errorDetail = nullptr);
@@ -69,10 +76,12 @@ private:
     bool PromptWipeConfirm(const std::wstring& drive, bool format, bool runVentoy);
     bool EnsureHelpGateAcknowledged();
     void RunPreInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
-                             VentoyInstallOptions ventoyInstall, std::wstring archive);
+                             VentoyInstallOptions ventoyInstall, std::wstring archive, std::wstring packBrowse,
+                             std::wstring releaseVersion);
     void RunInstallThread(std::wstring drive, bool format, bool runVentoy, std::wstring pinVersion,
-                          VentoyInstallOptions ventoyInstall);
-    void RunVerifyThread(std::wstring drive);
+                          VentoyInstallOptions ventoyInstall, std::wstring packBrowse);
+    void RunVerifyThread(std::wstring drive, std::wstring packBrowse = L"");
+    void RunApplyUpdatePackThread(std::wstring drive, std::wstring packBrowse);
 
     int RunGui();
     int RunHeadless(const CliOptions& cli);
@@ -85,7 +94,9 @@ private:
     int MapHeadlessExitCode(bool success, const std::wstring& message, const std::wstring& title) const;
     void LogCommandLine(int argc, wchar_t** argv);
     void LogMediCatArchiveDebug(const std::wstring& path) const;
-    std::wstring ResolveArchivePath(const std::wstring& overridePath) const;
+    std::wstring ResolveArchivePath(const std::wstring& overridePath,
+                                    const std::wstring& releaseVersion = L"") const;
+    std::wstring CurrentReleaseVersion() const;
     bool ShouldAutoConfirm() const;
     bool IsQuiet() const;
     bool WantsReExtract() const;

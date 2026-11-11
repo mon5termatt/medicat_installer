@@ -668,7 +668,8 @@ ExtractResult Extract7zArchiveSelective(
     const std::wstring& destinationRoot,
     const std::vector<std::wstring>& relativePaths,
     ProgressCallback onProgress,
-    const std::wstring& logFilePath) {
+    const std::wstring& logFilePath,
+    const bool monitorDestinationDrive) {
     ExtractResult result;
     if (relativePaths.empty()) {
         result.success = true;
@@ -785,7 +786,7 @@ ExtractResult Extract7zArchiveSelective(
             std::lock_guard lock(stderrMutex);
             stderrSnapshot = stderrText;
         }
-        if (PollExtractHealth(dest, stderrSnapshot, monitor, true)) {
+        if (PollExtractHealth(dest, stderrSnapshot, monitor, monitorDestinationDrive)) {
             TerminateProcess(pi.hProcess, 1);
             break;
         }

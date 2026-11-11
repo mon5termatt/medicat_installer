@@ -905,17 +905,20 @@ DestinationDriveStatus CheckDestinationDrive(const std::wstring& root, std::wstr
     if (letter >= L'a' && letter <= L'z') {
         letter = static_cast<wchar_t>(letter - L'a' + L'A');
     }
+    if (letter < L'A' || letter > L'Z') {
+        return DestinationDriveStatus::Ok;
+    }
+
     const std::wstring driveLetter = std::wstring(1, letter) + L":";
     if (!IsDriveLetterPresent(driveLetter)) {
         return DestinationDriveStatus::Removed;
     }
 
-    std::wstring normalized = root;
-    if (normalized.size() == 2 && normalized[1] == L':') {
-        normalized += L'\\';
-    }
+    // Volume APIs require the drive root (X:\). Passing a subdirectory makes
+    // GetVolumeInformationW fail with ERROR_INVALID_NAME on Windows.
+    const std::wstring volumeRoot = driveLetter + L"\\";
 
-    if (!GetVolumeInformationW(normalized.c_str(), nullptr, 0, nullptr, nullptr, nullptr, nullptr, 0)) {
+    if (!GetVolumeInformationW(volumeRoot.c_str(), nullptr, 0, nullptr, nullptr, nullptr, nullptr, 0)) {
         if (errorDetail) {
             *errorDetail = FormatWindowsError(GetLastError());
         }
@@ -925,7 +928,7 @@ DestinationDriveStatus CheckDestinationDrive(const std::wstring& root, std::wstr
     ULARGE_INTEGER freeBytesAvailable{};
     ULARGE_INTEGER totalBytes{};
     ULARGE_INTEGER totalFree{};
-    if (!GetDiskFreeSpaceExW(normalized.c_str(), &freeBytesAvailable, &totalBytes, &totalFree)) {
+    if (!GetDiskFreeSpaceExW(volumeRoot.c_str(), &freeBytesAvailable, &totalBytes, &totalFree)) {
         if (errorDetail) {
             *errorDetail = FormatWindowsError(GetLastError());
         }
@@ -933,7 +936,7 @@ DestinationDriveStatus CheckDestinationDrive(const std::wstring& root, std::wstr
     }
 
     const HANDLE rootDir =
-        CreateFileW(normalized.c_str(), FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+        CreateFileW(volumeRoot.c_str(), FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
                     OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
     if (rootDir == INVALID_HANDLE_VALUE) {
         if (errorDetail) {

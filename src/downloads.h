@@ -1,15 +1,61 @@
 #pragma once
 
+#include <windows.h>
+#include <shellapi.h>
+
 #include <cstddef>
 #include <cstdint>
-#include <shellapi.h>
-#include <windows.h>
+#include <string>
 
 namespace medicat {
 
-// From mon5termatt/medicat-website (altDownloads.json + downloads.astro).
+struct MediCatReleaseInfo {
+    const wchar_t* version = nullptr;          // e.g. L"21.12"
+    const wchar_t* archiveFileName = nullptr;  // e.g. L"MediCat.USB.v21.12.7z"
+    uint64_t fullBytes = 0;                    // 0 = unknown size (skip min-size gate)
+    const char* md5 = nullptr;                 // empty/null = skip MD5 gate
+    const wchar_t* mirror1Url = nullptr;
+    const wchar_t* mirror2Url = nullptr;
+    const wchar_t* torrentUrl = nullptr;
+    const wchar_t* magnetUrl = nullptr;
+    const wchar_t* googleDriveUrl = nullptr;
+    const wchar_t* megaUrl = nullptr;
+};
+
+// Known MediCat USB releases selectable in Advanced options.
+// All current public download links are 21.12; 26.12 slots stay empty until new links land.
+inline constexpr MediCatReleaseInfo kMediCatReleases[] = {
+    {
+        L"21.12",
+        L"MediCat.USB.v21.12.7z",
+        22994783619ULL,
+        "db50f96a5c7b5ec6dc9ed77ea29fffb0",
+        L"https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z",
+        L"https://files.dog/OD%20Rips/MediCat/v21.12/MediCat.USB.v21.12.7z",
+        L"https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_v21.12.torrent",
+        L"magnet:?xt=urn:btih:1D714BDF37890669E98933B724B55D47E7F2D01B",
+        L"https://drive.google.com/drive/folders/0B80MkZEQZejCSDZsY2NKbVJNWjg?resourcekey=0-wMGHCpg8SwR13oOYDfjPuA",
+        L"https://mega.nz/folder/jg1DWbaK#Qo6XsYzjx-HyIpxj8xQTiQ",
+    },
+    {
+        L"26.12",
+        L"MediCat.USB.v26.12.7z",
+        0,
+        "",
+        L"",
+        L"",
+        L"",
+        L"",
+        L"",
+        L"",
+    },
+};
+
+inline constexpr size_t kMediCatReleaseCount = sizeof(kMediCatReleases) / sizeof(kMediCatReleases[0]);
+inline constexpr size_t kDefaultMediCatReleaseIndex = 0;
+
+// Compatibility aliases for the default (21.12) release.
 constexpr wchar_t kMediCatArchiveFileName[] = L"MediCat.USB.v21.12.7z";
-// Full MediCat.USB.v21.12.7z is 22,994,783,619 bytes; allow 5% below for size check.
 constexpr uint64_t kMediCatArchiveFullBytes = 22994783619ULL;
 constexpr uint64_t kMediCatArchiveMinBytes = kMediCatArchiveFullBytes * 95 / 100;
 constexpr char kMediCatArchiveMd5[] = "db50f96a5c7b5ec6dc9ed77ea29fffb0";
@@ -42,16 +88,9 @@ constexpr wchar_t kMediCatSplitFirstFileName[] = L"MediCat.USB.v21.12.zip.001";
 constexpr wchar_t kDownloadMirror1Url[] =
     L"https://files.medicatusb.com/files/v21.12/MediCat.USB.v21.12.7z";
 
-constexpr wchar_t kDownloadMirror2Url[] =
-    L"https://files.dog/OD%20Rips/MediCat/v21.12/MediCat.USB.v21.12.7z";
+// Optional update pack beside the exe / offline (e.g. MediCat.USB.v21.12.update.7z).
+constexpr wchar_t kMediCatUpdatePackGlob[] = L"MediCat.USB.*update.7z";
 
-constexpr wchar_t kDownloadTorrentUrl[] =
-    L"https://github.com/mon5termatt/medicat_installer/raw/main/download/MediCat_USB_v21.12.torrent";
-constexpr wchar_t kDownloadMagnetUrl[] =
-    L"magnet:?xt=urn:btih:1D714BDF37890669E98933B724B55D47E7F2D01B";
-constexpr wchar_t kDownloadGoogleDriveUrl[] =
-    L"https://drive.google.com/drive/folders/0B80MkZEQZejCSDZsY2NKbVJNWjg?resourcekey=0-wMGHCpg8SwR13oOYDfjPuA";
-constexpr wchar_t kDownloadMegaUrl[] = L"https://mega.nz/folder/jg1DWbaK#Qo6XsYzjx-HyIpxj8xQTiQ";
 constexpr wchar_t kDownloadAllUrl[] = L"http://medicatusb.com/#downloads";
 constexpr wchar_t kManualInstallDocUrl[] = L"https://medicatusb.com/docs/medicat/installation/manual-install/";
 constexpr wchar_t kBetaFeedbackUrl[] = L"https://github.com/mon5termatt/medicat_installer/issues";
@@ -60,8 +99,52 @@ constexpr wchar_t kSevenZipProjectUrl[] = L"https://www.7-zip.org/";
 constexpr wchar_t kAria2ProjectUrl[] = L"https://aria2.github.io/";
 constexpr wchar_t kVentoyProjectUrl[] = L"https://www.ventoy.net/en/index.html";
 
+inline bool HasReleaseUrl(const wchar_t* url) {
+    return url != nullptr && url[0] != L'\0';
+}
+
+inline const MediCatReleaseInfo& DefaultMediCatRelease() {
+    return kMediCatReleases[kDefaultMediCatReleaseIndex];
+}
+
+inline const MediCatReleaseInfo* FindMediCatRelease(const std::wstring& version) {
+    for (size_t i = 0; i < kMediCatReleaseCount; ++i) {
+        if (version == kMediCatReleases[i].version) {
+            return &kMediCatReleases[i];
+        }
+    }
+    return nullptr;
+}
+
+inline const MediCatReleaseInfo& ResolveMediCatRelease(const std::wstring& version) {
+    if (const MediCatReleaseInfo* found = FindMediCatRelease(version)) {
+        return *found;
+    }
+    return DefaultMediCatRelease();
+}
+
+inline uint64_t MediCatReleaseMinBytes(const MediCatReleaseInfo& release) {
+    if (release.fullBytes == 0) {
+        return 1;
+    }
+    return release.fullBytes * 95 / 100;
+}
+
+inline bool MediCatReleaseHasMd5(const MediCatReleaseInfo& release) {
+    return release.md5 != nullptr && release.md5[0] != '\0';
+}
+
+inline bool MediCatReleaseHasMirrors(const MediCatReleaseInfo& release) {
+    return HasReleaseUrl(release.mirror1Url) || HasReleaseUrl(release.mirror2Url);
+}
+
+inline bool MediCatReleaseHasAltDownloads(const MediCatReleaseInfo& release) {
+    return HasReleaseUrl(release.torrentUrl) || HasReleaseUrl(release.magnetUrl) ||
+           HasReleaseUrl(release.googleDriveUrl) || HasReleaseUrl(release.megaUrl);
+}
+
 inline bool OpenBrowserUrl(const wchar_t* url) {
-    if (!url || !*url) {
+    if (!HasReleaseUrl(url)) {
         return false;
     }
     const HINSTANCE result =

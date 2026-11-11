@@ -18,6 +18,8 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #pragma comment(lib, "advapi32.lib")
@@ -125,6 +127,12 @@ std::wstring ResolveVerifyPath(const std::wstring& driveRoot, const std::wstring
         combined += L'\\';
     }
     combined += relativePath;
+    // Manifest paths use '/'; \\?\ long paths require '\' or Win32 treats the file as missing.
+    for (wchar_t& ch : combined) {
+        if (ch == L'/') {
+            ch = L'\\';
+        }
+    }
     return ToLongPath(combined);
 }
 
@@ -991,6 +999,82 @@ VerifyResult VerifyMedicatFiles(const VerifyOptions& options) {
 
     result.success = result.error.empty() && result.failedFiles == 0;
     return result;
+}
+
+bool WriteMergedMd5Manifest(const std::wstring& baseManifestPath, const std::wstring& packManifestPath,
+                            const std::vector<std::wstring>& removePaths, const std::wstring& outPath,
+                            std::wstring& error) {
+    error.clear();
+
+    std::vector<Md5Entry> baseEntries;
+    if (!LoadMd5Manifest(baseManifestPath, baseEntries, error)) {
+        return false;
+    }
+
+    std::vector<Md5Entry> packEntries;
+    if (!packManifestPath.empty() && !LoadMd5Manifest(packManifestPath, packEntries, error)) {
+        return false;
+    }
+
+    std::unordered_set<std::wstring> removeSet;
+    removeSet.reserve(removePaths.size());
+    for (const std::wstring& path : removePaths) {
+        removeSet.insert(NormalizeRelativePath(path));
+    }
+
+    std::unordered_map<std::wstring, Md5Entry> merged;
+    merged.reserve(baseEntries.size() + packEntries.size());
+    for (Md5Entry& entry : baseEntries) {
+        const std::wstring key = NormalizeRelativePath(entry.relativePath);
+        if (removeSet.find(key) != removeSet.end()) {
+            continue;
+        }
+        merged[key] = std::move(entry);
+    }
+    for (Md5Entry& entry : packEntries) {
+        const std::wstring key = NormalizeRelativePath(entry.relativePath);
+        if (removeSet.find(key) != removeSet.end()) {
+            continue;
+        }
+        merged[key] = std::move(entry);
+    }
+
+    std::vector<std::wstring> keys;
+    keys.reserve(merged.size());
+    for (const auto& item : merged) {
+        keys.push_back(item.first);
+    }
+    std::sort(keys.begin(), keys.end());
+
+    HANDLE file = CreateFileW(outPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
+                              nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        error = L"Could not write merged MD5 manifest: " + outPath;
+        return false;
+    }
+
+    for (const std::wstring& key : keys) {
+        const Md5Entry& entry = merged[key];
+        std::string line = entry.expectedHash + " *";
+        std::string pathUtf8 = medicat::WideToUtf8(entry.relativePath);
+        for (char& ch : pathUtf8) {
+            if (ch == '\\') {
+                ch = '/';
+            }
+        }
+        line += pathUtf8;
+        line += '\n';
+        DWORD written = 0;
+        if (!WriteFile(file, line.data(), static_cast<DWORD>(line.size()), &written, nullptr) ||
+            written != line.size()) {
+            CloseHandle(file);
+            error = L"Failed writing merged MD5 manifest: " + outPath;
+            return false;
+        }
+    }
+
+    CloseHandle(file);
+    return true;
 }
 
 }  // namespace medicat
